@@ -1,20 +1,239 @@
 # Shielded RL with Jev
 
-A runtime safety shield demo. A Stable-Baselines3 DQN drives in highway-env on
-task reward alone. Jev, TypeSafe's decision model, judges each candidate action
-against plain-English operator rules. Code allows, falls back or escalates to a
-human operator.
+**The policy was trained once. The rules changed live, in plain English.**
 
-The one-line pitch: the policy was trained once; the rules changed live, in
-plain English.
+A runtime safety shield for a reinforcement learning agent, with a human on the
+loop. A Stable-Baselines3 DQN drives in [highway-env](https://highway-env.farama.org/)
+on task reward alone and knows nothing about rules. At every step,
+[Jev](https://docs.typesafe.ai), TypeSafe's decision model, judges each of the
+agent's candidate actions against operator rules typed in plain English and
+returns a probability of violation. Code then allows the action, falls back to
+the agent's next-best safe action, or pauses and asks a human. An operator
+console shows the road, the rules, the approval queue, a decision inspector and
+the evaluation numbers.
 
-## Setup
+Built as a demo for a short talk on runtime safety for learned policies and on
+human-on-the-loop design.
+
+![Rule violations and task return per seed, shield off versus on](internal/plots/before_after.png)
+
+## What it shows
+
+- **A reward-only policy made safe at runtime, with no retraining.** The DQN
+  only ever sees env reward (speed, no collisions, a small right-lane bonus).
+  Rules such as "Speed limit 25 m/s" or "Lane 3 is closed ahead for a work zone"
+  are added while it drives.
+- **A system that knows when to ask a person.** Jev's probability drives three
+  outcomes: confident safe runs, confident violation falls back, and the
+  uncertain band escalates to an approval queue with the facts, the rule and the
+  probability.
+- **Honest numbers.** Violations, task return, crashes, escalation rate,
+  latency, cost and calibration, measured over seeded episodes with the shield
+  off and on, and a threshold sweep that shows the tradeoff.
+
+## How it works
+
+```mermaid
+flowchart LR
+  ENV[highway-env<br/>highway-fast-v0] --> POL[DQN policy<br/>5 actions ranked by Q]
+  ENV --> FACTS[Fact extractor<br/>geometry in code]
+  RULES[Operator rules<br/>plain English + zones] --> FACTS
+  FACTS --> JEV[Jev<br/>one yes/no question<br/>per action and rule]
+  POL --> SHIELD[Shield<br/>allow / fallback / escalate]
+  JEV --> SHIELD
+  SHIELD --> ENV
+  SHIELD --> QUEUE[Approval queue<br/>human approve / deny]
+  QUEUE --> SHIELD
+  SHIELD --> LOG[(JSONL decision log)]
+  LOG --> UI[Operator console]
+  LOG --> EVAL[Evaluation<br/>before/after, sweep, calibration]
+  classDef default fill:#f4f4f4,stroke:#333,color:#000;
+```
+
+Each simulation step:
+
+1. The DQN ranks all five actions (LANE_LEFT, IDLE, LANE_RIGHT, FASTER, SLOWER) by Q-value.
+2. The fact extractor turns the simulator state plus each candidate action into
+   structured facts with units: ego speed and lane, the lane after the action,
+   gaps and closing speeds to neighbouring vehicles, and any closed zones ahead.
+   All geometry happens in code. Jev never counts, compares numbers or reasons
+   in multiple hops, which its documentation lists as weaknesses.
+3. One Jev request per candidate asks, for every enabled rule, whether
+   executing that action would violate it. Each answer is a probability.
+4. The shield takes the top-ranked action's worst probability across rules and
+   applies two thresholds, by default 0.2 and 0.8:
+   - below the allow threshold: execute it;
+   - above the block threshold: execute the first lower-ranked action that is
+     confidently safe, or SLOWER as a last resort;
+   - in between: pause the simulation and ask the operator. Deny runs the
+     fallback.
+5. Ground-truth checkers label every candidate against every rule for scoring.
+   They never influence the decision.
+6. One JSONL record per step holds the facts, Q-values, every probability, the
+   decision, the human's answer and the raw Jev exchange. The console, replay
+   and evaluation all read this one record format.
+
+If Jev is unreachable and the question is not in the cache, the shield never
+invents a judgment. It escalates at p = 0.5 and tells the operator the judge is
+unavailable.
+
+## Results
+
+20 seeded episodes of 60 steps with three standing rules (speed limit, lane
+change gap, left lane for passing), live Jev, and a simulated operator that
+answers from the ground-truth checkers. The full run takes about eight minutes
+and costs under a dollar.
+
+| Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
+| --- | --- | --- | --- | --- |
+| Shield off | 58.1 | 50.7 | 40% | 0% |
+| Shield on, thresholds 0.2 / 0.8 | 2.65 | 41.4 | 25% | 23.9% |
+| Shield on, thresholds 0.4 / 0.6 | 1.25 | 42.0 | 40% | 6.6% |
+
+By rule, shield off to on: speed limit 1030 violations to 0, lane change gap
+124 to 1, left lane for passing 8 to 52. The crisp rules are solved; the fuzzy
+one is where the shield leaks. Calibration over 93,285 labeled checks gives an
+expected calibration error of 0.093 and 97.5% accuracy at a 0.5 cut, with the
+speed rule near perfect and the passing rule the weakest. Jev answers a full
+step of five requests in about 160 ms at the median.
+
+![Reliability diagram per rule](internal/plots/calibration.png)
+
+The threshold sweep, the reading of these numbers and the design decisions
+behind them live in `internal/build-plan.md`. Measured Jev behavior from the
+Day 1 spike is in `internal/jev-spike-results.md`.
+
+## The operator console
+
+A dark, dense console in React with a Canvas 2D road view.
+
+- **Road view**: ego-centered, four lanes, vehicles interpolated between steps,
+  closed zones hatched, the executed action as a solid arrow and a blocked
+  action as a ghost arrow.
+- **Operator rules**: type any rule, or add one of the four presets. Toggle,
+  remove, drop a work zone ahead with one click. The zone arms its rule and
+  retires it once the zone is passed.
+- **Approval queue**: the proposed action, its facts in plain sentences, the
+  rule that fired, the probability, what deny would execute, and approve or
+  deny by button or keyboard.
+- **Decision timeline and inspector**: one tick per step colored by outcome.
+  Click a tick to scrub the road view to that step and open the inspector: the
+  five candidates by Q-value, the probability grid against every rule with the
+  checker's label, the facts, and the exact Jev request and response.
+- **Shield toggle on the same seed**, speed control, replay of any logged run,
+  and a metrics tab with the before/after bars, the tradeoff curve and the
+  reliability diagram.
+
+Keyboard: space plays and pauses, `n` steps, `a` and `d` answer an escalation,
+arrow keys scrub, Esc returns to live.
+
+## Getting started
+
+Requirements: Python 3.12 via [uv](https://docs.astral.sh/uv/), Node 20+ with
+[pnpm](https://pnpm.io/), and a TypeSafe API key for live judging. Everything
+also runs offline in mock mode, which replays cached Jev answers and escalates
+anything it has not seen.
 
 ```
 uv sync --all-groups
-cp backend/.env.example backend/.env   # then add TYPESAFE_API_KEY
-uv run pytest
+cp backend/.env.example backend/.env        # add TYPESAFE_API_KEY
+uv run pytest                               # backend tests
 ```
 
-See `CLAUDE.md` for the command list and `internal/build-plan.md` for the
-design, schedule and module contracts.
+Train the agent once. Checkpoints are not committed. The 100k-step run takes
+about 25 minutes on a laptop and is promoted to `models/dqn_highway.zip`:
+
+```
+uv run python -m backend.train --timesteps 100000 --promote
+```
+
+Run a shielded episode headlessly, with per-step output and a JSONL log:
+
+```
+uv run python -m backend.run_episode --shield on
+uv run python -m backend.run_episode --shield off --seed 3
+uv run python -m backend.run_episode --jev mock --zone-at-step 10
+```
+
+Run the console:
+
+```
+uv run uvicorn backend.server:app --reload                     # WebSocket server on :8000
+cd frontend && pnpm install && pnpm dev                        # console on http://127.0.0.1:5173
+```
+
+Useful server environment variables: `JEV_MODE=live|mock` (default: live
+when the key is present), `ESCALATION_TIMEOUT_S` (default 20, use 0 to wait
+for the operator indefinitely, recommended for a live demo), `SEED`,
+`MODEL_PATH`, and `JEV_CACHE_PATH` for a separate cache file.
+
+Evaluate and plot:
+
+```
+uv run python -m backend.evaluate --seeds 0-19 --all --concurrency 2   # off, five threshold pairs, report
+uv run python -m backend.evaluate --report                             # rebuild internal/eval and internal/plots
+```
+
+Frontend checks:
+
+```
+cd frontend && pnpm typecheck && pnpm build
+cd frontend && pnpm test:e2e           # Playwright smoke test on its own mock backend
+```
+
+## Repository layout
+
+```
+backend/
+  env.py           highway-fast-v0 with the demo configuration
+  train.py         DQN training and checkpoint evaluation
+  policy.py        ranked actions with Q-values
+  facts.py         simulator state to structured facts and sentences
+  constraints.py   rule store, presets, zone lifecycle
+  jev_client.py    Jev through typesafe-sdk, content cache, mock mode
+  shield.py        allow / fallback / escalate rules
+  checkers.py      ground-truth checkers, scoring only
+  logger.py        the JSONL record
+  episode.py       the per-step loop shared by the CLI and the server
+  run_episode.py   headless CLI
+  server.py        FastAPI WebSocket server, live and replay
+  metrics.py       episode metrics, aggregates, calibration
+  evaluate.py      batch evaluation and report
+  plots.py         slide plots
+  spike/           the Day 1 Jev spike
+frontend/          Vite, React, TypeScript, Tailwind, Zustand, Recharts, Playwright
+internal/          project brief, build plan, spike results, evaluation report, plots
+models/            trained checkpoints (gitignored)
+tests/             pytest suite
+```
+
+## Design decisions worth knowing
+
+- **Geometry stays in code.** Jev receives precomputed JSON with units in the
+  field names and judges; it never calculates.
+- **Positive, literal questions.** Each question asserts that the action would
+  violate one rule, quoted verbatim. The spike showed that rules phrased with
+  negation score softer; the console suggests a positive rephrase but keeps the
+  operator's text.
+- **Rules and zones share a lifecycle.** Jev weights a rule that asserts a
+  closure even when no zone is in the facts, so dropping a zone arms its rule
+  and passing the last zone retires it.
+- **Fuzzy rules escalate by design.** "Keep the left lane for passing only"
+  sits near 0.5 for Jev regardless of phrasing. That is the human-on-the-loop
+  moment, not a bug to prompt away.
+- **The shield enforces rules, not collision safety.** An unattended
+  default-deny can override the policy's own crash avoidance, which argues for
+  a following-distance rule in the rule set and for no auto-deny in a live demo.
+
+## Status
+
+Days 1 to 5 of the plan are complete: trained agent, headless shield, console
+with approval queue and inspector, replay, evaluation with plots and a smoke
+test. Remaining before the talk: a backup video, an offline dry run on the warm
+cache, slides, and two product items the evaluation argued for, a
+following-distance preset and an operator override that lets the human pick a
+different candidate than the one proposed.
+
+Full internal documentation will follow. Until then, `CLAUDE.md` holds the
+working rules and command list, and `internal/build-plan.md` is the source of
+truth for decisions and contracts.

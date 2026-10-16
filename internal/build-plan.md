@@ -361,6 +361,20 @@ while playing, awaits an `asyncio.Event` while an escalation is open, and
 re-sends `state` on every transition. Client reconnect re-sends `hello` and
 `state`; the client keeps its own step history in the Zustand store.
 
+As built on Oct 16 (`backend/server.py`, `frontend/src/types.ts`):
+
+- `state` also carries `judge_mode`, `run_id`, `step`, `total_steps` (replay
+  only), `done` and `thresholds`, and is re-sent after every step.
+- `constraints` carries `zones` as well, so the UI can show a zone retiring.
+- A `history` message with this episode's records follows `state` on connect,
+  so a browser refresh mid-demo keeps the timeline. Connect order is `hello`,
+  `state`, `history`, `metrics`, then `escalation` if one is open.
+- `load_live` returns from replay to the live source.
+- The escalation future is awaited with `asyncio.wait_for`; the timeout comes
+  from `ESCALATION_TIMEOUT_S` (default 20, 0 means wait forever) and `JEV_MODE`
+  picks live or mock (default: live when the key is present).
+- `create_app(session)` lets tests inject an untrained policy and the mock judge.
+
 ## 9. UI layout
 
 C2-style operator console, dark theme, dense.
@@ -452,6 +466,7 @@ mid-episode zone drop.
 | Shape A indirection lowers accuracy | Spike item 4; default to shape B |
 | Operator rule text with negation confuses Jev | Spike item 6; UI suggests rephrase, never overrides |
 | Jev weights rule text over empty facts (a rule asserting a closure biases lane 3 with no zone in state) | Zone lifecycle in 5.6a; prefer rules whose trigger is always present in the facts |
+| Unattended default-deny can crash the car: the shield enforces rules, not collision safety, and deny falls through to SLOWER even when the policy's proposed lane change was the safe move (seen live on seed 0, step 27, with four 20 s timeouts) | Run the live demo with `ESCALATION_TIMEOUT_S=0`; eval uses the simulated operator; talking point: the policy's crash avoidance is a safety property the shield can override, so a following-distance rule belongs in the rule set |
 | Agent too timid to break rules | Density, speed range, seed selection; see section 12 |
 | highway-env 1.12 config or render changes differ from memory | Verify `lanes_count`, action names and `policy_frequency` on install |
 | Network down in the room | Warm cache for demo seeds; judge-unavailable escalation; backup video |

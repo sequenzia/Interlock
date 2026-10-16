@@ -1,0 +1,217 @@
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from backend import server as server_module
+from backend.env import make_env
+from backend.jev_client import JevCache, JevClient
+from backend.policy import Policy
+from backend.server import Session, create_app
+from backend.train import build_model
+from fastapi.testclient import TestClient
+
+from tests.test_logger import PLAN_KEYS
+
+
+@pytest.fixture(scope="module")
+def policy() -> Iterator[Policy]:
+    env = make_env()
+    yield Policy(build_model(env, seed=0))
+    env.close()
+
+
+@pytest.fixture
+def client(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    monkeypatch.setattr(server_module, "RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr("backend.logger.LOGS_DIR", tmp_path)
+    session = Session(policy, JevClient(live=None, cache=JevCache(None)), escalation_timeout_s=None)
+    with TestClient(create_app(session)) as c:
+        yield c
+
+
+def drain_greeting(ws: Any) -> dict[str, Any]:
+    """Consume hello, state and metrics sent on connect; return the hello."""
+    hello = ws.receive_json()
+    assert hello["type"] == "hello"
+    assert ws.receive_json()["type"] == "state"
+    assert ws.receive_json()["type"] == "history"
+    assert ws.receive_json()["type"] == "metrics"
+    return hello
+
+
+def recv_until(ws: Any, kind: str, limit: int = 40, **fields: Any) -> dict[str, Any]:
+    """Next message of ``kind`` whose top-level fields match ``fields``."""
+    for _ in range(limit):
+        msg = ws.receive_json()
+        if msg["type"] == kind and all(msg.get(k) == v for k, v in fields.items()):
+            return msg
+    raise AssertionError(f"no {kind} message matching {fields} within {limit} messages")
+
+
+def test_hello_state_and_metrics_on_connect(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        hello = ws.receive_json()
+        assert hello["type"] == "hello"
+        assert hello["config"]["lanes_count"] == 4 and len(hello["presets"]) == 4
+        assert hello["constraints"] == [] and hello["zones"] == []
+        state = ws.receive_json()
+        assert state["type"] == "state"
+        assert state["playing"] is False and state["step"] == 0 and state["source"] == "live"
+        assert state["judge_mode"] == "mock" and state["thresholds"] == {
+            "t_allow": 0.2,
+            "t_block": 0.8,
+        }
+        assert ws.receive_json() == {"type": "history", "records": []}
+        assert ws.receive_json()["type"] == "metrics"
+    assert client.get("/health").json()["ok"] is True
+
+
+def test_step_without_rules_streams_a_record(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "step"})
+        step = recv_until(ws, "step")
+        assert set(step["record"]) == PLAN_KEYS and step["record"]["decision"] == "allow"
+        metrics = recv_until(ws, "metrics")
+        assert metrics["steps"] == 1
+
+
+def test_constraint_commands_broadcast_the_full_list(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "add_constraint", "text": "Speed limit 25 m/s"})
+        msg = recv_until(ws, "constraints")
+        assert [c["checker"] for c in msg["constraints"]] == ["speed_limit"]
+        cid = msg["constraints"][0]["id"]
+        ws.send_json({"type": "toggle_constraint", "id": cid, "enabled": False})
+        assert recv_until(ws, "constraints")["constraints"][0]["enabled"] is False
+        ws.send_json({"type": "drop_zone"})
+        msg = recv_until(ws, "constraints")
+        assert len(msg["zones"]) == 1 and msg["zones"][0]["lane"] == 3
+        assert any(c["checker"] == "lane_closed" and c["enabled"] for c in msg["constraints"])
+        ws.send_json({"type": "remove_constraint", "id": cid})
+        assert all(c["id"] != cid for c in recv_until(ws, "constraints")["constraints"])
+        ws.send_json({"type": "remove_constraint", "id": "nope"})
+        assert "nope" in recv_until(ws, "error")["message"]
+
+
+def test_escalation_round_trip_with_mock_judge(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "add_constraint", "text": "Speed limit 25 m/s"})
+        recv_until(ws, "constraints")
+        ws.send_json({"type": "step"})
+        esc = recv_until(ws, "escalation")["escalation"]
+        assert esc["judge_unavailable"] is True and esc["p"] == 0.5 and "ground_truth" not in esc
+        state = recv_until(ws, "state")
+        assert state["paused_on_escalation_id"] == esc["id"]
+        ws.send_json({"type": "resolve", "escalation_id": esc["id"], "decision": "approve"})
+        step = recv_until(ws, "step")["record"]
+        assert step["escalated"] is True and step["human"] == {
+            **step["human"],
+            "decision": "approve",
+            "operator": "ui",
+        }
+        assert step["executed"] == esc["action"]
+        state = recv_until(ws, "state")
+        assert state["paused_on_escalation_id"] is None and state["step"] == 1
+
+
+def test_shield_toggle_thresholds_speed_and_reset(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "set_shield", "on": False})
+        assert recv_until(ws, "state")["shield_on"] is False
+        ws.send_json({"type": "set_thresholds", "t_allow": 0.3, "t_block": 0.7})
+        assert recv_until(ws, "state")["thresholds"] == {"t_allow": 0.3, "t_block": 0.7}
+        ws.send_json({"type": "set_thresholds", "t_allow": 0.9, "t_block": 0.1})
+        assert "set_thresholds" in recv_until(ws, "error")["message"]
+        ws.send_json({"type": "set_speed", "steps_per_sec": 4})
+        assert recv_until(ws, "state")["speed"] == 4
+        ws.send_json({"type": "step"})
+        recv_until(ws, "step")
+        ws.send_json({"type": "reset", "seed": 7})
+        hello = recv_until(ws, "hello")
+        assert hello["type"] == "hello"
+        state = recv_until(ws, "state")
+        assert state["seed"] == 7 and state["step"] == 0 and state["done"] is False
+
+
+def test_reset_while_an_escalation_is_open_cancels_it(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "add_constraint", "text": "Speed limit 25 m/s"})
+        recv_until(ws, "constraints")
+        ws.send_json({"type": "step"})
+        esc_id = recv_until(ws, "escalation")["escalation"]["id"]
+        recv_until(ws, "state", paused_on_escalation_id=esc_id)
+        ws.send_json({"type": "reset", "seed": 1})
+        recv_until(ws, "hello")
+        state = recv_until(ws, "state")
+        assert (
+            state["paused_on_escalation_id"] is None and state["step"] == 0 and state["seed"] == 1
+        )
+
+
+def test_play_runs_the_loop_and_pause_stops_it(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "set_speed", "steps_per_sec": 10})
+        recv_until(ws, "state")
+        ws.send_json({"type": "play"})
+        assert recv_until(ws, "state")["playing"] is True
+        first = recv_until(ws, "step")["record"]["step"]
+        second = recv_until(ws, "step")["record"]["step"]
+        assert second == first + 1
+        ws.send_json({"type": "pause"})
+        assert recv_until(ws, "state", playing=False)["playing"] is False
+
+
+def test_replay_streams_a_logged_run(client: TestClient, tmp_path: Path) -> None:
+    runs = tmp_path / "runs"
+    runs.mkdir(exist_ok=True)
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "add_constraint", "text": "Speed limit 25 m/s"})
+        recv_until(ws, "constraints")
+        run_id = ""
+        for _ in range(2):
+            ws.send_json({"type": "step"})
+            esc = recv_until(ws, "escalation")["escalation"]
+            ws.send_json({"type": "resolve", "escalation_id": esc["id"], "decision": "deny"})
+            run_id = recv_until(ws, "step")["record"]["run_id"]
+            recv_until(ws, "metrics")
+    log_path = runs / f"{run_id}.jsonl"
+    assert log_path.exists() and len(log_path.read_text().splitlines()) == 2
+
+    with client.websocket_connect("/ws") as ws:
+        hello = drain_greeting(ws)
+        assert run_id in hello["runs"]
+        ws.send_json({"type": "load_replay", "run_id": run_id})
+        state = recv_until(ws, "state")
+        assert state["source"] == "replay" and state["total_steps"] == 2 and state["step"] == 0
+        ws.send_json({"type": "step"})
+        step = recv_until(ws, "step")["record"]
+        assert (
+            step["run_id"] == run_id and step["step"] == 0 and step["human"]["decision"] == "deny"
+        )
+        assert recv_until(ws, "metrics")["steps"] == 1
+        ws.send_json({"type": "step"})
+        recv_until(ws, "step")
+        assert recv_until(ws, "state")["done"] is True
+        ws.send_json({"type": "load_live"})
+        assert recv_until(ws, "state")["source"] == "live"
+
+
+def test_late_joiner_receives_the_episode_history(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        for _ in range(3):
+            ws.send_json({"type": "step"})
+            recv_until(ws, "metrics")
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "hello"
+        assert recv_until(ws, "state")["step"] == 3
+        history = ws.receive_json()
+        assert history["type"] == "history" and [r["step"] for r in history["records"]] == [0, 1, 2]

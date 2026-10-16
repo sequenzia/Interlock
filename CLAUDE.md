@@ -46,7 +46,8 @@ around Oct 23, 2026.
 
 - Python: ruff for format and lint, pytest, type hints on every function.
 - TypeScript: strict mode, kebab-case filenames, one Zustand store with
-  slices for steps, constraints, queue and metrics.
+  slices for steps, constraints, queue and metrics. Zustand selectors must
+  return stable references: never `?? []` or `?? {}` inside a selector.
 - Keep the headless CLI working at all times; the server and UI sit on top
   of it, not beside it. `backend/episode.py` holds the per-step loop both share.
 - Context7 is disabled in this project. Read library docs from the official
@@ -73,7 +74,9 @@ uv run python -m backend.run_episode --shield off --seed 3            # shadow m
 uv run python -m backend.run_episode --jev mock --zone-at-step 10     # offline, drop the work zone mid-episode
 uv run python -m backend.run_episode --rules speed_limit --operator approve --max-steps 20
 uv run python -m backend.evaluate --seeds 0-19 --mode on
-uv run uvicorn backend.server:app --reload           # WebSocket server
-cd frontend && pnpm dev                              # console on Vite
+uv run uvicorn backend.server:app --reload           # WebSocket server on :8000, live Jev if key present
+JEV_MODE=mock ESCALATION_TIMEOUT_S=0 uv run uvicorn backend.server:app   # offline, wait for the operator
+cd frontend && pnpm install && pnpm dev              # console on :5173, proxies /ws to :8000
+cd frontend && pnpm typecheck && pnpm build          # strict tsc, then Vite production build
 cd frontend && pnpm test:e2e                         # Playwright smoke test
 ```

@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-zinc-950 font-mono text-[13px] text-zinc-200 antialiased;
+}
+
+.panel {
+  @apply rounded border border-zinc-800 bg-zinc-900/60;
+}
+
+.panel-title {
+  @apply flex items-center justify-between border-b border-zinc-800 px-3 py-1.5 text-[11px] font-semibold tracking-[0.18em] text-zinc-400 uppercase;
+}
+
+.btn {
+  @apply rounded border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-[12px] text-zinc-200 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+.btn-primary {
+  @apply border-cyan-600/60 bg-cyan-600/30 text-cyan-100 hover:bg-cyan-600/50;
+}
+
+.chip {
+  @apply rounded-full border border-zinc-700 bg-zinc-800/80 px-2 py-0.5 text-[11px] text-zinc-300 hover:border-zinc-500 disabled:opacity-40;
+}
+
+.badge {
+  @apply inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase;
+}

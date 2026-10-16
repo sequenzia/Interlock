@@ -1,0 +1,314 @@
+"""One episode of the shielded loop, driven step by step. Plan section 5.1.
+
+The headless CLI in run_episode.py and the WebSocket server both sit on
+EpisodeRunner. Shield off still runs facts, Jev and the checkers in shadow and
+executes the policy's top action unconditionally, so before and after numbers
+come from the same code path.
+"""
+
+from __future__ import annotations
+
+import statistics
+import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field, replace
+from typing import Any, Literal
+
+from backend import checkers
+from backend import facts as fact_extractor
+from backend.constraints import ConstraintStore
+from backend.env import ACTION_INDEX, make_env
+from backend.jev_client import JevClient
+from backend.logger import JsonlLogger, build_record, make_run_id
+from backend.policy import Policy
+from backend.shield import Decision, Thresholds, decide, resolve
+
+OperatorAnswer = Literal["approve", "deny"]
+
+
+@dataclass(frozen=True)
+class Escalation:
+    """Queue item for the operator. Plan section 5.6."""
+
+    id: str
+    step: int
+    action: str  # the proposed top action
+    sentences: list[str]
+    constraint_id: str | None
+    constraint_text: str | None
+    p: float
+    q_rank: int
+    fallback: str
+    judge_unavailable: bool
+    ground_truth: (
+        bool | None
+    )  # proposed action breaks any enabled rule; for the simulated operator, never shown
+
+
+Operator = Callable[[Escalation], Awaitable[OperatorAnswer]]
+
+
+async def simulated_operator(escalation: Escalation) -> OperatorAnswer:
+    """Answers with the ground-truth checker; unknown labels are denied."""
+    return "deny" if escalation.ground_truth in (True, None) else "approve"
+
+
+async def always_approve(escalation: Escalation) -> OperatorAnswer:
+    return "approve"
+
+
+async def always_deny(escalation: Escalation) -> OperatorAnswer:
+    return "deny"
+
+
+OPERATORS: dict[str, Operator] = {
+    "simulated": simulated_operator,
+    "approve": always_approve,
+    "deny": always_deny,
+}
+
+
+@dataclass
+class StepResult:
+    record: dict[str, Any]
+    escalation: Escalation | None
+    terminated: bool
+    truncated: bool
+
+    @property
+    def done(self) -> bool:
+        return self.terminated or self.truncated
+
+
+@dataclass
+class Totals:
+    steps: int = 0
+    reward: float = 0.0
+    crashed: bool = False
+    decisions: dict[str, int] = field(default_factory=dict)
+    violations: dict[str, int] = field(
+        default_factory=dict
+    )  # constraint id -> executed-action violations
+    human: dict[str, int] = field(default_factory=dict)
+    sources: dict[str, int] = field(default_factory=dict)
+    latencies_ms: list[float] = field(default_factory=list)
+    input_tokens: int = 0
+    cost_usd: float = 0.0
+
+
+class EpisodeRunner:
+    def __init__(
+        self,
+        *,
+        policy: Policy,
+        judge: JevClient,
+        store: ConstraintStore,
+        thresholds: Thresholds | None = None,
+        shield_on: bool = True,
+        operator: Operator | None = None,
+        operator_name: str = "simulated",
+        logger: JsonlLogger | None = None,
+        env_config: dict[str, Any] | None = None,
+        source: str = "live",
+    ) -> None:
+        self.policy = policy
+        self.judge = judge
+        self.store = store
+        self.thresholds = thresholds or Thresholds()
+        self.shield_on = shield_on
+        self.operator = operator or simulated_operator
+        self.operator_name = operator_name
+        self.logger = logger
+        self.source = source
+        self.env = make_env(env_config)
+        self.seed = 0
+        self.episode = 0
+        self.run_id = ""
+        self.step_index = 0
+        self.totals = Totals()
+        self._obs: Any = None
+
+    def reset(self, seed: int) -> dict[str, Any]:
+        self.seed = seed
+        self.run_id = make_run_id(seed, self.shield_on)
+        self.step_index = 0
+        self.totals = Totals()
+        self._obs, _ = self.env.reset(seed=seed)
+        return fact_extractor.snapshot(self.env)
+
+    @property
+    def ego_x_m(self) -> float:
+        return float(self.env.unwrapped.vehicle.position[0])
+
+    async def step(self) -> StepResult:
+        self.store.retire_passed_zones(self.ego_x_m)
+        ranked = self.policy.ranked_actions(self._obs)
+        names = [r.name for r in ranked]
+        candidates = fact_extractor.for_candidates(self.env, names, self.store.zones)
+        enabled = self.store.enabled()
+        check = await self.judge.check(candidates, enabled)
+        labels = checkers.label_all(candidates, enabled)
+        decision = decide(names, check.p, self.thresholds)
+
+        escalation: Escalation | None = None
+        human: dict[str, Any] | None = None
+        escalated = False
+        if not self.shield_on:
+            decision = replace(
+                decision, kind="allow", executed=decision.proposed, all_blocked=False
+            )
+        elif decision.kind == "escalate":
+            escalated = True
+            escalation = self._escalation(decision, candidates, labels, check.judge_unavailable)
+            started = time.perf_counter()
+            answer = await self.operator(escalation)
+            human = {
+                "decision": answer,
+                "latency_ms": round((time.perf_counter() - started) * 1000, 1),
+                "operator": self.operator_name,
+            }
+            decision = resolve(decision, approved=answer == "approve")
+
+        snapshot = fact_extractor.snapshot(self.env)
+        self._obs, reward, terminated, truncated, info = self.env.step(
+            ACTION_INDEX[decision.executed]
+        )
+        record = build_record(
+            run_id=self.run_id,
+            episode=self.episode,
+            step=self.step_index,
+            seed=self.seed,
+            source=self.source,
+            shield_on=self.shield_on,
+            thresholds=self.thresholds,
+            snapshot=snapshot,
+            zones=[z.to_dict() for z in self.store.zones],
+            constraints=[c.to_dict() for c in self.store.constraints],
+            candidates=[
+                {
+                    "action": r.name,
+                    "rank": r.rank,
+                    "q": round(r.q, 4),
+                    "facts": candidates[r.name],
+                    "sentences": fact_extractor.sentences(candidates[r.name]),
+                    "checks": [
+                        {
+                            "constraint_id": c.id,
+                            "p_violation": check.p[r.name][c.id],
+                            "ground_truth": labels[r.name][c.id],
+                        }
+                        for c in enabled
+                    ],
+                }
+                for r in ranked
+            ],
+            decision=decision,
+            escalated=escalated,
+            human=human,
+            judge=check.judge_record(),
+            reward=float(reward),
+            crashed=bool(info["crashed"]),
+        )
+        if self.logger is not None:
+            self.logger.write(record)
+        self._account(
+            record, labels[decision.executed], check.latency_ms, check.input_tokens, check.cost_usd
+        )
+        self.step_index += 1
+        return StepResult(record, escalation, bool(terminated), bool(truncated))
+
+    def _escalation(
+        self,
+        decision: Decision,
+        candidates: dict[str, Any],
+        labels: dict[str, dict[str, bool | None]],
+        judge_unavailable: bool,
+    ) -> Escalation:
+        cid = decision.fired_constraint
+        proposed_labels = [v for v in labels[decision.proposed].values() if v is not None]
+        ground_truth = any(proposed_labels) if proposed_labels else None
+        return Escalation(
+            id=f"{self.run_id}-{self.step_index}",
+            step=self.step_index,
+            action=decision.proposed,
+            sentences=fact_extractor.sentences(candidates[decision.proposed]),
+            constraint_id=cid,
+            constraint_text=self.store.get(cid).text if cid else None,
+            p=decision.p_proposed,
+            q_rank=0,
+            fallback=decision.fallback,
+            judge_unavailable=judge_unavailable,
+            ground_truth=ground_truth,
+        )
+
+    def _account(
+        self,
+        record: dict[str, Any],
+        executed_labels: dict[str, bool | None],
+        latency_ms: float,
+        tokens: int,
+        cost: float,
+    ) -> None:
+        t = self.totals
+        t.steps += 1
+        t.reward += record["reward"]
+        t.crashed = t.crashed or record["crashed"]
+        t.decisions[record["decision"]] = t.decisions.get(record["decision"], 0) + 1
+        for cid, violated in executed_labels.items():
+            if violated:
+                t.violations[cid] = t.violations.get(cid, 0) + 1
+        if record["human"] is not None:
+            key = record["human"]["decision"]
+            t.human[key] = t.human.get(key, 0) + 1
+        src = record["judge"]["source"]
+        t.sources[src] = t.sources.get(src, 0) + 1
+        t.latencies_ms.append(latency_ms)
+        t.input_tokens += tokens
+        t.cost_usd += cost
+
+    def summary(self) -> dict[str, Any]:
+        t = self.totals
+        lat = sorted(t.latencies_ms)
+        return {
+            "run_id": self.run_id,
+            "seed": self.seed,
+            "shield_on": self.shield_on,
+            "judge_mode": self.judge.mode,
+            "steps": t.steps,
+            "return": round(t.reward, 3),
+            "crashed": t.crashed,
+            "decisions": dict(sorted(t.decisions.items())),
+            "violations": {
+                cid: t.violations.get(cid, 0) for cid in [c.id for c in self.store.constraints]
+            },
+            "violations_total": sum(t.violations.values()),
+            "human": dict(sorted(t.human.items())),
+            "judge_sources": dict(sorted(t.sources.items())),
+            "latency_ms_p50": round(statistics.median(lat), 1) if lat else 0.0,
+            "latency_ms_p95": round(lat[min(len(lat) - 1, int(0.95 * (len(lat) - 1)))], 1)
+            if lat
+            else 0.0,
+            "input_tokens": t.input_tokens,
+            "cost_usd": round(t.cost_usd, 6),
+        }
+
+    async def run(
+        self,
+        seed: int,
+        max_steps: int | None = None,
+        on_step: Callable[[StepResult], None] | None = None,
+        zone_at_step: int | None = None,
+    ) -> dict[str, Any]:
+        """Headless loop: reset, step until done, optionally dropping the default zone mid-episode."""
+        self.reset(seed)
+        while True:
+            if zone_at_step is not None and self.step_index == zone_at_step:
+                self.store.drop_zone(self.ego_x_m)
+            result = await self.step()
+            if on_step is not None:
+                on_step(result)
+            if result.done or (max_steps is not None and self.step_index >= max_steps):
+                return self.summary()
+
+    def close(self) -> None:
+        self.env.close()

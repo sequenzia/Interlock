@@ -48,7 +48,7 @@ around Oct 23, 2026.
 - TypeScript: strict mode, kebab-case filenames, one Zustand store with
   slices for steps, constraints, queue and metrics.
 - Keep the headless CLI working at all times; the server and UI sit on top
-  of it, not beside it.
+  of it, not beside it. `backend/episode.py` holds the per-step loop both share.
 - Context7 is disabled in this project. Read library docs from the official
   sites: highway-env.farama.org, stable-baselines3.readthedocs.io,
   docs.typesafe.ai.
@@ -68,7 +68,10 @@ uv run python -m backend.train --eval-only models/dqn_highway_20k.zip   # greedy
 uv run python -m backend.train --eval-only models/dqn_highway_20k.zip --promote  # copy to dqn_highway.zip
 uv run python -m backend.spike.jev_spike             # Day 1 Jev spike, writes internal/jev-spike-results.md
 uv run python -m backend.spike.jev_spike --dry-run   # validate every spike request offline, no key needed
-uv run python -m backend.run_episode --shield on     # headless shielded episode
+uv run python -m backend.run_episode --shield on     # headless shielded episode, logs to backend/logs/runs/
+uv run python -m backend.run_episode --shield off --seed 3            # shadow mode on another seed
+uv run python -m backend.run_episode --jev mock --zone-at-step 10     # offline, drop the work zone mid-episode
+uv run python -m backend.run_episode --rules speed_limit --operator approve --max-steps 20
 uv run python -m backend.evaluate --seeds 0-19 --mode on
 uv run uvicorn backend.server:app --reload           # WebSocket server
 cd frontend && pnpm dev                              # console on Vite

@@ -30,6 +30,9 @@ from typing import Any
 from dotenv import load_dotenv
 from typesafe_sdk import AsyncTypeSafeClient, Noul, RetryPolicy, TypeSafeError
 
+from backend.facts import ACTION_MEANING
+from backend.jev_client import DEFAULT_MODEL, build_question
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_DIR = BACKEND_DIR.parent
 RESULTS_PATH = REPO_DIR / "internal" / "jev-spike-results.md"
@@ -49,35 +52,10 @@ GAP_RULE_POSITIVE = (
     "A lane change requires at least 10 m of clear space to the nearest vehicle in the target lane"
 )
 
-ACTION_MEANING: dict[str, str] = {
-    "LANE_LEFT": "move one lane to the left",
-    "IDLE": "keep the current lane and target speed",
-    "LANE_RIGHT": "move one lane to the right",
-    "FASTER": "raise the target speed by 5 m/s",
-    "SLOWER": "lower the target speed by 5 m/s",
-}
-
 # --------------------------------------------------------------------------- questions
 
 
-def question(rule_text: str, candidate: str | None = None) -> Noul:
-    """One noul question per (action, rule) pair. Positive assertion, rule verbatim."""
-    if candidate is None:
-        subject = "Executing the candidate action described in state"
-    else:
-        subject = (
-            f'Executing candidate action "{candidate}", described in state.candidates.{candidate},'
-        )
-    return Noul(
-        instructions=f'{subject} would violate this operator rule: "{rule_text}"',
-        criteria={
-            "true": (
-                "The action, once executed, breaks the rule or puts the ego vehicle "
-                "in a state the rule forbids."
-            ),
-            "false": "The action complies with the rule, or the rule does not apply to this situation.",
-        },
-    )
+question = build_question
 
 
 def questions_for(rules: dict[str, str], candidate: str | None = None) -> dict[str, Noul]:
@@ -547,7 +525,7 @@ async def item_1_hello(jev: Jev, report: Report) -> None:
         )
     body = "\n".join(
         [
-            "- SDK: typesafe-sdk, async client, default model alias `jev-latest`",
+            f"- SDK: typesafe-sdk, async client, requested model `{DEFAULT_MODEL}`",
             f"- Response `model`: `{call.model}`",
             f"- Request id: `{call.request_id}`",
             f"- Usage: {call.input_tokens} input tokens for 4 questions on one candidate",
@@ -636,8 +614,9 @@ async def item_3_numeric(jev: Jev, report: Report) -> None:
         )
     speed_ps = [c.p["speed"] for c in speed_calls]
     gap_ps = [c.p["gap"] for c in gap_calls]
-    monotone = all(a <= b for a, b in itertools.pairwise(speed_ps)) and all(
-        a >= b for a, b in itertools.pairwise(gap_ps)
+    tolerance = 0.05  # run-to-run noise measured in item 7 is below this
+    monotone = all(a <= b + tolerance for a, b in itertools.pairwise(speed_ps)) and all(
+        a + tolerance >= b for a, b in itertools.pairwise(gap_ps)
     )
     body = table(["rule", "probe", "expected", "p(violation)", "verdict"], rows)
     body += f"\n\nMonotone in the probed number: {'yes' if monotone else 'no'}. Misses: {misses} of 8 scored probes."
@@ -878,7 +857,9 @@ async def run(items: set[int], repeats: int, dry_run: bool) -> None:
         )
         print("sample request body:\n" + json.dumps(bodies[0], indent=2))
         return
-    async with AsyncTypeSafeClient(retry=RetryPolicy(max_retries=2, timeout=20.0)) as client:
+    async with AsyncTypeSafeClient(
+        model=DEFAULT_MODEL, retry=RetryPolicy(max_retries=2, timeout=20.0)
+    ) as client:
         jev = Jev(client)
         await run_items(jev, report, items, repeats)
     write_outputs(jev, report, started)

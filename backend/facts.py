@@ -40,6 +40,15 @@ def _lane_tuple(ego: Any, lane: int) -> tuple[str, str, int]:
     return (ego.lane_index[0], ego.lane_index[1], lane - 1)
 
 
+def action_meaning(action: str, lane: int, lane_count: int) -> str:
+    """Plain meaning of the action; a lane change at the road edge is a no-op and says so."""
+    if action == "LANE_LEFT" and lane == 1:
+        return "keep lane 1, already the leftmost lane, so this action changes nothing"
+    if action == "LANE_RIGHT" and lane == lane_count:
+        return f"keep lane {lane}, already the rightmost lane, so this action changes nothing"
+    return ACTION_MEANING[action]
+
+
 def lane_after(action: str, lane: int, lane_count: int) -> int:
     if action == "LANE_LEFT":
         return max(1, lane - 1)
@@ -140,7 +149,7 @@ def facts_for_action(env: Any, action: str, zones: list[Zone]) -> Facts:
         },
         "action": {
             "name": action,
-            "meaning": ACTION_MEANING[action],
+            "meaning": action_meaning(action, lane, lane_count),
             "lane_after": new_lane,
             "target_speed_after_mps": target_speed_after(ego, action),
         },

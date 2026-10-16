@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { DECISION_COLOR } from "../format";
-import { selectLatestStep, selectPreviousStep, useStore } from "../store";
+import { selectViewPrevStep, selectViewStep, useStore } from "../store";
 import type { ActionName, LogRecord, Zone } from "../types";
 
 // Ego-centered view. The road runs left to right; lane 1 (leftmost) is at the top.
@@ -237,15 +237,19 @@ function render(canvas: HTMLCanvasElement, f: Frame, zones: Zone[], laneCount: n
 export function RoadView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frame = useRef<Frame>({ prev: null, cur: null, t0: 0, intervalMs: 500 });
-  const latest = useStore(selectLatestStep);
-  const previous = useStore(selectPreviousStep);
-  const zones = useStore((s) => s.zones);
+  const latest = useStore(selectViewStep);
+  const previous = useStore(selectViewPrevStep);
+  const inspecting = useStore((s) => s.selectedStep);
+  const liveZones = useStore((s) => s.zones);
+  const zones = inspecting === null ? liveZones : (latest?.zones ?? liveZones);
   const speed = useStore((s) => s.session?.speed ?? 2);
   const laneCount = useStore((s) => s.hello?.config.lanes_count ?? 4);
 
   useEffect(() => {
-    frame.current = { prev: previous, cur: latest, t0: performance.now(), intervalMs: 1000 / speed };
-  }, [latest, previous, speed]);
+    // While inspecting, jump straight to the frame instead of animating into it.
+    const t0 = inspecting === null ? performance.now() : 0;
+    frame.current = { prev: previous, cur: latest, t0, intervalMs: 1000 / speed };
+  }, [latest, previous, speed, inspecting]);
 
   useEffect(() => {
     let raf = 0;
@@ -261,9 +265,11 @@ export function RoadView() {
   return (
     <section className="panel flex min-h-[280px] flex-1 flex-col">
       <div className="panel-title">
-        <span>Road view</span>
+        <span>Road view{inspecting !== null && <span className="text-violet-300"> · inspecting step {inspecting}</span>}</span>
         <span className="font-normal tracking-normal text-zinc-500 normal-case">
-          ego-centered · solid arrow executed · dashed arrow blocked
+          {inspecting === null
+            ? "ego-centered · solid arrow executed · dashed arrow blocked"
+            : "arrow keys move · esc follows live"}
         </span>
       </div>
       <canvas ref={canvasRef} className="block h-full w-full flex-1" />

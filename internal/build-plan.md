@@ -227,6 +227,9 @@ Notes added Oct 16 after writing `facts.py`:
   the ego is already in lane 1.
 - A vehicle farther than 200 m is reported as absent: gap, speed and closing
   speed are `null`. Gaps are bumper to bumper (center distance minus 5 m).
+- A lane change at the road edge (LANE_LEFT in lane 1, LANE_RIGHT in the
+  rightmost lane) changes nothing, and `action.meaning` says so. Without that,
+  Jev scored LANE_RIGHT from lane 4 at 0.87 on the gap rule.
 - `action_enters_zone` is true when the lane after the action is the zone's
   lane and the ego's position after one step at its current speed falls inside
   the zone. Zones already passed are dropped from the facts.
@@ -334,12 +337,21 @@ One line per step. This is the contract between backend, UI and eval.
   "decision": "fallback", "executed": "IDLE", "fired_constraint": "c1",
   "escalated": false, "human": null, "all_blocked": false,
   "judge": {"model": "jev-1.13.0", "source": "live", "latency_ms": 140,
-            "input_tokens": 1210, "cost_usd": 0.0000508},
+            "input_tokens": 1210, "cost_usd": 0.0000508,
+            "questions": {"c1": {"type": "noul", "instructions": "...", "criteria": {"true": "...", "false": "..."}}},
+            "exchanges": [{"action": "FASTER", "source": "live", "latency_ms": 131, "asked": ["c1"],
+                           "request_id": "req_...", "response": {"model": "jev-1.13.0", "answers": {"...": "..."}, "usage": {"...": "..."}}}]},
   "reward": 0.83, "crashed": false
 }
 ```
 
 `vehicles` is the render snapshot so replay needs nothing but the log.
+`judge.questions` holds the exact question per constraint (shared across
+candidates) and `judge.exchanges` one entry per request actually sent, with the
+constraint ids it asked and the raw response. The request state is the
+candidate's `facts`, so the inspector can rebuild the exact request body without
+storing it twice. Cache hits produce no exchange. Added Oct 16 for the Day 4
+inspector.
 
 ## 8. WebSocket protocol
 
@@ -374,6 +386,24 @@ As built on Oct 16 (`backend/server.py`, `frontend/src/types.ts`):
   from `ESCALATION_TIMEOUT_S` (default 20, 0 means wait forever) and `JEV_MODE`
   picks live or mock (default: live when the key is present).
 - `create_app(session)` lets tests inject an untrained policy and the mock judge.
+
+Day 4 as built (Oct 16): the decision strip is clickable and doubles as a
+scrubber, so the road view and the inspector show the selected step while the
+sim keeps running; arrow keys move, Esc follows live. The inspector shows the
+five candidates by Q, the p grid against every rule colored by the thresholds
+with the checker's label as a mark, the sentences and facts, and the exact
+request and response rebuilt from `judge.questions`, `judge.exchanges` and the
+candidate's facts. A replay picker in the status strip lists
+`backend/logs/runs/`; `back to live` returns.
+
+Observed while verifying: once the ego is inside a closed lane, no exit scores
+as confidently safe (lane changes sit at 0.2 to 0.5 on the gap rule), so every
+step escalates and deny only means SLOWER. The operator can approve or deny the
+policy's proposal but cannot pick the lane change that would fix it.
+Candidate for Day 5 if time allows: an "override" resolution that lets the
+operator choose any ranked candidate, logged as `human.decision = "override"`
+with the chosen action. Until then the presenter should keep the ego out of
+the closed lane rather than drive through it.
 
 ## 9. UI layout
 

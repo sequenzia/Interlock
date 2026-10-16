@@ -125,3 +125,10 @@ export const useStore = create<Store>()((...a) => ({
 
 export const selectLatestStep = (s: Store): LogRecord | null => s.steps[s.steps.length - 1] ?? null;
 export const selectPreviousStep = (s: Store): LogRecord | null => s.steps[s.steps.length - 2] ?? null;
+export const selectInspected = (s: Store): LogRecord | null =>
+  s.selectedStep === null ? null : (s.steps[s.selectedStep] ?? null);
+// The road view follows the live step unless a tick is selected, then it scrubs.
+export const selectViewStep = (s: Store): LogRecord | null =>
+  s.selectedStep === null ? selectLatestStep(s) : (s.steps[s.selectedStep] ?? null);
+export const selectViewPrevStep = (s: Store): LogRecord | null =>
+  s.selectedStep === null ? selectPreviousStep(s) : (s.steps[s.selectedStep - 1] ?? null);

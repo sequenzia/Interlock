@@ -1,6 +1,7 @@
 from backend.constraints import Zone
 from backend.env import ACTION_NAMES, make_env
 from backend.facts import (
+    action_meaning,
     facts_for_action,
     for_candidates,
     lane_after,
@@ -153,3 +154,14 @@ def test_sentences_with_vehicles_on_both_sides() -> None:
     assert "nearest vehicle ahead is 42 m away at 24 m/s" in text
     assert "Lane to the right of lane 1" in text
     assert "starts 120 m ahead and ends 320 m ahead. This action enters it: no" in text
+
+
+def test_edge_lane_changes_are_described_as_no_ops() -> None:
+    assert action_meaning("LANE_RIGHT", 4, 4).startswith("keep lane 4, already the rightmost")
+    assert action_meaning("LANE_LEFT", 1, 4).startswith("keep lane 1, already the leftmost")
+    assert action_meaning("LANE_LEFT", 2, 4) == "move one lane to the left"
+    env = make_env()
+    env.reset(seed=0)  # ego starts in lane 4
+    f = facts_for_action(env, "LANE_RIGHT", zones=[])
+    assert f["action"]["lane_after"] == 4 and "changes nothing" in f["action"]["meaning"]
+    env.close()

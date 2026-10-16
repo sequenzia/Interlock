@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ApprovalQueue } from "./components/approval-queue";
 import { ConstraintPanel } from "./components/constraint-panel";
 import { DecisionStrip } from "./components/decision-strip";
+import { InspectorDrawer } from "./components/inspector-drawer";
 import { RoadView } from "./components/road-view";
 import { StatusStrip } from "./components/status-strip";
 import { useStore } from "./store";
@@ -16,8 +17,14 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const { session, escalation } = useStore.getState();
-      if (e.code === "Space") {
+      const { session, escalation, selectedStep, steps, selectStep } = useStore.getState();
+      if (e.key === "Escape") {
+        selectStep(null);
+      } else if (e.key === "ArrowLeft") {
+        selectStep(Math.max(0, (selectedStep ?? steps.length) - 1));
+      } else if (e.key === "ArrowRight" && selectedStep !== null) {
+        selectStep(selectedStep >= steps.length - 1 ? null : selectedStep + 1);
+      } else if (e.code === "Space") {
         e.preventDefault();
         send({ type: session?.playing ? "pause" : "play" });
       } else if (e.key === "n") {
@@ -38,6 +45,7 @@ export function App() {
       <div className="flex min-h-0 flex-1 gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <RoadView />
+          <InspectorDrawer />
           <DecisionStrip />
         </div>
         <aside className="flex w-[400px] shrink-0 flex-col gap-2 overflow-y-auto">

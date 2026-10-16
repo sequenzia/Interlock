@@ -122,3 +122,27 @@ def test_live_judge_constructs_and_closes_without_network(monkeypatch: pytest.Mo
     monkeypatch.setenv("TYPESAFE_API_KEY", "test-key-not-real")
     judge = LiveJudge()
     run(judge.close())
+
+
+def test_judge_record_carries_questions_and_exchanges() -> None:
+    judge = FakeJudge({"FASTER": 0.9, "IDLE": 0.1})
+    client = JevClient(live=judge, cache=JevCache(None))  # type: ignore[arg-type]
+    result = run(client.check(FACTS, [SPEED, GAP]))
+    record = result.judge_record()
+    assert set(record["questions"]) == {"c1", "c2"}
+    assert (
+        record["questions"]["c1"]["type"] == "noul"
+        and SPEED.text in record["questions"]["c1"]["instructions"]
+    )
+    assert [e["action"] for e in record["exchanges"]] == ["FASTER", "IDLE"]
+    assert record["exchanges"][0] == {
+        "action": "FASTER",
+        "source": "live",
+        "latency_ms": 12.0,
+        "asked": ["c1", "c2"],
+        "request_id": None,
+        "response": {"ok": True},
+    }
+    cached = JevClient(live=None, cache=client.cache)
+    again = run(cached.check(FACTS, [SPEED, GAP])).judge_record()
+    assert again["exchanges"] == [] and set(again["questions"]) == {"c1", "c2"}

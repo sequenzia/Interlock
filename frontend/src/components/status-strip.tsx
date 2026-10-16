@@ -4,6 +4,7 @@ import { selectLatestStep, useStore } from "../store";
 import { send } from "../ws-client";
 
 const SPEEDS = [0.5, 1, 2, 4];
+const NO_RUNS: string[] = [];
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -20,6 +21,8 @@ export function StatusStrip() {
   const hello = useStore((s) => s.hello);
   const metrics = useStore((s) => s.metrics);
   const latest = useStore(selectLatestStep);
+  const runs = useStore((s) => s.hello?.runs) ?? NO_RUNS;
+  const inspecting = useStore((s) => s.selectedStep);
   const [seed, setSeed] = useState(0);
   const sessionSeed = session?.seed;
   useEffect(() => {
@@ -100,6 +103,33 @@ export function StatusStrip() {
       </button>
       {paused && <span className="badge border-violet-500/60 bg-violet-500/20 text-violet-200">waiting on operator</span>}
       {done && <span className="badge border-zinc-600 text-zinc-300">episode over</span>}
+
+      <div className="mx-1 h-5 w-px bg-zinc-800" />
+
+      <select
+        className="max-w-[260px] rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-300"
+        value=""
+        disabled={!ready || runs.length === 0}
+        onChange={(e) => {
+          if (e.target.value) send({ type: "load_replay", run_id: e.target.value });
+        }}
+        title="Replay a logged run"
+      >
+        <option value="">{runs.length ? `replay a run (${runs.length})` : "no logged runs yet"}</option>
+        {runs.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
+      </select>
+      {replay && (
+        <button className="btn" onClick={() => send({ type: "load_live" })}>
+          back to live
+        </button>
+      )}
+      {inspecting !== null && (
+        <span className="badge border-violet-500/40 text-violet-200">inspecting {inspecting}</span>
+      )}
 
       <div className="flex-1" />
 

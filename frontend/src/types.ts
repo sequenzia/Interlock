@@ -46,12 +46,29 @@ export interface Human {
   operator: string;
 }
 
+export interface JevQuestion {
+  type: "noul";
+  instructions: string;
+  criteria?: { true: string; false: string };
+}
+
+export interface Exchange {
+  action: ActionName;
+  source: JudgeSource;
+  latency_ms: number;
+  asked: string[];
+  request_id: string | null;
+  response: unknown;
+}
+
 export interface Judge {
   model: string;
   source: JudgeSource;
   latency_ms: number;
   input_tokens: number;
   cost_usd: number;
+  questions?: Record<string, JevQuestion>;
+  exchanges?: Exchange[];
 }
 
 export interface Ego {

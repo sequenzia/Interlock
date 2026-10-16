@@ -108,6 +108,7 @@ class LiveAnswer:
     input_tokens: int
     raw_response: Any
     latency_ms: float
+    request_id: str | None = None
 
 
 class LiveJudge:
@@ -133,6 +134,7 @@ class LiveJudge:
             input_tokens=resp.usage.input_tokens or 0,
             raw_response=raw.json() if raw is not None else resp.model_dump(),
             latency_ms=latency_ms,
+            request_id=resp.request_id,
         )
 
     async def close(self) -> None:
@@ -141,13 +143,24 @@ class LiveJudge:
 
 @dataclass
 class Exchange:
-    """One raw request and response, kept for the decision inspector."""
+    """One request actually sent, kept for the decision inspector."""
 
     action: str
-    request: dict[str, Any]
+    asked: list[str]  # constraint ids in this request; the state is the candidate's facts
     response: Any
     latency_ms: float
     source: Source
+    request_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "action": self.action,
+            "source": self.source,
+            "latency_ms": round(self.latency_ms, 1),
+            "asked": self.asked,
+            "request_id": self.request_id,
+            "response": self.response,
+        }
 
 
 @dataclass
@@ -159,6 +172,7 @@ class CheckResult:
     latency_ms: float  # wall-clock for the whole step
     input_tokens: int
     cost_usd: float
+    questions: dict[str, dict[str, Any]] = field(default_factory=dict)  # constraint id -> question
     exchanges: list[Exchange] = field(default_factory=list)
 
     @property
@@ -172,6 +186,8 @@ class CheckResult:
             "latency_ms": round(self.latency_ms, 1),
             "input_tokens": self.input_tokens,
             "cost_usd": round(self.cost_usd, 8),
+            "questions": self.questions,
+            "exchanges": [e.to_dict() for e in self.exchanges],
         }
 
 
@@ -223,6 +239,7 @@ class JevClient:
             latency_ms=(time.perf_counter() - started) * 1000,
             input_tokens=tokens,
             cost_usd=tokens * USD_PER_INPUT_TOKEN,
+            questions={c.id: question_dict(build_question(c.text)) for c in constraints},
             exchanges=exchanges,
         )
 
@@ -244,20 +261,18 @@ class JevClient:
             return p, sources, 0, None, None
 
         questions = {cid: q for cid, (q, _) in missing.items()}
-        request = {
-            "model": self.model,
-            "state": facts,
-            "questions": {cid: question_dict(q) for cid, q in questions.items()},
-        }
+        asked = list(questions)
         answer = None if self.live is None else await self.live.ask(facts, questions)
         if answer is None:
             for cid in missing:
                 p[cid], sources[cid] = UNAVAILABLE_P, "unavailable"
-            return p, sources, 0, None, Exchange(action, request, None, 0.0, "unavailable")
+            return p, sources, 0, None, Exchange(action, asked, None, 0.0, "unavailable")
         for cid, (_, key) in missing.items():
             p[cid], sources[cid] = answer.p[cid], "live"
             self.cache.put(key, answer.p[cid], answer.model)
-        exchange = Exchange(action, request, answer.raw_response, answer.latency_ms, "live")
+        exchange = Exchange(
+            action, asked, answer.raw_response, answer.latency_ms, "live", answer.request_id
+        )
         return p, sources, answer.input_tokens, answer.model, exchange
 
     async def close(self) -> None:

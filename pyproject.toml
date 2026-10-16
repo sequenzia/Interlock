@@ -1,0 +1,41 @@
+[project]
+name = "shielded"
+version = "0.1.0"
+description = "Runtime safety shield demo: SB3 DQN in highway-env, judged by Jev against plain-English rules"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "highway-env>=1.12,<1.13",
+    "gymnasium>=1.0",
+    "stable-baselines3>=2.9,<3",
+    "torch>=2.8",
+    "numpy",
+    "typesafe-sdk",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-dotenv",
+    "matplotlib",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W", "ANN", "RUF"]
+ignore = ["ANN401", "E501"]  # ruff format owns layout; E501 only fires on unbreakable strings
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

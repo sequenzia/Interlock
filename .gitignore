@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets: TYPESAFE_API_KEY lives in backend/.env and is never committed
+backend/.env
+.env
+
+# Runtime artifacts
+backend/logs/*
+!backend/logs/.gitkeep
+models/*
+!models/README.md
+highway_dqn/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

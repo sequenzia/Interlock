@@ -59,9 +59,15 @@ around Oct 23, 2026.
 Update this section as modules land.
 
 ```
-uv sync                                              # backend deps
-uv run python -m backend.train                       # train DQN to models/
-uv run python -m backend.spike.jev_spike             # Day 1 Jev spike
+uv sync --all-groups                                 # backend deps (+ pytest, ruff)
+uv run pytest                                        # backend tests
+uv run ruff format backend tests && uv run ruff check backend tests
+uv run python -m backend.train                       # 20k-step DQN to models/dqn_highway_20k.zip
+uv run python -m backend.train --timesteps 100000    # long run
+uv run python -m backend.train --eval-only models/dqn_highway_20k.zip   # greedy rollouts over --eval-seeds
+uv run python -m backend.train --eval-only models/dqn_highway_20k.zip --promote  # copy to dqn_highway.zip
+uv run python -m backend.spike.jev_spike             # Day 1 Jev spike, writes internal/jev-spike-results.md
+uv run python -m backend.spike.jev_spike --dry-run   # validate every spike request offline, no key needed
 uv run python -m backend.run_episode --shield on     # headless shielded episode
 uv run python -m backend.evaluate --seeds 0-19 --mode on
 uv run uvicorn backend.server:app --reload           # WebSocket server

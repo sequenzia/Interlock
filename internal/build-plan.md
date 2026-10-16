@@ -66,6 +66,12 @@ The `noul` mapping is the whole shield: one `noul` question per (candidate
 action, constraint) pair, p is the violation probability, and `T_ALLOW` /
 `T_BLOCK` apply to p directly.
 
+Measured Oct 16 (spike run 1, `internal/jev-spike-results.md`): the API
+reports `jev-1.13.0` and accepts it as a request model, so it is pinned in
+`backend/jev_client.py`. Step latency at shape B is p50 157 ms, p95 247 ms;
+a 60-step episode costs about $0.011. Run-to-run std on identical requests is
+at most 0.05.
+
 ## 3. Schedule
 
 | Day | Date | Focus | Done when |
@@ -113,6 +119,8 @@ shielded/
     env.py            # make_env(seed, config overrides)
     train.py          # SB3 DQN, saves models/dqn_highway.zip
     policy.py         # load model, ranked actions with Q-values
+    paths.py          # repo-relative paths shared by the modules
+    episode.py        # EpisodeRunner: the per-step loop the CLI and server share
     facts.py          # (env state, action, constraints, zones) -> facts JSON + sentences
     constraints.py    # constraint store, zone presets
     jev_client.py     # RealClient, CachedClient, MockClient, shared interface
@@ -180,6 +188,10 @@ calibration data come from the same seeds and the same code path.
 
 Default to B unless the spike shows A agrees with B and is meaningfully faster.
 
+Decided Oct 16: shape B. A was faster (143 versus 197 ms) and 29% cheaper but
+disagreed by 0.32 on one gap question, and the per-candidate cache needs one
+state per candidate.
+
 ### 5.4 Fact schema
 
 JSON for Jev, sentences for humans, both generated from the same extractor.
@@ -200,16 +212,34 @@ observation the policy sees.
   },
   "current_lane": {"vehicle_ahead_gap_m": 15.0, "vehicle_ahead_speed_mps": 22.0,
                    "slower_vehicle_ahead_within_40_m": true},
+  "lane_right_of_lane_after": {"vehicle_ahead_gap_m": 15.0, "vehicle_ahead_speed_mps": 22.0,
+                               "slower_vehicle_ahead_within_40_m": true},
   "zones": [{"name": "work zone", "lane": 3, "starts_in_m": 120, "ends_in_m": 320,
              "action_enters_zone": false}]
 }
 ```
+
+Notes added Oct 16 after writing `facts.py`:
+
+- `lane_right_of_lane_after` is present only when the lane after the action is
+  the leftmost lane. It is the lane being passed, which the passing rule needs
+  and which the current lane and the lane after the action do not cover when
+  the ego is already in lane 1.
+- A vehicle farther than 200 m is reported as absent: gap, speed and closing
+  speed are `null`. Gaps are bumper to bumper (center distance minus 5 m).
+- `action_enters_zone` is true when the lane after the action is the zone's
+  lane and the ego's position after one step at its current speed falls inside
+  the zone. Zones already passed are dropped from the facts.
 
 Numeric-comparison fallback, built only if the spike shows Jev misjudging
 plain comparisons: a regex pulls numbers with units out of each rule's text
 and the extractor adds relational facts such as
 `"target_speed_after_vs_25_mps": "greater"`. Arithmetic stays in code; Jev
 still decides which number the rule is about and whether the rule applies.
+
+Decided Oct 16: not built. Speed comparisons were crisp at every probe. Gap
+comparisons had the right sign at every probe but were soft, and the softness
+tracked the negation in the rule text (section 5.5), not the arithmetic.
 
 ### 5.5 Question phrasing
 
@@ -226,12 +256,31 @@ Rules themselves are typed by the operator and may contain negation ("No lane
 change if ..."). The spike checks whether that hurts; if it does, the UI can
 suggest a rephrase but must still accept the operator's text.
 
+Measured Oct 16: the gap rule as typed scores 0.53 on a 9 m gap; the positive
+rephrase "A lane change requires at least 10 m of clear space to the nearest
+vehicle in the target lane" scores 0.91. The UI offers a rephrase for rules
+that read as "No ... if ...". The passing rule sits near 0.5 on lane-left
+moves and near 0.7 on cruising in the left lane regardless of phrasing or
+extra facts; those steps escalate by design.
+
 ### 5.6 Escalation
 
 Queue item: step, candidate action, its sentences, the constraint with the
 highest p, that p, Q-value rank, and a deadline. Operator approves or denies.
 Each resolution is appended to the log record as `human: {decision,
 latency_ms, operator: "ui" | "simulated"}` and becomes a labeled example.
+
+### 5.6a Zone lifecycle (added Oct 16)
+
+The lane-closed rule is in force only while a zone exists. `drop_zone` adds
+the rule or re-enables it; `retire_passed_zones`, called at the top of every
+step, drops zones the ego has passed and disables the rule when none remain.
+Reason: in the first live run Jev kept p between 0.31 and 0.66 on every lane 3
+action after the zone was behind the ego and absent from the facts, because
+the rule text still asserted a closure. The CLI's `--rules all` means the
+three standing rules; the zone rule arrives with `--zone-at-step` or, in the
+UI, with the drop-zone button. The UI shows the rule chip flipping off with a
+"zone passed" note so the operator sees the retirement.
 
 ### 5.7 Cache, mock and offline
 
@@ -258,7 +307,7 @@ demo rules as presets; a free-text rule with no checker is logged as
 | --- | --- |
 | Speed limit 25 m/s | `target_speed_after_mps > 25` |
 | No lane change if a vehicle is within 10 m in the target lane | action is a lane change and min(gap behind, gap ahead) in the target lane < 10 |
-| Keep the left lane for passing only | lane after action is leftmost and no slower vehicle ahead within 40 m in that lane |
+| Keep the left lane for passing only | lane after action is leftmost and no slower vehicle ahead within 40 m in the lane to its right (the lane being passed) |
 | Lane 3 is closed ahead for a work zone | lane after action is 3 and ego's longitudinal position after one step falls inside the zone |
 
 All four are closed-form on the pre-step state, so every candidate gets a
@@ -384,6 +433,17 @@ lower crash rate over 20 seeds while still averaging above 25 m/s, because a
 timid agent makes a boring demo. Q-values come from `model.q_net` on the
 observation tensor.
 
+Result, Oct 16, greedy rollouts over seeds 0 to 19:
+
+| Checkpoint | Crash rate | Mean speed | Mean steps of 60 | Mean return |
+| --- | --- | --- | --- | --- |
+| 20k | 0.85 | 27.3 m/s | 33.5 | 28.5 |
+| 100k | 0.40 | 29.8 m/s | 52.0 | 50.7 |
+
+The 100k checkpoint is promoted to `models/dqn_highway.zip`. It is faster and
+crashes less, so it breaks the speed rule more often while leaving room for the
+mid-episode zone drop.
+
 ## 13. Risks
 
 | Risk | Mitigation |
@@ -391,6 +451,7 @@ observation tensor.
 | Jev misjudges plain numeric comparisons | Spike item 3; regex comparison facts fallback in section 5.4 |
 | Shape A indirection lowers accuracy | Spike item 4; default to shape B |
 | Operator rule text with negation confuses Jev | Spike item 6; UI suggests rephrase, never overrides |
+| Jev weights rule text over empty facts (a rule asserting a closure biases lane 3 with no zone in state) | Zone lifecycle in 5.6a; prefer rules whose trigger is always present in the facts |
 | Agent too timid to break rules | Density, speed range, seed selection; see section 12 |
 | highway-env 1.12 config or render changes differ from memory | Verify `lanes_count`, action names and `policy_frequency` on install |
 | Network down in the room | Warm cache for demo seeds; judge-unavailable escalation; backup video |
@@ -401,7 +462,7 @@ observation tensor.
 
 - [ ] Confirm the presentation date and length.
 - [ ] Confirm whether a live demo is expected or slides plus video suffice.
-- [ ] Put `TYPESAFE_API_KEY` in `backend/.env` (gitignored) before Day 1 spike.
-- [ ] Pin the concrete Jev model version after the spike.
-- [ ] Choose N for the passing-lane rule (plan says 40 m).
+- [x] `TYPESAFE_API_KEY` in `backend/.env`; Day 1 spike run on Oct 16.
+- [x] Jev model pinned to `jev-1.13.0`.
+- [x] N for the passing-lane rule is 40 m (`facts.SLOWER_AHEAD_RANGE_M`).
 - [ ] Install ffmpeg via Homebrew if QuickTime screen recording is not enough for the backup video.

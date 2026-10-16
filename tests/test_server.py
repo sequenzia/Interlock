@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -215,3 +216,15 @@ def test_late_joiner_receives_the_episode_history(client: TestClient) -> None:
         assert recv_until(ws, "state")["step"] == 3
         history = ws.receive_json()
         assert history["type"] == "history" and [r["step"] for r in history["records"]] == [0, 1, 2]
+
+
+def test_eval_latest_reports_absence_and_presence(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(server_module, "EVAL_REPORT", tmp_path / "none.json")
+    assert client.get("/eval/latest").json()["available"] is False
+    present = tmp_path / "latest.json"
+    present.write_text(json.dumps({"sweep": [], "calibration": {"overall": {"n": 0}}}))
+    monkeypatch.setattr(server_module, "EVAL_REPORT", present)
+    body = client.get("/eval/latest").json()
+    assert body["available"] is True and body["sweep"] == []

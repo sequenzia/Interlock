@@ -209,3 +209,82 @@ export type ClientMessage =
   | { type: "resolve"; escalation_id: string; decision: OperatorAnswer }
   | { type: "load_replay"; run_id: string }
   | { type: "load_live" };
+
+// Evaluation report written by backend.evaluate (internal/eval/latest.json).
+
+export interface EpisodeMetrics {
+  seed: number;
+  steps: number;
+  return: number;
+  crashed: boolean;
+  violations_total: number;
+  escalations: number;
+  all_blocked: number;
+}
+
+export interface AggregateMetrics {
+  episodes: number;
+  steps: number;
+  violations_per_episode: number;
+  violations_per_episode_std: number;
+  violations_by_constraint: Record<string, number>;
+  mean_return: number;
+  crash_rate: number;
+  escalation_rate: number;
+  all_blocked_rate: number;
+  human: Record<string, number>;
+  latency_ms_p50: number;
+  latency_ms_p95: number;
+  cost_usd: number;
+  cost_per_episode_usd: number;
+}
+
+export interface RunReport {
+  label: string;
+  shield_on: boolean;
+  thresholds: Thresholds;
+  seeds: number[];
+  jev_mode: string;
+  created: string;
+  episodes: EpisodeMetrics[];
+  aggregate: AggregateMetrics;
+}
+
+export interface SweepPoint {
+  label: string;
+  t_allow: number;
+  t_block: number;
+  violations_per_episode: number;
+  escalation_rate: number;
+  all_blocked_rate: number;
+  crash_rate: number;
+  mean_return: number;
+  cost_per_episode_usd: number;
+}
+
+export interface ReliabilityBin {
+  lo: number;
+  hi: number;
+  count: number;
+  mean_p: number | null;
+  observed: number | null;
+}
+
+export interface Reliability {
+  n: number;
+  positives: number;
+  bins: ReliabilityBin[];
+  ece: number;
+  brier: number;
+  accuracy_at_0_5: number;
+}
+
+export interface EvalReport {
+  available: boolean;
+  message?: string;
+  generated_at?: string;
+  thresholds_default?: Thresholds;
+  before_after?: { off: RunReport | null; on: RunReport | null };
+  sweep?: SweepPoint[];
+  calibration?: { overall: Reliability; by_checker: Record<string, Reliability> };
+}

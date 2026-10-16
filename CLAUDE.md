@@ -14,6 +14,8 @@ around Oct 23, 2026.
   log schema, spike checklist. Read this before touching any module.
 - `internal/jev-spike-results.md`: written on Day 1; holds measured Jev
   behavior. Do not assume Jev behavior that is not recorded there.
+- `internal/eval/latest.json` and `internal/plots/`: the Day 5 evaluation.
+  Plan section 10 holds the results table and the reading of it.
 
 ## Stack
 
@@ -73,10 +75,13 @@ uv run python -m backend.run_episode --shield on     # headless shielded episode
 uv run python -m backend.run_episode --shield off --seed 3            # shadow mode on another seed
 uv run python -m backend.run_episode --jev mock --zone-at-step 10     # offline, drop the work zone mid-episode
 uv run python -m backend.run_episode --rules speed_limit --operator approve --max-steps 20
-uv run python -m backend.evaluate --seeds 0-19 --mode on
+uv run python -m backend.evaluate --seeds 0-19 --mode on           # one configuration, writes backend/logs/eval/<stamp>_<label>/
+uv run python -m backend.evaluate --seeds 0-19 --all --concurrency 2  # off + 5-pair sweep + report, ~8 min, ~$0.75 live
+uv run python -m backend.evaluate --report                           # rebuild internal/eval/latest.json and internal/plots/*.png
 uv run uvicorn backend.server:app --reload           # WebSocket server on :8000, live Jev if key present
 JEV_MODE=mock ESCALATION_TIMEOUT_S=0 uv run uvicorn backend.server:app   # offline, wait for the operator
+JEV_CACHE_PATH=/tmp/empty.jsonl JEV_MODE=mock uv run uvicorn backend.server:app  # empty cache: every step escalates
 cd frontend && pnpm install && pnpm dev              # console on :5173, proxies /ws to :8000
 cd frontend && pnpm typecheck && pnpm build          # strict tsc, then Vite production build
-cd frontend && pnpm test:e2e                         # Playwright smoke test
+cd frontend && pnpm test:e2e                         # Playwright smoke test: own mock backend on :8001, Vite on :5174
 ```

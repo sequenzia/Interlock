@@ -22,6 +22,8 @@ export function StatusStrip() {
   const metrics = useStore((s) => s.metrics);
   const latest = useStore(selectLatestStep);
   const runs = useStore((s) => s.hello?.runs) ?? NO_RUNS;
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
   const inspecting = useStore((s) => s.selectedStep);
   const [seed, setSeed] = useState(0);
   const sessionSeed = session?.seed;
@@ -37,10 +39,22 @@ export function StatusStrip() {
   const total = replay ? session?.total_steps : hello?.config.duration;
 
   return (
-    <header className="panel flex items-center gap-3 px-3 py-1.5">
-      <div className="flex items-center gap-2">
+    <header className="panel flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-rose-500"}`} />
         <span className="text-[12px] font-semibold tracking-[0.22em] text-zinc-200">SHIELD CONSOLE</span>
+      </div>
+      <div className="flex shrink-0 overflow-hidden rounded border border-zinc-700 text-[11px]">
+        {(["console", "metrics"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            className={`px-2 py-0.5 ${view === v ? "bg-zinc-700 text-zinc-100" : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"}`}
+          >
+            {v}
+          </button>
+        ))}
       </div>
       <span className={`badge ${replay ? "border-amber-500/50 text-amber-300" : "border-zinc-700 text-zinc-300"}`}>
         {session?.source ?? "offline"}
@@ -107,7 +121,7 @@ export function StatusStrip() {
       <div className="mx-1 h-5 w-px bg-zinc-800" />
 
       <select
-        className="max-w-[260px] rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-300"
+        className="max-w-[210px] rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-300"
         value=""
         disabled={!ready || runs.length === 0}
         onChange={(e) => {

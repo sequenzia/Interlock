@@ -442,6 +442,48 @@ difference on the same opening scene.
 - Plots to `internal/plots/` as PNG via matplotlib for the slides; the same
   JSON feeds the metrics tab.
 
+### Results, Oct 16
+
+20 seeds, 60 steps, the three standing rules, simulated operator answering
+from the checkers, live `jev-1.13.0`, concurrency 2. One run of everything took
+8 minutes and $0.73. Report: `internal/eval/latest.json`; plots in
+`internal/plots/`; raw runs under `backend/logs/eval/`.
+
+| Configuration | Violations per episode | Return | Crash rate | Escalated steps | All-blocked steps |
+| --- | --- | --- | --- | --- | --- |
+| Shield off | 58.1 | 50.7 | 40% | 0% | 0% |
+| On, 0.1 / 0.9 | 2.85 | 45.1 | 10% | 49.9% | 18.8% |
+| On, 0.2 / 0.8 (default) | 2.65 | 41.4 | 25% | 23.9% | 0.2% |
+| On, 0.3 / 0.7 | 2.65 | 41.6 | 30% | 18.5% | 0.9% |
+| On, 0.4 / 0.6 | 1.25 | 42.0 | 40% | 6.6% | 1.3% |
+| On, 0.5 / 0.5 | 1.85 | 41.7 | 30% | 0.2% | 0.6% |
+
+By rule at the default thresholds, shield off to on: speed limit 1030 to 0,
+lane change gap 124 to 1, left lane for passing 8 to 52. The two crisp rules
+are essentially solved; the fuzzy rule is where the shield leaks, and the
+shield's own interventions make it worse because the car weaves less and so
+cruises in the left lane more often with nobody to pass. Jev scores those
+steps at 0.1 to 0.2, below T_ALLOW, so they are allowed.
+
+Calibration over 93,285 labeled (candidate, rule) checks: ECE 0.093, Brier
+0.032, accuracy at a 0.5 cut 97.5%. Per rule: speed limit ECE 0.059 and 100%
+accurate with p bimodal below 0.2 or above 0.8; lane change gap ECE 0.081 but
+underconfident on real violations, since p in 0.3 to 0.5 is a violation 70 to
+90% of the time; left lane for passing ECE 0.179 with weak discrimination
+between 0.3 and 0.6.
+
+Reading the sweep: 0.4 / 0.6 is the knee, 1.25 violations per episode with
+6.6% of steps escalated, but its crash rate matches shield off. 0.1 / 0.9 has
+the lowest crash rate because 19% of steps hit the all-blocked path and the car
+simply drives slower. The simulated operator is perfect, which flatters the
+high-escalation settings; a human will not be. Decision: keep 0.2 / 0.8 as the
+demo default and show the curve; name 0.4 / 0.6 as the operating point when
+operator attention is the scarce resource.
+
+Latency per step with the shield on: p50 160 ms, p95 304 ms over live steps.
+Cost per episode $0.0067 shielded, $0.0080 unshielded (the shielded run hit the
+cache more often).
+
 ## 11. Day 1 Jev spike checklist
 
 Script: `backend/spike/jev_spike.py`. Results to

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import time
@@ -35,14 +36,15 @@ from backend.constraints import (
 )
 from backend.env import ACTION_NAMES, DEFAULT_CONFIG
 from backend.episode import EpisodeRunner, Escalation, OperatorAnswer
-from backend.jev_client import JevClient, make_client
+from backend.jev_client import DEFAULT_CACHE_PATH, JevClient, make_client
 from backend.logger import JsonlLogger, default_log_path, read_log
-from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, LOGS_DIR
+from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
 from backend.policy import Policy
 from backend.shield import Thresholds
 
 log = logging.getLogger("shield.server")
 RUNS_DIR = LOGS_DIR / "runs"
+EVAL_REPORT = INTERNAL_DIR / "eval" / "latest.json"
 DEFAULT_STEPS_PER_SEC = 2.0
 DEFAULT_ESCALATION_TIMEOUT_S = 20.0
 
@@ -424,6 +426,11 @@ def session_from_env() -> Session:
         mode = "live" if os.environ.get("TYPESAFE_API_KEY") else "mock"
     timeout = float(os.environ.get("ESCALATION_TIMEOUT_S", DEFAULT_ESCALATION_TIMEOUT_S))
     model_path = Path(os.environ.get("MODEL_PATH", DEFAULT_MODEL_PATH))
+    cache_path = (
+        Path(os.environ["JEV_CACHE_PATH"])
+        if os.environ.get("JEV_CACHE_PATH")
+        else DEFAULT_CACHE_PATH
+    )
     log.info(
         "session: jev %s, model %s, escalation timeout %s s",
         mode,
@@ -432,7 +439,7 @@ def session_from_env() -> Session:
     )
     return Session(
         Policy.load(model_path),
-        make_client(mode),  # type: ignore[arg-type]
+        make_client(mode, cache_path=cache_path),  # type: ignore[arg-type]
         seed=int(os.environ.get("SEED", "0")),
         escalation_timeout_s=timeout,
     )
@@ -456,6 +463,16 @@ def create_app(session: Session | None = None) -> FastAPI:
             "source": s.source,
             "step": s.runner.step_index,
         }
+
+    @app.get("/eval/latest")
+    async def eval_latest() -> dict[str, Any]:
+        """The newest evaluation report written by backend.evaluate, for the metrics tab."""
+        if not EVAL_REPORT.exists():
+            return {
+                "available": False,
+                "message": "run: uv run python -m backend.evaluate --seeds 0-19 --all",
+            }
+        return {"available": True, **json.loads(EVAL_REPORT.read_text())}
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:

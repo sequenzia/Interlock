@@ -5,7 +5,11 @@ import type { Constraint, Escalation, Hello, LogRecord, Metrics, SessionState, Z
 // One store, four slices (plan: steps, constraints, queue, metrics) plus the
 // connection slice that holds hello and the session state.
 
+export type View = "console" | "metrics";
+
 interface ConnectionSlice {
+  view: View;
+  setView: (view: View) => void;
   connected: boolean;
   hello: Hello | null;
   session: SessionState | null;
@@ -49,6 +53,8 @@ export type Store = ConnectionSlice & StepsSlice & ConstraintsSlice & QueueSlice
 const MAX_STEPS = 2000;
 
 const createConnectionSlice: StateCreator<Store, [], [], ConnectionSlice> = (set) => ({
+  view: "console",
+  setView: (view) => set({ view }),
   connected: false,
   hello: null,
   session: null,

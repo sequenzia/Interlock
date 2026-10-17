@@ -128,7 +128,8 @@ shielded/
     shield.py         # decide(ranked, checks, thresholds) -> Decision
     checkers.py       # ground-truth checker per constraint template
     logger.py         # JSONL writer, record schema
-    run_episode.py    # headless CLI
+    cli.py            # interlock entry point: run, eval, train, spike, console
+    run_episode.py    # headless episode, behind interlock run
     server.py         # FastAPI app, WebSocket, live + replay sources
     evaluate.py       # batch runs, sweep, calibration, plots
     spike/jev_spike.py

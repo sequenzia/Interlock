@@ -4,6 +4,7 @@
     uv run python -m backend.run_episode --shield off --seed 3
     uv run python -m backend.run_episode --shield on --jev mock --zone-at-step 10
     uv run python -m backend.run_episode --shield on --rules speed_limit,lane_change_gap
+    uv run interlock run --shield on                 # same flags via backend/cli.py
 
 Jev mode defaults to live when TYPESAFE_API_KEY is set in backend/.env and to
 mock otherwise. In mock mode every uncached question is "judge unavailable" at
@@ -17,6 +18,7 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -103,10 +105,8 @@ async def main_async(args: argparse.Namespace) -> int:
     return 0
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Flags shared by ``python -m backend.run_episode`` and ``interlock run``."""
     parser.add_argument("--shield", choices=["on", "off"], default="on")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--jev", choices=["auto", "live", "mock"], default="auto")
@@ -133,8 +133,18 @@ def main() -> None:
         help="JSONL path (default backend/logs/runs/<run_id>.jsonl)",
     )
     parser.add_argument("--quiet", action="store_true")
-    args = parser.parse_args()
-    sys.exit(asyncio.run(main_async(args)))
+
+
+def run_cli(args: argparse.Namespace) -> int:
+    return asyncio.run(main_async(args))
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    add_arguments(parser)
+    sys.exit(run_cli(parser.parse_args(argv)))
 
 
 if __name__ == "__main__":

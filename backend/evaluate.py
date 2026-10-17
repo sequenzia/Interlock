@@ -5,6 +5,7 @@
     uv run python -m backend.evaluate --seeds 0-19 --sweep          # five threshold pairs, shield on
     uv run python -m backend.evaluate --seeds 0-19 --all            # off, the sweep, then the report
     uv run python -m backend.evaluate --report                      # newest run per configuration
+    uv run interlock eval --report                                  # same flags via backend/cli.py
 
 Each configuration writes backend/logs/eval/<stamp>_<label>/ with one JSONL per
 seed and a metrics.json. The report aggregates the newest run per label into
@@ -20,6 +21,7 @@ import json
 import os
 import sys
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -269,10 +271,8 @@ async def main_async(args: argparse.Namespace) -> int:
     return 0
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Flags shared by ``python -m backend.evaluate`` and ``interlock eval``."""
     parser.add_argument("--seeds", default="0-19")
     parser.add_argument(
         "--mode",
@@ -302,12 +302,23 @@ def main() -> None:
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
     parser.add_argument("--out", type=Path, default=EVAL_DIR)
-    args = parser.parse_args()
+
+
+def run_cli(args: argparse.Namespace) -> int:
     if args.mode == "shadow":
         args.mode = "off"
     if not (args.mode or args.sweep or args.all or args.report):
-        parser.error("choose --mode, --sweep, --all or --report")
-    sys.exit(asyncio.run(main_async(args)))
+        print("choose --mode, --sweep, --all or --report", file=sys.stderr)
+        return 2
+    return asyncio.run(main_async(args))
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    add_arguments(parser)
+    sys.exit(run_cli(parser.parse_args(argv)))
 
 
 if __name__ == "__main__":

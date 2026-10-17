@@ -16,14 +16,26 @@ dependencies = [
     "matplotlib",
 ]
 
+[project.scripts]
+interlock = "backend.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest",
     "ruff",
 ]
 
-[tool.uv]
-package = false
+[build-system]
+requires = ["uv_build>=0.9.21,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# The package is backend/ at the repo root, not src/interlock/. uv sync installs it
+# editable so the interlock script resolves; nothing is ever built for distribution.
+module-name = "backend"
+module-root = ""
+source-exclude = ["backend/.env", "backend/logs"]
+wheel-exclude = ["backend/.env", "backend/logs"]
 
 [tool.ruff]
 line-length = 100

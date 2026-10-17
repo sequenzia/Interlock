@@ -7,6 +7,7 @@ backend/logs/spike/<timestamp>/. Needs TYPESAFE_API_KEY in backend/.env.
     uv run python -m backend.spike.jev_spike                 # all eight items
     uv run python -m backend.spike.jev_spike --items 1,3,8   # a subset
     uv run python -m backend.spike.jev_spike --dry-run       # build and validate requests, no network
+    uv run interlock spike --dry-run                         # same flags via backend/cli.py
 
 No simulator is involved. Facts follow the schema in plan section 5.4 and the
 question phrasing in section 5.5 so the spike measures what the shield will send.
@@ -22,6 +23,7 @@ import os
 import statistics
 import sys
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -885,10 +887,8 @@ async def run_items(jev: Jev, report: Report, items: set[int], repeats: int) -> 
         await item_8_latency(jev, report, repeats)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Flags shared by ``python -m backend.spike.jev_spike`` and ``interlock spike``."""
     parser.add_argument(
         "--items", default="1-8", help='checklist items to run, e.g. "1,3,8" or "1-8"'
     )
@@ -898,8 +898,9 @@ def main() -> None:
         action="store_true",
         help="build and validate every request without calling the API",
     )
-    args = parser.parse_args()
 
+
+def run_cli(args: argparse.Namespace) -> int:
     items: set[int] = set()
     for part in args.items.split(","):
         if "-" in part:
@@ -914,12 +915,21 @@ def main() -> None:
             "TYPESAFE_API_KEY is not set. Copy backend/.env.example to backend/.env and fill it in.",
             file=sys.stderr,
         )
-        sys.exit(2)
+        return 2
     try:
         asyncio.run(run(items, args.repeats, args.dry_run))
     except TypeSafeError as exc:
         print(f"TypeSafe SDK error: {exc}", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    add_arguments(parser)
+    sys.exit(run_cli(parser.parse_args(argv)))
 
 
 if __name__ == "__main__":

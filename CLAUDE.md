@@ -56,6 +56,9 @@ around Oct 23, 2026.
   return stable references: never `?? []` or `?? {}` inside a selector.
 - Keep the headless CLI working at all times; the server and UI sit on top
   of it, not beside it. `backend/episode.py` holds the per-step loop both share.
+  `backend/cli.py` is the `interlock` command. Each subcommand calls a module's
+  `add_arguments` and `run_cli`, so new flags go in the module, never in the
+  dispatcher, and `python -m backend.<module>` stays equivalent.
 - Context7 is disabled in this project. Read library docs from the official
   sites: highway-env.farama.org, stable-baselines3.readthedocs.io,
   docs.typesafe.ai.
@@ -66,26 +69,29 @@ around Oct 23, 2026.
 Update this section as modules land.
 
 ```
-uv sync --all-groups                                 # backend deps (+ pytest, ruff)
+uv sync --all-groups                                 # backend deps (+ pytest, ruff) and the interlock command
 uv run pytest                                        # backend tests
 uv run ruff format backend tests && uv run ruff check backend tests
-uv run python -m backend.train                       # 20k-step DQN to models/dqn_highway_20k.zip
-uv run python -m backend.train --timesteps 100000    # long run
-uv run python -m backend.train --eval-only models/dqn_highway_20k.zip   # greedy rollouts over --eval-seeds
-uv run python -m backend.train --eval-only models/dqn_highway_20k.zip --promote  # copy to dqn_highway.zip
-uv run python -m backend.spike.jev_spike             # Day 1 Jev spike, writes internal/jev-spike-results.md
-uv run python -m backend.spike.jev_spike --dry-run   # validate every spike request offline, no key needed
-uv run python -m backend.run_episode --shield on     # headless shielded episode, logs to backend/logs/runs/
-uv run python -m backend.run_episode --shield off --seed 3            # shadow mode on another seed
-uv run python -m backend.run_episode --jev mock --zone-at-step 10     # offline, drop the work zone mid-episode
-uv run python -m backend.run_episode --rules speed_limit --operator approve --max-steps 20
-uv run python -m backend.evaluate --seeds 0-19 --mode on           # one configuration, writes backend/logs/eval/<stamp>_<label>/
-uv run python -m backend.evaluate --seeds 0-19 --all --concurrency 2  # off + 5-pair sweep + report, ~8 min, ~$0.75 live
-uv run python -m backend.evaluate --report                           # rebuild internal/eval/latest.json and internal/plots/*.png
-uv run uvicorn backend.server:app --reload           # WebSocket server on :8000, live Jev if key present
-JEV_MODE=mock ESCALATION_TIMEOUT_S=0 uv run uvicorn backend.server:app   # offline, wait for the operator
-JEV_CACHE_PATH=/tmp/empty.jsonl JEV_MODE=mock uv run uvicorn backend.server:app  # empty cache: every step escalates
-cd frontend && pnpm install && pnpm dev              # console on :5173, proxies /ws to :8000
+uv run interlock --help                              # every subcommand takes its module's flags
+uv run interlock train                               # 20k-step DQN to models/dqn_highway_20k.zip
+uv run interlock train --timesteps 100000            # long run
+uv run interlock train --eval-only models/dqn_highway_20k.zip   # greedy rollouts over --eval-seeds
+uv run interlock train --eval-only models/dqn_highway_20k.zip --promote  # copy to dqn_highway.zip
+uv run interlock spike                               # Day 1 Jev spike, writes internal/jev-spike-results.md
+uv run interlock spike --dry-run                     # validate every spike request offline, no key needed
+uv run interlock run --shield on                     # headless shielded episode, logs to backend/logs/runs/
+uv run interlock run --shield off --seed 3           # shadow mode on another seed
+uv run interlock run --jev mock --zone-at-step 10    # offline, drop the work zone mid-episode
+uv run interlock run --rules speed_limit --operator approve --max-steps 20
+uv run interlock eval --seeds 0-19 --mode on         # one configuration, writes backend/logs/eval/<stamp>_<label>/
+uv run interlock eval --seeds 0-19 --all --concurrency 2  # off + 5-pair sweep + report, ~8 min, ~$0.75 live
+uv run interlock eval --report                       # rebuild internal/eval/latest.json and internal/plots/*.png
+uv run interlock console                             # uvicorn on :8000 + Vite on :5173, live Jev if key present
+uv run interlock console --jev mock --escalation-timeout 0   # offline, wait for the operator
+uv run interlock console --jev mock --cache /tmp/empty.jsonl  # empty cache: every step escalates
+uv run interlock console --reload --open             # dev loop; --no-ui runs the server alone
+uv run uvicorn backend.server:app --reload           # server by itself; python -m backend.<module> also still works
+cd frontend && pnpm install && pnpm dev              # console by itself on :5173, proxies /ws to :8000
 cd frontend && pnpm typecheck && pnpm build          # strict tsc, then Vite production build
 cd frontend && pnpm test:e2e                         # Playwright smoke test: own mock backend on :8001, Vite on :5174
 ```

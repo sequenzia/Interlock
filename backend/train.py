@@ -7,6 +7,7 @@ The policy is trained on env reward alone and never sees an operator rule.
     uv run python -m backend.train --timesteps 100000      # long run
     uv run python -m backend.train --eval-only models/dqn_highway_20k.zip
     uv run python -m backend.train --promote               # also copy to dqn_highway.zip
+    uv run interlock train --promote                       # same flags via backend/cli.py
 """
 
 from __future__ import annotations
@@ -14,7 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -115,10 +118,8 @@ def parse_seed_range(text: str) -> list[int]:
     return seeds
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Flags shared by ``python -m backend.train`` and ``interlock train``."""
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
@@ -136,8 +137,9 @@ def main() -> None:
     parser.add_argument(
         "--promote", action="store_true", help="also copy the checkpoint to models/dqn_highway.zip"
     )
-    args = parser.parse_args()
 
+
+def run_cli(args: argparse.Namespace) -> int:
     seeds = parse_seed_range(args.eval_seeds)
     if args.eval_only is not None:
         checkpoint = args.eval_only
@@ -154,6 +156,15 @@ def main() -> None:
     if args.promote:
         shutil.copyfile(checkpoint, DEFAULT_MODEL_PATH)
         print(f"promoted {checkpoint.name} to {DEFAULT_MODEL_PATH}")
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    add_arguments(parser)
+    sys.exit(run_cli(parser.parse_args(argv)))
 
 
 if __name__ == "__main__":

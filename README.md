@@ -144,38 +144,49 @@ cp backend/.env.example backend/.env        # add TYPESAFE_API_KEY
 uv run pytest                               # backend tests
 ```
 
+`uv sync` also installs the `interlock` command. Every subcommand is a thin
+wrapper over a module in `backend/`, so `uv run python -m backend.run_episode`
+and friends still work and take the same flags.
+
 Train the agent once. Checkpoints are not committed. The 100k-step run takes
 about 25 minutes on a laptop and is promoted to `models/dqn_highway.zip`:
 
 ```
-uv run python -m backend.train --timesteps 100000 --promote
+uv run interlock train --timesteps 100000 --promote
 ```
 
 Run a shielded episode headlessly, with per-step output and a JSONL log:
 
 ```
-uv run python -m backend.run_episode --shield on
-uv run python -m backend.run_episode --shield off --seed 3
-uv run python -m backend.run_episode --jev mock --zone-at-step 10
+uv run interlock run --shield on
+uv run interlock run --shield off --seed 3
+uv run interlock run --jev mock --zone-at-step 10
 ```
 
-Run the console:
+Run the console. One command starts the WebSocket server on :8000 and the Vite
+dev server on http://127.0.0.1:5173, and Ctrl-C stops both:
 
 ```
-uv run uvicorn backend.server:app --reload                     # WebSocket server on :8000
-cd frontend && pnpm install && pnpm dev                        # console on http://127.0.0.1:5173
+cd frontend && pnpm install && cd ..                           # once
+uv run interlock console                                       # live Jev when the key is present
+uv run interlock console --jev mock --escalation-timeout 0     # offline, wait for the operator
+uv run interlock console --reload --open                       # dev loop, open the browser
 ```
 
-Useful server environment variables: `JEV_MODE=live|mock` (default: live
-when the key is present), `ESCALATION_TIMEOUT_S` (default 20, use 0 to wait
-for the operator indefinitely, recommended for a live demo), `SEED`,
-`MODEL_PATH`, and `JEV_CACHE_PATH` for a separate cache file.
+The console flags map onto the server's environment variables: `--jev` sets
+`JEV_MODE` (default: live when the key is present), `--escalation-timeout`
+sets `ESCALATION_TIMEOUT_S` (default 20; 0 waits for the operator
+indefinitely, recommended for a live demo), and `--seed`, `--model-path` and
+`--cache` set `SEED`, `MODEL_PATH` and `JEV_CACHE_PATH`. The two halves still
+run on their own with `uv run uvicorn backend.server:app --reload` and
+`cd frontend && pnpm dev`, or `uv run interlock console --no-ui` for the
+server alone.
 
 Evaluate and plot:
 
 ```
-uv run python -m backend.evaluate --seeds 0-19 --all --concurrency 2   # off, five threshold pairs, report
-uv run python -m backend.evaluate --report                             # rebuild internal/eval and internal/plots
+uv run interlock eval --seeds 0-19 --all --concurrency 2   # off, five threshold pairs, report
+uv run interlock eval --report                             # rebuild internal/eval and internal/plots
 ```
 
 Frontend checks:
@@ -199,7 +210,8 @@ backend/
   checkers.py      ground-truth checkers, scoring only
   logger.py        the JSONL record
   episode.py       the per-step loop shared by the CLI and the server
-  run_episode.py   headless CLI
+  cli.py           the interlock command: run, eval, train, spike, console
+  run_episode.py   headless episode, behind interlock run
   server.py        FastAPI WebSocket server, live and replay
   metrics.py       episode metrics, aggregates, calibration
   evaluate.py      batch evaluation and report

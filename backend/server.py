@@ -8,6 +8,7 @@ JSONL run from backend/logs/runs/ through the same messages.
     uv run uvicorn backend.server:app --reload
     JEV_MODE=mock uv run uvicorn backend.server:app          # offline
     ESCALATION_TIMEOUT_S=0 uv run uvicorn backend.server:app # wait forever
+    uv run interlock console --jev mock --escalation-timeout 0  # both, plus the Vite console
 """
 
 from __future__ import annotations

@@ -16,6 +16,8 @@ around Oct 23, 2026.
   log schema, spike checklist. Read this before touching any module.
 - `internal/jev-spike-results.md`: written on Day 1; holds measured Jev
   behavior. Do not assume Jev behavior that is not recorded there.
+  `internal/jev-spike-recheck-oct17.md` repeats items 2 and 3 after the Oct 17
+  fact schema change and compares them with Day 1.
 - `internal/decision-models-research.md`: public facts about Jev and the
   decision-model category as of Oct 16. Vendor claims, not measured behavior.
 - `internal/eval/latest.json` and `internal/plots/`: the Day 5 evaluation.

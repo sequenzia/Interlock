@@ -5,6 +5,7 @@ from backend.facts import (
     facts_for_action,
     for_candidates,
     lane_after,
+    lane_history,
     sentences,
     snapshot,
     target_speed_after,
@@ -35,7 +36,61 @@ def test_facts_follow_the_plan_schema_from_live_state() -> None:
     assert target_speed_after(ego, "SLOWER") == 20.0
     assert target_speed_after(ego, "IDLE") == 25.0
     assert "lane_right_of_lane_after" not in f
+    assert f["history"] == {"lane_changes_last_10_steps": 0, "steps_in_current_lane": 0}
+    assert f["traffic"]["vehicles_within_50_m"] >= 0
+    with_history = facts_for_action(
+        env,
+        "FASTER",
+        zones=[],
+        history={"lane_changes_last_10_steps": 2, "steps_in_current_lane": 3},
+    )
+    assert with_history["history"] == {"lane_changes_last_10_steps": 2, "steps_in_current_lane": 3}
     env.close()
+
+
+def test_headway_ttc_tailgating_and_density_follow_the_geometry() -> None:
+    env = make_env()
+    env.reset(seed=0)
+    u = env.unwrapped
+    ego = u.vehicle
+    f = facts_for_action(env, "FASTER", zones=[])  # target 30 m/s after the action
+    la = f["lane_after_action"]
+    front, rear = u.road.neighbour_vehicles(ego, ego.lane_index)
+    gap = la["vehicle_ahead_gap_m"]
+    assert front is not None and gap is not None
+    assert la["headway_s"] == round(gap / 30.0, 1)
+    closing = 30.0 - float(front.speed)
+    assert la["time_to_collision_ahead_s"] == (round(gap / closing, 1) if closing > 0 else None)
+    behind = la["vehicle_behind_gap_m"]
+    expected_tailgated = (
+        rear is not None and behind is not None and behind < 10.0 and float(rear.speed) > ego.speed
+    )
+    assert la["being_tailgated"] is expected_tailgated
+    x = float(ego.position[0])
+    expected_density = sum(
+        1 for v in u.road.vehicles if v is not ego and abs(float(v.position[0]) - x) <= 50.0
+    )
+    assert f["traffic"]["vehicles_within_50_m"] == expected_density
+    env.close()
+
+
+def test_lane_history_counts_changes_and_steps_in_lane() -> None:
+    assert lane_history([], 2) == {"lane_changes_last_10_steps": 0, "steps_in_current_lane": 0}
+    assert lane_history([2, 2, 2], 2) == {
+        "lane_changes_last_10_steps": 0,
+        "steps_in_current_lane": 3,
+    }
+    assert lane_history([1, 2, 2], 3) == {
+        "lane_changes_last_10_steps": 2,
+        "steps_in_current_lane": 0,
+    }
+    assert lane_history([3, 3, 2, 2], 2) == {
+        "lane_changes_last_10_steps": 1,
+        "steps_in_current_lane": 2,
+    }
+    old = [1, 2] + [2] * 10  # the change from 1 to 2 is older than ten transitions
+    assert lane_history(old, 2)["lane_changes_last_10_steps"] == 0
+    assert lane_history(old, 2)["steps_in_current_lane"] == 11
 
 
 def test_gaps_match_the_simulator_geometry() -> None:
@@ -107,6 +162,12 @@ def test_candidates_and_snapshot_and_sentences() -> None:
     text = "\n".join(sentences(all_facts["LANE_LEFT"]))
     assert "LANE_LEFT: move one lane to the left" in text
     assert "no vehicle within 200 m behind" in text
+    assert (
+        "Headway:" in text
+        and "Time to collision ahead:" in text
+        and "Tailgated within 10 m:" in text
+    )
+    assert "Traffic:" in text and "Lane changes in the last 10 steps: 0" in text
     assert "Operator zones: none." in text
     env.close()
 
@@ -154,6 +215,7 @@ def test_sentences_with_vehicles_on_both_sides() -> None:
     assert "nearest vehicle ahead is 42 m away at 24 m/s" in text
     assert "Lane to the right of lane 1" in text
     assert "starts 120 m ahead and ends 320 m ahead. This action enters it: no" in text
+    assert "Headway" not in text  # a facts object without the Oct 17 fields still renders
 
 
 def test_edge_lane_changes_are_described_as_no_ops() -> None:

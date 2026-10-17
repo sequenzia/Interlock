@@ -9,6 +9,7 @@ starting at 1.
 
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import Any
 
 from backend.constraints import Zone
@@ -23,9 +24,14 @@ ACTION_MEANING: dict[str, str] = {
 
 NEIGHBOUR_RANGE_M = 200.0  # vehicles farther away are reported as absent
 SLOWER_AHEAD_RANGE_M = 40.0
+TAILGATE_RANGE_M = 10.0  # a vehicle behind within this gap and closing is tailgating
+TRAFFIC_RANGE_M = 50.0  # density is the vehicle count within this distance, any lane
+HISTORY_STEPS = 10  # lane changes are counted over this many past transitions
 STEP_SECONDS = 1.0  # policy_frequency 1
 
 Facts = dict[str, Any]
+History = dict[str, int]
+NO_HISTORY: History = {"lane_changes_last_10_steps": 0, "steps_in_current_lane": 0}
 
 
 def _r(value: float) -> float:
@@ -100,8 +106,21 @@ def _ahead_block(road: Any, ego: Any, lane: int) -> Facts:
     }
 
 
-def _lane_block(road: Any, ego: Any, lane: int, lane_count: int) -> Facts:
+def _headway_and_ttc(
+    ahead_gap: float | None, front: Any, speed_after: float
+) -> tuple[float | None, float | None]:
+    """Seconds of headway at the speed after the action, and time to collision when closing."""
+    if ahead_gap is None or front is None:
+        return None, None
+    headway = _r(ahead_gap / speed_after) if speed_after > 0 else None
+    closing = speed_after - float(front.speed)
+    ttc = _r(ahead_gap / closing) if closing > 0 else None
+    return headway, ttc
+
+
+def _lane_block(road: Any, ego: Any, lane: int, lane_count: int, speed_after: float) -> Facts:
     front, ahead_gap, rear, behind_gap = _gaps(road, ego, lane)
+    headway, ttc = _headway_and_ttc(ahead_gap, front, speed_after)
     return {
         "is_leftmost": lane == 1,
         "is_rightmost": lane == lane_count,
@@ -110,7 +129,23 @@ def _lane_block(road: Any, ego: Any, lane: int, lane_count: int) -> Facts:
         "vehicle_ahead_gap_m": None if ahead_gap is None else _r(ahead_gap),
         "vehicle_ahead_speed_mps": None if front is None else _r(front.speed),
         "slower_vehicle_ahead_within_40_m": _slower_ahead(ego, front, ahead_gap),
+        "headway_s": headway,
+        "time_to_collision_ahead_s": ttc,
+        "being_tailgated": rear is not None
+        and behind_gap is not None
+        and behind_gap < TAILGATE_RANGE_M
+        and float(rear.speed) > float(ego.speed),
     }
+
+
+def _traffic(road: Any, ego: Any) -> Facts:
+    x = float(ego.position[0])
+    within = sum(
+        1
+        for v in road.vehicles
+        if v is not ego and abs(float(v.position[0]) - x) <= TRAFFIC_RANGE_M
+    )
+    return {"vehicles_within_50_m": within}
 
 
 def _zone_facts(ego: Any, zones: list[Zone], new_lane: int) -> list[Facts]:
@@ -133,13 +168,20 @@ def _zone_facts(ego: Any, zones: list[Zone], new_lane: int) -> list[Facts]:
     return out
 
 
-def facts_for_action(env: Any, action: str, zones: list[Zone]) -> Facts:
-    """Facts for one candidate action from the live simulator state."""
+def facts_for_action(
+    env: Any, action: str, zones: list[Zone], history: History | None = None
+) -> Facts:
+    """Facts for one candidate action from the live simulator state.
+
+    ``history`` is the ego's recent lane history from the episode runner; a
+    headless caller without one gets zeros, which is right at the first step.
+    """
     u = env.unwrapped
     ego, road = u.vehicle, u.road
     lane_count = int(u.config["lanes_count"])
     lane = lane_number(ego.lane_index)
     new_lane = lane_after(action, lane, lane_count)
+    speed_after = target_speed_after(ego, action)
     facts: Facts = {
         "ego": {
             "lane": lane,
@@ -151,10 +193,12 @@ def facts_for_action(env: Any, action: str, zones: list[Zone]) -> Facts:
             "name": action,
             "meaning": action_meaning(action, lane, lane_count),
             "lane_after": new_lane,
-            "target_speed_after_mps": target_speed_after(ego, action),
+            "target_speed_after_mps": speed_after,
         },
-        "lane_after_action": _lane_block(road, ego, new_lane, lane_count),
+        "lane_after_action": _lane_block(road, ego, new_lane, lane_count, speed_after),
         "current_lane": _ahead_block(road, ego, lane),
+        "traffic": _traffic(road, ego),
+        "history": dict(NO_HISTORY if history is None else history),
         "zones": _zone_facts(ego, zones, new_lane),
     }
     if new_lane == 1 and lane_count > 1:
@@ -162,8 +206,22 @@ def facts_for_action(env: Any, action: str, zones: list[Zone]) -> Facts:
     return facts
 
 
-def for_candidates(env: Any, actions: list[str], zones: list[Zone]) -> dict[str, Facts]:
-    return {action: facts_for_action(env, action, zones) for action in actions}
+def for_candidates(
+    env: Any, actions: list[str], zones: list[Zone], history: History | None = None
+) -> dict[str, Facts]:
+    return {action: facts_for_action(env, action, zones, history) for action in actions}
+
+
+def lane_history(past_lanes: list[int], lane: int) -> History:
+    """Lane changes over the last ``HISTORY_STEPS`` transitions and steps spent in ``lane``."""
+    sequence = [*past_lanes[-HISTORY_STEPS:], lane]
+    changes = sum(a != b for a, b in pairwise(sequence))
+    in_lane = 0
+    for previous in reversed(past_lanes):
+        if previous != lane:
+            break
+        in_lane += 1
+    return {"lane_changes_last_10_steps": changes, "steps_in_current_lane": in_lane}
 
 
 def noop_actions(candidates: dict[str, Facts]) -> frozenset[str]:
@@ -214,6 +272,19 @@ def _gap_phrase(gap: float | None, speed: float | None, direction: str) -> str:
     return phrase if speed is None else f"{phrase} at {speed:g} m/s"
 
 
+def _margins_phrase(la: Facts) -> str:
+    """Headway, time to collision and tailgating for the lane after the action, when present."""
+    if "headway_s" not in la:
+        return ""
+    headway = la["headway_s"]
+    ttc = la["time_to_collision_ahead_s"]
+    return (
+        f" Headway: {'none, no vehicle ahead' if headway is None else f'{headway:g} s'}."
+        f" Time to collision ahead: {'not closing' if ttc is None else f'{ttc:g} s'}."
+        f" Tailgated within 10 m: {'yes' if la['being_tailgated'] else 'no'}."
+    )
+
+
 def sentences(f: Facts) -> list[str]:
     """Plain sentences for the operator UI, generated from the same facts Jev sees."""
     ego, act, la, cur = f["ego"], f["action"], f["lane_after_action"], f["current_lane"]
@@ -231,10 +302,18 @@ def sentences(f: Facts) -> list[str]:
             else ""
         )
         + f"; {_gap_phrase(la['vehicle_ahead_gap_m'], la['vehicle_ahead_speed_mps'], 'ahead')}. "
-        f"Slower vehicle ahead within 40 m: {yes_no[la['slower_vehicle_ahead_within_40_m']]}.",
+        f"Slower vehicle ahead within 40 m: {yes_no[la['slower_vehicle_ahead_within_40_m']]}."
+        + _margins_phrase(la),
         f"Current lane {ego['lane']}: {_gap_phrase(cur['vehicle_ahead_gap_m'], cur['vehicle_ahead_speed_mps'], 'ahead')}. "
         f"Slower vehicle ahead within 40 m: {yes_no[cur['slower_vehicle_ahead_within_40_m']]}.",
     ]
+    if "traffic" in f and "history" in f:
+        traffic, history = f["traffic"], f["history"]
+        lines.append(
+            f"Traffic: {traffic['vehicles_within_50_m']} vehicles within 50 m. "
+            f"Lane changes in the last 10 steps: {history['lane_changes_last_10_steps']}. "
+            f"Steps in the current lane: {history['steps_in_current_lane']}."
+        )
     if "lane_right_of_lane_after" in f:
         right = f["lane_right_of_lane_after"]
         lines.append(

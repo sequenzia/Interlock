@@ -94,7 +94,10 @@ def lane_block(
     closing: float,
     ahead: float,
     ahead_speed: float,
+    speed_after: float | None = None,
 ) -> dict[str, Any]:
+    speed_after = ego_speed if speed_after is None else speed_after
+    closing_ahead = speed_after - ahead_speed
     return {
         "is_leftmost": lane == 1,
         "is_rightmost": lane == LANE_COUNT,
@@ -103,6 +106,9 @@ def lane_block(
         "vehicle_ahead_gap_m": ahead,
         "vehicle_ahead_speed_mps": ahead_speed,
         "slower_vehicle_ahead_within_40_m": ahead <= 40 and ahead_speed < ego_speed,
+        "headway_s": round(ahead / speed_after, 1) if speed_after > 0 else None,
+        "time_to_collision_ahead_s": round(ahead / closing_ahead, 1) if closing_ahead > 0 else None,
+        "being_tailgated": behind < 10 and closing > 0,
     }
 
 
@@ -133,14 +139,20 @@ def build(
     after: dict[str, float],
     current: dict[str, float],
     zones: list[dict[str, Any]] | None = None,
+    traffic: int = 4,
+    lane_changes: int = 0,
+    steps_in_lane: int = 5,
 ) -> dict[str, Any]:
     """Assemble one candidate's facts in the plan's 5.4 schema.
 
     ``after`` holds behind/closing/ahead/ahead_speed for the lane the action ends
-    in; ``current`` holds ahead/ahead_speed for the lane the ego is in now.
+    in; ``current`` holds ahead/ahead_speed for the lane the ego is in now. The
+    traffic and history fields added on Oct 17 take neutral defaults so the
+    fact sets stay comparable with the Oct 16 run.
     """
     target = speed if target is None else target
     new_lane = lane_after(action, lane)
+    after_speed = target_after(action, target)
     return {
         "ego": {
             "lane": lane,
@@ -152,10 +164,15 @@ def build(
             "name": action,
             "meaning": ACTION_MEANING[action],
             "lane_after": new_lane,
-            "target_speed_after_mps": target_after(action, target),
+            "target_speed_after_mps": after_speed,
         },
-        "lane_after_action": lane_block(new_lane, speed, **after),
+        "lane_after_action": lane_block(new_lane, speed, speed_after=after_speed, **after),
         "current_lane": current_block(speed, **current),
+        "traffic": {"vehicles_within_50_m": traffic},
+        "history": {
+            "lane_changes_last_10_steps": lane_changes,
+            "steps_in_current_lane": steps_in_lane,
+        },
         "zones": zones or [],
     }
 
@@ -807,7 +824,7 @@ async def item_8_latency(jev: Jev, report: Report, repeats: int) -> None:
 # --------------------------------------------------------------------------- main
 
 
-def write_outputs(jev: Jev, report: Report, started: datetime) -> None:
+def write_outputs(jev: Jev, report: Report, started: datetime, results_path: Path) -> None:
     stamp = started.strftime("%Y-%m-%dT%H-%M-%S")
     raw_dir = RAW_DIR / stamp
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -843,11 +860,11 @@ def write_outputs(jev: Jev, report: Report, started: datetime) -> None:
             "",
         ]
     )
-    RESULTS_PATH.write_text(header + "\n" + "\n".join(report.sections))
-    print(f"\nwrote {RESULTS_PATH} and {len(jev.calls)} raw exchanges to {raw_dir}")
+    results_path.write_text(header + "\n" + "\n".join(report.sections))
+    print(f"\nwrote {results_path} and {len(jev.calls)} raw exchanges to {raw_dir}")
 
 
-async def run(items: set[int], repeats: int, dry_run: bool) -> None:
+async def run(items: set[int], repeats: int, dry_run: bool, results_path: Path) -> None:
     started = datetime.now(UTC)
     report = Report()
     if dry_run:
@@ -864,7 +881,7 @@ async def run(items: set[int], repeats: int, dry_run: bool) -> None:
     ) as client:
         jev = Jev(client)
         await run_items(jev, report, items, repeats)
-    write_outputs(jev, report, started)
+    write_outputs(jev, report, started, results_path)
 
 
 async def run_items(jev: Jev, report: Report, items: set[int], repeats: int) -> None:
@@ -898,6 +915,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="build and validate every request without calling the API",
     )
+    parser.add_argument(
+        "--results",
+        type=Path,
+        default=RESULTS_PATH,
+        help="where to write the results markdown (default: internal/jev-spike-results.md)",
+    )
 
 
 def run_cli(args: argparse.Namespace) -> int:
@@ -917,7 +940,7 @@ def run_cli(args: argparse.Namespace) -> int:
         )
         return 2
     try:
-        asyncio.run(run(items, args.repeats, args.dry_run))
+        asyncio.run(run(items, args.repeats, args.dry_run, Path(args.results)))
     except TypeSafeError as exc:
         print(f"TypeSafe SDK error: {exc}", file=sys.stderr)
         return 1

@@ -262,6 +262,24 @@ Decided Oct 16: not built. Speed comparisons were crisp at every probe. Gap
 comparisons had the right sign at every probe but were soft, and the softness
 tracked the negation in the rule text (section 5.5), not the arithmetic.
 
+Added Oct 17 (section 16.2, item A3), all computed in code:
+
+- `lane_after_action.headway_s`: gap ahead over the target speed after the
+  action; null with no vehicle ahead.
+- `lane_after_action.time_to_collision_ahead_s`: gap ahead over the closing
+  speed at the target speed after the action; null when not closing.
+- `lane_after_action.being_tailgated`: a vehicle behind within 10 m and faster
+  than the ego.
+- `traffic.vehicles_within_50_m`: other vehicles within 50 m along the road,
+  any lane.
+- `history.lane_changes_last_10_steps` and `history.steps_in_current_lane`:
+  from a lane deque on `EpisodeRunner`, the same for every candidate in a step.
+
+Every cache key changed with the schema, so the demo seeds need re-warming.
+The spike's builder carries the same fields with neutral defaults, and
+`interlock spike --items 2,3 --results <path>` re-ran the fact sets and the
+numeric probes without touching the Oct 16 results file.
+
 ### 5.5 Question phrasing
 
 Positive assertion, no negation, one rule per question, rule text verbatim:
@@ -706,6 +724,9 @@ old all-blocked column; both were corrected on Oct 17.
    deque on `EpisodeRunner` passed into `for_candidates`. Re-run the spike
    fact sets live and confirm no preset rule moves by more than 0.1; Jev's
    docs warn that irrelevant state costs accuracy.
+   Done Oct 17: 44 fact-set pairs, max abs diff 0.10, mean 0.013, misses 1 of
+   43 as before; speed probes unchanged, gap probes sharper and now monotone.
+   Record in `internal/jev-spike-recheck-oct17.md`.
 4. New rules. Crisp, with checkers: "Keep at least 2 seconds of headway" and
    "At most one lane change in any 10 seconds". Fuzzy, without checkers: "Do
    not cut in close ahead of a fast-closing vehicle" and "Drive conservatively
@@ -769,8 +790,8 @@ and the first plan went from brief to deployed in one night.
 
 | Phase | Work | Done when |
 | --- | --- | --- |
-| 1 | A1 metrics fix, A2 conflict policy and queue protocol | Report regenerated from the existing logs; a no-compliant-action escalation resolves from the console with a chosen action |
-| 2 | A3 facts, spike re-run | New fields on every candidate; preset rules within 0.1 of the Oct 16 spike |
+| 1 | A1 metrics fix, A2 conflict policy and queue protocol | Report regenerated from the existing logs; a no-compliant-action escalation resolves from the console with a chosen action. Done Oct 17. |
+| 2 | A3 facts, spike re-run | New fields on every candidate; preset rules within 0.1 of the Oct 16 spike. Done Oct 17. |
 | 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot |
 | 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor |
 | 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed |

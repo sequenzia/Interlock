@@ -47,9 +47,11 @@ async def step(self) -> StepResult:
    rule. This runs first so the facts and the enabled rule set agree.
 2. **Rank the actions.** `policy.ranked_actions(obs)` returns all five actions
    sorted by Q-value, best first; `names` keeps that order.
-3. **Build the facts.** `facts.for_candidates(env, names, store.zones)` makes
-   one facts object per action from the live simulator state. See
-   [Facts](facts.md).
+3. **Build the facts.** The runner reads the ego's lane, derives the
+   `history` block from the lanes of past steps with `facts.lane_history`,
+   records this step's lane, and `facts.for_candidates(env, names,
+   store.zones, history)` makes one facts object per action from the live
+   simulator state. See [Facts](facts.md).
 4. **Ask the judge.** `judge.check(candidates, store.enabled())` returns a
    `CheckResult` with `p[action][constraint_id]`, per-question sources, the
    exchanges that were actually sent, latency, tokens and cost. Only enabled

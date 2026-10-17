@@ -1,4 +1,5 @@
 import asyncio
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -142,6 +143,25 @@ def test_shield_off_runs_in_shadow(policy: Policy, tmp_path: Path) -> None:
         assert r["executed"] == r["candidates"][0]["action"] and r["human"] is None
         assert r["escalation_reason"] is None and r["fallback"]["kind"] == "least_bad"
         assert len(r["candidates"][0]["checks"]) == 4  # judge and checkers still ran
+
+
+def test_lane_history_in_the_facts_matches_the_logged_lanes(policy: Policy, tmp_path: Path) -> None:
+    runner = make_runner(policy, tmp_path, shield_on=False)
+    asyncio.run(runner.run(seed=0, max_steps=12))
+    runner.close()
+    records = read_log(tmp_path / "run.jsonl")
+    lanes = [r["ego"]["lane"] for r in records]
+    for k, r in enumerate(records):
+        history = r["candidates"][0]["facts"]["history"]
+        window = lanes[max(0, k - 10) : k + 1]
+        assert history["lane_changes_last_10_steps"] == sum(a != b for a, b in pairwise(window))
+        in_lane = 0
+        for previous in reversed(lanes[:k]):
+            if previous != lanes[k]:
+                break
+            in_lane += 1
+        assert history["steps_in_current_lane"] == in_lane
+        assert all(c["facts"]["history"] == history for c in r["candidates"])
 
 
 def test_no_rules_means_allow(policy: Policy, tmp_path: Path) -> None:

@@ -61,8 +61,9 @@ Simulator state plus one action to facts JSON and sentences. See [Facts](../deve
 | `action_meaning` | `(action: str, lane: int, lane_count: int) -> str` |
 | `lane_after` | `(action: str, lane: int, lane_count: int) -> int` |
 | `target_speed_after` | `(ego: Any, action: str) -> float` |
-| `facts_for_action` | `(env: Any, action: str, zones: list[Zone]) -> Facts` |
-| `for_candidates` | `(env: Any, actions: list[str], zones: list[Zone]) -> dict[str, Facts]` |
+| `facts_for_action` | `(env: Any, action: str, zones: list[Zone], history: History \| None = None) -> Facts` |
+| `for_candidates` | `(env: Any, actions: list[str], zones: list[Zone], history: History \| None = None) -> dict[str, Facts]` |
+| `lane_history` | `(past_lanes: list[int], lane: int) -> History`, the `history` block |
 | `noop_actions` | `(candidates: dict[str, Facts]) -> frozenset[str]`, lane changes at the road edge and speed changes at the end of the range |
 | `snapshot` | `(env: Any) -> dict[str, Any]`, ego and vehicle positions for the log record |
 | `sentences` | `(f: Facts) -> list[str]` |

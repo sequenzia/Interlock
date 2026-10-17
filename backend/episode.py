@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import statistics
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -152,12 +153,14 @@ class EpisodeRunner:
         self.step_index = 0
         self.totals = Totals()
         self._obs: Any = None
+        self._lanes: deque[int] = deque(maxlen=2 * fact_extractor.HISTORY_STEPS)
 
     def reset(self, seed: int) -> dict[str, Any]:
         self.seed = seed
         self.run_id = make_run_id(seed, self.shield_on)
         self.step_index = 0
         self.totals = Totals()
+        self._lanes.clear()
         self._obs, _ = self.env.reset(seed=seed)
         return fact_extractor.snapshot(self.env)
 
@@ -169,7 +172,10 @@ class EpisodeRunner:
         self.store.retire_passed_zones(self.ego_x_m)
         ranked = self.policy.ranked_actions(self._obs)
         names = [r.name for r in ranked]
-        candidates = fact_extractor.for_candidates(self.env, names, self.store.zones)
+        lane = fact_extractor.lane_number(self.env.unwrapped.vehicle.lane_index)
+        history = fact_extractor.lane_history(list(self._lanes), lane)
+        self._lanes.append(lane)
+        candidates = fact_extractor.for_candidates(self.env, names, self.store.zones, history)
         enabled = self.store.enabled()
         check = await self.judge.check(candidates, enabled)
         labels = checkers.label_all(candidates, enabled)

@@ -17,8 +17,10 @@ never from the normalized observation the policy sees.
 
 ## The schema
 
-One object per candidate action. Here is a real one from a logged step: the
-ego is in the rightmost lane and the candidate is `LANE_LEFT`.
+One object per candidate action. Here is a real one from a logged step, the
+ego in the rightmost lane and the candidate `LANE_LEFT`, with the fields added
+on Oct 17 (`headway_s`, `time_to_collision_ahead_s`, `being_tailgated`,
+`traffic`, `history`) filled in with illustrative values.
 
 ```json
 {
@@ -36,13 +38,18 @@ ego is in the rightmost lane and the candidate is `LANE_LEFT`.
     "vehicle_behind_closing_speed_mps": -3.9,
     "vehicle_ahead_gap_m": 56.3,
     "vehicle_ahead_speed_mps": 20.4,
-    "slower_vehicle_ahead_within_40_m": false
+    "slower_vehicle_ahead_within_40_m": false,
+    "headway_s": 2.3,
+    "time_to_collision_ahead_s": 12.2,
+    "being_tailgated": false
   },
   "current_lane": {
     "vehicle_ahead_gap_m": 7.2,
     "vehicle_ahead_speed_mps": 21.1,
     "slower_vehicle_ahead_within_40_m": true
   },
+  "traffic": {"vehicles_within_50_m": 5},
+  "history": {"lane_changes_last_10_steps": 1, "steps_in_current_lane": 4},
   "zones": []
 }
 ```
@@ -82,6 +89,27 @@ lane for `IDLE`, `FASTER` and `SLOWER`.
 | `vehicle_ahead_gap_m` | Bumper to bumper gap to the nearest vehicle ahead, or `null`. |
 | `vehicle_ahead_speed_mps` | Its speed, or `null`. |
 | `slower_vehicle_ahead_within_40_m` | `true` when a vehicle ahead is within 40 m and slower than the ego. |
+| `headway_s` | Gap ahead divided by the target speed after the action, or `null` with no vehicle ahead. The target speed is used rather than the current speed because it is what the action commits to; for `FASTER` that makes the headway conservative. |
+| `time_to_collision_ahead_s` | Gap ahead divided by the closing speed (target speed after the action minus the vehicle ahead's speed), or `null` when not closing or with no vehicle ahead. |
+| `being_tailgated` | `true` when a vehicle behind in that lane is within 10 m and faster than the ego. For a lane change this is a cut-in close ahead of a closing vehicle. |
+
+### `traffic`
+
+| Field | Meaning |
+| --- | --- |
+| `vehicles_within_50_m` | Other vehicles within 50 m of the ego longitudinally, in any lane. A density measure for rules such as "drive conservatively in dense traffic". |
+
+### `history`
+
+| Field | Meaning |
+| --- | --- |
+| `lane_changes_last_10_steps` | Lane changes over the last ten transitions, counting the one this step's state implies. |
+| `steps_in_current_lane` | Consecutive previous steps spent in the current lane, 0 at the first step. |
+
+The history comes from `EpisodeRunner`, which keeps the ego's lane at the
+start of each past step and calls `lane_history` before building the facts.
+It is the same for every candidate in a step: it describes the past, not the
+action. A caller without a runner gets zeros.
 
 ### `current_lane` and `lane_right_of_lane_after`
 
@@ -114,6 +142,10 @@ retires them at the top of each step anyway (see
 | Gaps are bumper to bumper | `_gaps` | Center distance minus the vehicle length (5 m), floored at 0. |
 | Far vehicles are absent | `NEIGHBOUR_RANGE_M = 200` | Beyond 200 m a neighbour is reported as `null` rather than as a large number. |
 | Slower means slower and close | `_slower_ahead`, `SLOWER_AHEAD_RANGE_M = 40` | Both conditions are required. |
+| Tailgating is close and closing | `TAILGATE_RANGE_M = 10` | A vehicle behind within 10 m whose speed exceeds the ego's. |
+| Density is a count | `_traffic`, `TRAFFIC_RANGE_M = 50` | Vehicles within 50 m along the road, any lane, ego excluded. |
+| History is ten transitions | `lane_history`, `HISTORY_STEPS = 10` | The runner keeps twenty past lanes so `steps_in_current_lane` can exceed ten. |
+| Margins use the speed after the action | `_headway_and_ttc` | Headway and time to collision divide by the target speed the action commits to. |
 | One step is one second | `STEP_SECONDS = 1.0` | Matches `policy_frequency: 1`; used for zone entry. |
 | Neighbours come from the road | `road.neighbour_vehicles(ego, lane_tuple)` | highway-env's own lookup on the target lane, so the facts and the simulator agree. |
 | Numbers are rounded to one decimal | `_r` | Keeps the state short and the cache key stable across floating-point noise. |
@@ -122,8 +154,10 @@ retires them at the top of each step anyway (see
 
 | Function | Returns |
 | --- | --- |
-| `facts_for_action(env, action, zones)` | The facts object for one candidate from the live environment. |
-| `for_candidates(env, actions, zones)` | `{action: facts}` for the ranking. |
+| `facts_for_action(env, action, zones, history=None)` | The facts object for one candidate from the live environment. |
+| `for_candidates(env, actions, zones, history=None)` | `{action: facts}` for the ranking, all sharing the same history. |
+| `lane_history(past_lanes, lane)` | The `history` block from the lanes of past steps and the current lane. |
+| `noop_actions(candidates)` | The actions whose facts show no change in lane or target speed; the shield excludes them from the least-bad fallback. |
 | `snapshot(env)` | The render snapshot for the record: ego `lane`, `speed_mps`, `x_m` and a list of other vehicles with `id`, `lane`, `x_m`, `speed_mps`. Ids are the index in `road.vehicles`, stable within an episode. |
 | `sentences(facts)` | The same facts as plain sentences for the console and the approval card. |
 | `lane_after`, `target_speed_after`, `action_meaning`, `lane_number` | Small helpers reused by the checkers' tests and the spike. |
@@ -136,8 +170,9 @@ is exactly what the judge saw. For the example above:
 ```text
 Ego speed 24.4 m/s, target 25 m/s, lane 4 of 4 (numbered from the left).
 LANE_LEFT: move one lane to the left. Lane after: 3. Target speed after: 25 m/s.
-Lane 3 after the action: nearest vehicle behind is 1.5 m away, closing at -3.9 m/s; nearest vehicle ahead is 56.3 m away at 20.4 m/s. Slower vehicle ahead within 40 m: no.
+Lane 3 after the action: nearest vehicle behind is 1.5 m away, closing at -3.9 m/s; nearest vehicle ahead is 56.3 m away at 20.4 m/s. Slower vehicle ahead within 40 m: no. Headway: 2.3 s. Time to collision ahead: 12.2 s. Tailgated within 10 m: no.
 Current lane 4: nearest vehicle ahead is 7.2 m away at 21.1 m/s. Slower vehicle ahead within 40 m: yes.
+Traffic: 5 vehicles within 50 m. Lane changes in the last 10 steps: 1. Steps in the current lane: 4.
 Operator zones: none.
 ```
 
@@ -158,13 +193,18 @@ with the model and the question. Any change to a field name, a rounding rule
 or a new block therefore invalidates every cached answer. That is the right
 behaviour, since a different state is a different question, but it means a
 warm cache for the demo seeds has to be rebuilt after editing this module.
-See [Jev integration](jev-integration.md).
+The Oct 17 additions did exactly that: every key changed, so the demo seeds
+need `interlock run` again before a mock-mode demo. See
+[Jev integration](jev-integration.md).
 
 ## Tests
 
 `tests/test_facts.py` checks the schema against a live environment, that gaps
 match the simulator's own geometry, lane clamping at the edges, the no-op
 wording for edge lane changes, the lane-to-the-right block, the slower flag
-needing both gap and speed, zone facts relative to the ego with the entry
-flag, the speed grid for `target_speed_after`, and that the sentences cover
-every block.
+needing both gap and speed, headway, time to collision, tailgating and density
+against the simulator, `lane_history` over short and long sequences, the
+no-op action set, zone facts relative to the ego with the entry flag, the
+speed grid for `target_speed_after`, and that the sentences cover every block.
+`tests/test_episode.py` checks that the history in every logged candidate
+matches the lanes of the preceding records.

@@ -109,6 +109,7 @@ The hand-written probe of Jev's behaviour on fixed fact sets. It needs the key u
 ```bash
 uv run interlock spike --dry-run
 uv run interlock spike --items 1,3,8
+uv run interlock spike --items 2,3 --results internal/jev-spike-recheck-oct17.md   # keep the Day 1 file
 ```
 
 | Flag | Default | Meaning |
@@ -116,6 +117,7 @@ uv run interlock spike --items 1,3,8
 | `--items LIST` | `1-8` | which checklist items to run |
 | `--repeats N` | `20` | steps for the latency item |
 | `--dry-run` | off | no network |
+| `--results PATH` | `internal/jev-spike-results.md` | where the results markdown goes; a re-run after a schema change writes elsewhere so the Day 1 record survives |
 
 Without the key and without `--dry-run` it exits with code 2. An SDK error exits with 1.
 

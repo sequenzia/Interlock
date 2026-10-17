@@ -30,7 +30,20 @@ def test_target_after_follows_the_mdp_speed_grid() -> None:
 
 def test_build_matches_plan_schema() -> None:
     f = build("LANE_LEFT", lane=2, speed=29.6, target=30.0, after=OPEN, current=CLEAR)
-    assert set(f) == {"ego", "action", "lane_after_action", "current_lane", "zones"}
+    assert set(f) == {
+        "ego",
+        "action",
+        "lane_after_action",
+        "current_lane",
+        "traffic",
+        "history",
+        "zones",
+    }
+    assert f["lane_after_action"]["headway_s"] == 2.0  # 60 m at 30 m/s
+    assert f["lane_after_action"]["time_to_collision_ahead_s"] == 15.0  # closing at 4 m/s
+    assert f["lane_after_action"]["being_tailgated"] is False
+    assert f["traffic"] == {"vehicles_within_50_m": 4}
+    assert f["history"] == {"lane_changes_last_10_steps": 0, "steps_in_current_lane": 5}
     assert f["ego"] == {"lane": 2, "lane_count": 4, "speed_mps": 29.6, "target_speed_mps": 30.0}
     assert f["action"]["lane_after"] == 1
     assert f["lane_after_action"]["is_leftmost"] is True

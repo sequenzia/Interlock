@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("console connects, a rule escalates in mock mode, the operator resolves it, the inspector opens", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("SHIELD CONSOLE")).toBeVisible();
+  await expect(page.getByText("INTERLOCK")).toBeVisible();
   await expect(page.getByText("jev mock")).toBeVisible();
   await expect(page.getByText("No rules yet", { exact: false })).toBeVisible();
 

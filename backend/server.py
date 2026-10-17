@@ -452,7 +452,7 @@ def create_app(session: Session | None = None) -> FastAPI:
         yield
         await app.state.session.close()
 
-    app = FastAPI(title="Shielded RL with Jev", lifespan=lifespan)
+    app = FastAPI(title="Interlock: shielded RL with Jev", lifespan=lifespan)
 
     @app.get("/health")
     async def health() -> dict[str, Any]:

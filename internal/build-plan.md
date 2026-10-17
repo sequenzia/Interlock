@@ -27,6 +27,7 @@ around Thursday, Oct 23, with a live demo and a backup video.
 | Camera | Ego-centered road view | Matches how the facts are phrased |
 | Plan location | This file plus CLAUDE.md | Reviewed before any code |
 | Writing style | No em dashes anywhere: docs, slides, UI copy | Brief's preference |
+| Project name | Interlock; "shield" stays the lowercase technical term for the mechanism | A wordmark built on "shield" reads as a brand, not a technique; a safety interlock permits an action only when a condition holds, with a supervised override |
 
 ## 2. Confirmed Jev facts
 

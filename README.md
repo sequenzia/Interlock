@@ -1,9 +1,9 @@
-# Shielded RL with Jev
+# Interlock
 
 **The policy was trained once. The rules changed live, in plain English.**
 
-A runtime safety shield for a reinforcement learning agent, with a human on the
-loop. A Stable-Baselines3 DQN drives in [highway-env](https://highway-env.farama.org/)
+Interlock is a runtime safety shield for a reinforcement learning agent, with a
+human on the loop. A Stable-Baselines3 DQN drives in [highway-env](https://highway-env.farama.org/)
 on task reward alone and knows nothing about rules. At every step,
 [Jev](https://docs.typesafe.ai), TypeSafe's decision model, judges each of the
 agent's candidate actions against operator rules typed in plain English and
@@ -14,6 +14,10 @@ the evaluation numbers.
 
 Built as a demo for a short talk on runtime safety for learned policies and on
 human-on-the-loop design.
+
+Interlock is an independent personal project and is not affiliated with any
+company. The name is the safety-engineering term for a mechanism that permits
+an action only when a condition holds, with a supervised override.
 
 ![Rule violations and task return per seed, shield off versus on](internal/plots/before_after.png)
 
@@ -237,3 +241,5 @@ different candidate than the one proposed.
 Full internal documentation will follow. Until then, `CLAUDE.md` holds the
 working rules and command list, and `internal/build-plan.md` is the source of
 truth for decisions and contracts.
+`internal/decision-models-research.md` collects what is publicly known about
+Jev and the decision-model category.

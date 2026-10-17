@@ -1,8 +1,8 @@
-# Shielded RL with Jev
+# Interlock: Shielded RL with Jev
 
-A runtime safety shield demo. A Stable-Baselines3 DQN drives in highway-env on
-task reward alone. Jev, TypeSafe's decision model, judges each candidate
-action against plain-English operator rules. Code allows, falls back or
+Interlock is a runtime safety shield demo. A Stable-Baselines3 DQN drives in
+highway-env on task reward alone. Jev, TypeSafe's decision model, judges each
+candidate action against plain-English operator rules. Code allows, falls back or
 escalates to a human. A React console shows the road, the rules, the approval
 queue and the decision log. Built as a demo for a presentation
 around Oct 23, 2026.
@@ -14,6 +14,8 @@ around Oct 23, 2026.
   log schema, spike checklist. Read this before touching any module.
 - `internal/jev-spike-results.md`: written on Day 1; holds measured Jev
   behavior. Do not assume Jev behavior that is not recorded there.
+- `internal/decision-models-research.md`: public facts about Jev and the
+  decision-model category as of Oct 16. Vendor claims, not measured behavior.
 - `internal/eval/latest.json` and `internal/plots/`: the Day 5 evaluation.
   Plan section 10 holds the results table and the reading of it.
 
@@ -43,6 +45,8 @@ around Oct 23, 2026.
 - `TYPESAFE_API_KEY` comes from `backend/.env`, which is gitignored. Never
   commit it, never log it.
 - No em dashes in docs, slides, UI copy or commit messages.
+- The project is Interlock. "Shield" stays the lowercase technical term for
+  the mechanism. Never use it as a name in the header, page title or packages.
 
 ## Conventions
 

@@ -42,7 +42,7 @@ export function StatusStrip() {
     <header className="panel flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
       <div className="flex shrink-0 items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-rose-500"}`} />
-        <span className="text-[12px] font-semibold tracking-[0.22em] text-zinc-200">SHIELD CONSOLE</span>
+        <span className="text-[12px] font-semibold tracking-[0.22em] text-zinc-200">INTERLOCK</span>
       </div>
       <div className="flex shrink-0 overflow-hidden rounded border border-zinc-700 text-[11px]">
         {(["console", "metrics"] as const).map((v) => (

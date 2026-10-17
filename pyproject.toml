@@ -1,5 +1,5 @@
 [project]
-name = "shielded"
+name = "interlock"
 version = "0.1.0"
 description = "Runtime safety shield demo: SB3 DQN in highway-env, judged by Jev against plain-English rules"
 requires-python = ">=3.12,<3.13"

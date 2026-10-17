@@ -1,1 +1,1 @@
-"""Shielded RL with Jev: backend package."""
+"""Interlock: shielded RL with Jev. Backend package."""

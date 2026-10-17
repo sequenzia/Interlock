@@ -1,0 +1,134 @@
+site_name: Interlock
+site_description: Runtime safety shield for a reinforcement learning agent, judged by Jev against plain-English rules, with a human on the loop.
+site_url: https://sequenzia.github.io/interlock/
+repo_url: https://github.com/sequenzia/interlock
+repo_name: sequenzia/interlock
+edit_uri: edit/main/docs/
+copyright: Interlock is an independent personal project.
+
+docs_dir: docs
+site_dir: site
+strict: false
+
+theme:
+  name: material
+  icon:
+    logo: material/traffic-light
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.path
+    - search.suggest
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/sequenzia/interlock
+
+nav:
+  - Home: index.md
+  - User guide:
+      - Concepts: user-guide/concepts.md
+      - Install: user-guide/install.md
+      - Quickstart: user-guide/quickstart.md
+      - The console:
+          - Tour: user-guide/console/tour.md
+          - Running an episode: user-guide/console/running-an-episode.md
+          - Rules and zones: user-guide/console/rules-and-zones.md
+          - Approval queue: user-guide/console/approval-queue.md
+          - Timeline and inspector: user-guide/console/timeline-and-inspector.md
+          - Replay: user-guide/console/replay.md
+          - Metrics tab: user-guide/console/metrics-tab.md
+      - Command line: user-guide/cli.md
+      - Evaluation and results: user-guide/evaluation.md
+      - Deployment: user-guide/deployment.md
+      - Troubleshooting: user-guide/troubleshooting.md
+  - Developer guide:
+      - Architecture: developer-guide/architecture.md
+      - Repository layout: developer-guide/repository-layout.md
+      - Development setup: developer-guide/development-setup.md
+      - Backend:
+          - Per-step loop: developer-guide/backend/episode-loop.md
+          - Shield algorithm: developer-guide/backend/shield.md
+          - Facts: developer-guide/backend/facts.md
+          - Jev integration: developer-guide/backend/jev-integration.md
+          - Constraints and checkers: developer-guide/backend/constraints-and-checkers.md
+          - Server and session: developer-guide/backend/server.md
+          - CLI internals: developer-guide/backend/cli.md
+          - Evaluation internals: developer-guide/backend/evaluation.md
+          - Training and policy: developer-guide/backend/training.md
+      - Contracts:
+          - Log record: developer-guide/contracts/log-record.md
+          - WebSocket protocol: developer-guide/contracts/websocket-protocol.md
+          - Evaluation report: developer-guide/contracts/eval-report.md
+      - Frontend:
+          - Overview: developer-guide/frontend/overview.md
+          - Store and selectors: developer-guide/frontend/store.md
+          - Components: developer-guide/frontend/components.md
+          - Socket client: developer-guide/frontend/socket-client.md
+      - Testing: developer-guide/testing.md
+      - Extending Interlock: developer-guide/extending.md
+      - Deployment internals: developer-guide/deployment-internals.md
+      - Conventions: developer-guide/conventions.md
+  - Reference:
+      - Configuration: reference/configuration.md
+      - Module reference: reference/modules.md
+      - Glossary: reference/glossary.md

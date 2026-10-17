@@ -1,0 +1,55 @@
+# Build the MkDocs site and publish it to GitHub Pages.
+#
+# The docs toolchain is the `docs` dependency group in pyproject.toml, so the
+# build installs mkdocs-material alone: torch, highway-env and the rest of the
+# backend never enter the runner. Pages must be set to "GitHub Actions" as its
+# source once, under Settings > Pages in the repository.
+
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install the docs group only
+        run: uv sync --only-group docs
+      - name: Build the site
+        run: uv run --no-sync mkdocs build --strict
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

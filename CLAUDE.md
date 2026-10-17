@@ -18,6 +18,10 @@ around Oct 23, 2026.
   decision-model category as of Oct 16. Vendor claims, not measured behavior.
 - `internal/eval/latest.json` and `internal/plots/`: the Day 5 evaluation.
   Plan section 10 holds the results table and the reading of it.
+- `docs/` and `mkdocs.yml`: the public documentation site (MkDocs Material),
+  published to GitHub Pages by `.github/workflows/docs.yml`. It covers code,
+  usage and results only; it never quotes or links the files under `internal/`.
+  When a contract, flag, message or screen changes, update its page in `docs/`.
 
 ## Stack
 
@@ -80,6 +84,11 @@ around Oct 23, 2026.
   https://interlock-console-pied.vercel.app.
 - Linux installs CPU-only torch through `[tool.uv.sources]` in `pyproject.toml`.
   Keep that when bumping torch, or the image grows by the CUDA libraries.
+- The docs site deploys to GitHub Pages at https://sequenzia.github.io/interlock/
+  from `.github/workflows/docs.yml` on pushes to `main` that touch `docs/`,
+  `mkdocs.yml`, `pyproject.toml` or `uv.lock`. The job installs only the uv
+  `docs` group (`uv sync --only-group docs`), so torch never enters the runner.
+  Pages must be set to the GitHub Actions source once in the repo settings.
 - `.dockerignore` is an allowlist. A new runtime file the server reads must be
   added there and copied in the `Dockerfile`.
 
@@ -88,7 +97,7 @@ around Oct 23, 2026.
 Update this section as modules land.
 
 ```
-uv sync --all-groups                                 # backend deps (+ pytest, ruff) and the interlock command
+uv sync --all-groups                                 # backend deps (+ pytest, ruff, mkdocs) and the interlock command
 uv run pytest                                        # backend tests
 uv run ruff format backend tests && uv run ruff check backend tests
 uv run interlock --help                              # every subcommand takes its module's flags
@@ -113,6 +122,8 @@ uv run uvicorn backend.server:app --reload           # server by itself; python 
 cd frontend && pnpm install && pnpm dev              # console by itself on :5173, proxies /ws to :8000
 cd frontend && pnpm typecheck && pnpm build          # strict tsc, then Vite production build
 cd frontend && pnpm test:e2e                         # Playwright smoke test: own mock backend on :8001, Vite on :5174
+uv run mkdocs serve -a 127.0.0.1:8080                # docs site with live reload; port 8000 belongs to the backend
+uv run mkdocs build --strict                         # what the GitHub Pages workflow runs; fails on a broken link
 docker build --platform linux/amd64 -t interlock-backend .   # backend image: lock, backend/, model, eval report, Jev cache
 docker run --rm -p 8000:8000 --env-file backend/.env -e ESCALATION_TIMEOUT_S=0 interlock-backend
 fly deploy --ha=false                                # backend on Fly.io per fly.toml, one machine; key via: grep '^TYPESAFE_API_KEY=' backend/.env | fly secrets import

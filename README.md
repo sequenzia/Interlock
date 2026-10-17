@@ -15,6 +15,11 @@ the evaluation numbers.
 Built as a demo of runtime safety for learned policies and human-on-the-loop
 design.
 
+Full documentation, with a user guide for the console and the command line and
+a developer guide for every module and contract, is at
+[sequenzia.github.io/interlock](https://sequenzia.github.io/interlock/). It builds
+from `docs/` with `uv run mkdocs serve -a 127.0.0.1:8080`.
+
 Interlock is an independent personal project and is not affiliated with any
 company. The name is the safety-engineering term for a mechanism that permits
 an action only when a condition holds, with a supervised override.
@@ -196,6 +201,13 @@ cd frontend && pnpm typecheck && pnpm build
 cd frontend && pnpm test:e2e           # Playwright smoke test on its own mock backend
 ```
 
+Documentation site:
+
+```
+uv run mkdocs serve -a 127.0.0.1:8080  # live preview; port 8000 belongs to the backend
+uv run mkdocs build --strict           # the GitHub Pages workflow runs this
+```
+
 ## Deploying for a live demo
 
 The console is a static Vite build and deploys to Vercel as is. The server is
@@ -286,6 +298,7 @@ backend/
   plots.py         slide plots
   spike/           the Day 1 Jev spike
 frontend/          Vite, React, TypeScript, Tailwind, Zustand, Recharts, Playwright
+docs/              documentation site source (MkDocs Material), published to GitHub Pages
 internal/          project brief, build plan, spike results, evaluation report, plots
 models/            trained checkpoints (gitignored)
 tests/             pytest suite

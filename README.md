@@ -12,8 +12,8 @@ the agent's next-best safe action, or pauses and asks a human. An operator
 console shows the road, the rules, the approval queue, a decision inspector and
 the evaluation numbers.
 
-Built as a demo for a short talk on runtime safety for learned policies and on
-human-on-the-loop design.
+Built as a demo of runtime safety for learned policies and human-on-the-loop
+design.
 
 Interlock is an independent personal project and is not affiliated with any
 company. The name is the safety-engineering term for a mechanism that permits
@@ -308,18 +308,3 @@ tests/             pytest suite
 - **The shield enforces rules, not collision safety.** An unattended
   default-deny can override the policy's own crash avoidance, which argues for
   a following-distance rule in the rule set and for no auto-deny in a live demo.
-
-## Status
-
-Days 1 to 5 of the plan are complete: trained agent, headless shield, console
-with approval queue and inspector, replay, evaluation with plots and a smoke
-test. Remaining before the talk: a backup video, an offline dry run on the warm
-cache, slides, and two product items the evaluation argued for, a
-following-distance preset and an operator override that lets the human pick a
-different candidate than the one proposed.
-
-Full internal documentation will follow. Until then, `CLAUDE.md` holds the
-working rules and command list, and `internal/build-plan.md` is the source of
-truth for decisions and contracts.
-`internal/decision-models-research.md` collects what is publicly known about
-Jev and the decision-model category.

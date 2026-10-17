@@ -10,6 +10,8 @@ around Oct 23, 2026.
 ## Source of truth
 
 - `internal/project-brief.md`: intent, concept, talk.
+- `internal/interlock-summary.md`: two-page summary of what Interlock is, what
+  it does and why it matters. Written Oct 17.
 - `internal/build-plan.md`: decisions, schedule, module contracts, protocol,
   log schema, spike checklist. Read this before touching any module.
 - `internal/jev-spike-results.md`: written on Day 1; holds measured Jev

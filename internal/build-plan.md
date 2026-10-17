@@ -468,6 +468,10 @@ shield's own interventions make it worse because the car weaves less and so
 cruises in the left lane more often with nobody to pass. Jev scores those
 steps at 0.1 to 0.2, below T_ALLOW, so they are allowed.
 
+Correction, Oct 17: the last sentence is wrong. The logs show all 52 steps
+were escalations at p 0.54 to 0.80, denied, with the SLOWER last resort
+executed while no action satisfied every rule. Section 16.1 has the reading.
+
 Calibration over 93,285 labeled (candidate, rule) checks: ECE 0.093, Brier
 0.032, accuracy at a 0.5 cut 97.5%. Per rule: speed limit ECE 0.059 and 100%
 accurate with p bimodal below 0.2 or above 0.8; lane change gap ECE 0.081 but
@@ -590,3 +594,154 @@ and one shielded step over the socket.
 
 Known limit: one session per backend. Every browser on the URL shares the
 episode and the controls. A read-only viewer mode is a feature, not a config.
+
+## 16. Upgrade plan (added Oct 17)
+
+Goal: make the demo show something a rules engine cannot, and make the numbers
+survive a skeptical audience. Four items agreed Oct 17, in priority order, with
+a freeze phase before the talk. Critique that led here: three of the four preset rules
+are if-statements over facts the extractor already computes; the one fuzzy rule
+is where the shield leaks; "type any rule" is bounded by the fact schema; and
+the shield can override the policy's own crash avoidance.
+
+### 16.1 Diagnosis of the passing-rule leaks (done Oct 17)
+
+Section 10 reads the 52 left-lane violations at the default thresholds as
+steps Jev scored low and the shield allowed. The logs under
+`backend/logs/eval/2026-10-16T23-15-42_on_ta0.20_tb0.80` say otherwise:
+
+- All 52 are escalations, p 0.54 to 0.80 on the passing rule, denied by the
+  simulated operator, with SLOWER executed as the last resort. The
+  `all_blocked` flag is true on every one.
+- The car is in lane 1 with nobody slower to pass, so every lane-keeping
+  action violates the passing rule. The only compliant action, LANE_RIGHT,
+  truly violates the lane-change gap rule in 49 of the 52 steps, and Jev
+  scores it 0.6 to 0.9 on that rule. No action satisfies every rule.
+- SLOWER at the lowest target speed is a no-op (target 20 to 20), so the state
+  does not change and the step repeats: 37 consecutive steps on seed 10, 12 on
+  seed 5, 3 on seed 2.
+- Jev's answers on these steps have the right sign for every candidate and
+  rule. The leak is a shield policy gap: nothing says what to execute when
+  every candidate violates something, and the hardcoded resort is itself a
+  violation.
+- `all_blocked_rate` in `metrics.py` counts only decision kind `all_blocked`.
+  It misses resolved escalations whose fallback was the last resort, where the
+  kind stays `escalate` and only the flag is true. The true rate at 0.2 / 0.8
+  is at least 52 of 1035 steps, about 5%, not 0.2%. The sweep column in
+  section 10 is undercounted for every on configuration.
+- Passing-rule calibration is underconfident, not undiscriminating: true
+  violations score 0.3 to 0.8 and never above 0.9; non-violations sit mostly
+  below 0.3 with a shoulder at 0.4 to 0.6. At T_BLOCK 0.8 a passing violation
+  is never blocked outright; it always escalates.
+
+Consequences: item A starts with the shield's conflict policy, not the fact
+schema. The passing rule stays as the fuzzy-rule example because the
+underconfidence is real. The README and `docs/user-guide/evaluation.md` say
+only that the fuzzy rule leaks, which stands; any all-blocked figure they carry
+regenerates at the freeze.
+
+### 16.2 Item A: a rule set worth a model
+
+1. Fix `all_blocked_rate` to count the flag. Re-run `interlock eval --report`
+   over the existing logs, no Jev cost, and update the section 10 table.
+2. Conflict policy in `shield.py`. Recommended: when no lower-ranked action is
+   confidently safe, execute the candidate with the lowest worst-p that is not
+   above T_BLOCK, flagged `least_bad`; keep SLOWER only when nothing
+   qualifies. When the last resort would not change the state (SLOWER at the
+   floor, lane change at the edge), escalate with reason `no_compliant_action`
+   and let the operator pick any candidate. Alternative considered and
+   rejected Oct 17: rule priorities typed by the operator; least-bad plus the
+   operator's choice covers the demo without a new concept to explain.
+   Contracts: the escalation message gains `candidates` with each action's
+   worst p and rule; the resolve message gains an optional `action`; the log
+   record's `human` gains `action` and `decision` gains the value `choose`;
+   `Decision.kind` gains `least_bad`. Plan sections 7 and 8 first, then
+   `logger.py`, then `frontend/src/types.ts`.
+3. Fact schema additions in `facts.py`, all computed in code:
+   `headway_s_after` (gap ahead over speed after), `time_to_collision_ahead_s`
+   (gap over closing speed when closing, else null), `being_tailgated` (behind
+   gap under 10 m and closing), `vehicles_within_50_m`,
+   `lane_changes_last_10_steps`, `steps_in_current_lane`. History is a small
+   deque on `EpisodeRunner` passed into `for_candidates`. Re-run the spike
+   fact sets live and confirm no preset rule moves by more than 0.1; Jev's
+   docs warn that irrelevant state costs accuracy.
+4. New rules. Crisp, with checkers: "Keep at least 2 seconds of headway" and
+   "At most one lane change in any 10 seconds". Fuzzy, without checkers: "Do
+   not cut in close ahead of a fast-closing vehicle" and "Drive conservatively
+   in dense traffic". All phrased as positive statements.
+5. Labeling command `interlock label --run <jsonl> --rule <id> --sample N`:
+   shows a candidate's sentences, takes y, n or skip, appends to
+   `backend/logs/labels/<run>.jsonl` keyed like the Jev cache (facts hash plus
+   rule text). `metrics.py` merges human labels where the checker label is
+   null, so fuzzy rules enter calibration with their label source recorded.
+   Target 300 labels per fuzzy rule.
+6. Re-run `interlock eval --seeds 0-19 --all`, rebuild the report and plots.
+
+### 16.3 Item B: chat-LLM baseline, offline
+
+- New module `backend/baseline_llm.py` behind `interlock baseline --checks
+  2000 --models claude-haiku-5-5,claude-sonnet-5-5`.
+- Sample labeled (candidate, rule) checks from the eval logs, stratified by
+  rule and label. Send the identical facts JSON and question text and ask for
+  a probability of violation as one structured number. Record latency and
+  tokens; take prices from the API docs at run time, never hardcoded.
+- ECE, Brier and accuracy at 0.5 per model through the existing functions in
+  `metrics.py`; a `baseline` block in `latest.json`; a reliability and
+  latency plot in `plots.py`; a third panel in the metrics tab if time allows.
+- Jev's answers for the same checks come from the logs, so Jev costs nothing.
+- Dependency: the `anthropic` SDK, approved Oct 17. Key as `ANTHROPIC_API_KEY`
+  in `backend/.env`, gitignored, never logged.
+
+### 16.4 Item C: physics floor in code
+
+- After A3 the facts carry time to collision. `shield.py` gains a floor,
+  default 1.0 s: any candidate below it is removed from the executable set
+  before `decide()`, so it is never the proposal, the fallback or the last
+  resort. If the floor removes every candidate, SLOWER executes flagged
+  `floor`.
+- Log record gains `floor: {"applied": bool, "removed": [actions]}`; decision
+  kinds unchanged; the inspector greys floored candidates.
+- Talk framing: the floor is physics, not policy. Operators cannot type it
+  away. Three layers: physical limits in code, rules in the model, judgment
+  calls to the human.
+- Eval: crash rate before and after, expected to fall at the aggressive
+  threshold settings.
+
+### 16.5 Item D: the unshielded twin
+
+- The shield-off run on a seed is deterministic and already logged. On
+  `reset`, the server looks for a shield-off log for that seed under
+  `backend/logs/runs/` and the eval directories and sends one `twin` message
+  with per-step ego, vehicles, executed action, violation count and crash
+  flag. Absent a log, the console hides the strip. Demo seeds are warmed with
+  `interlock run --shield off --seed N` and ship in the image.
+- Console: a second, shorter road strip under the main one, driven by the
+  twin record at the current step index and drawn faded, with a running count
+  of twin violations and crashes. Playback and scrubbing share the index.
+- No Jev cost and no new server state beyond the loaded records.
+
+### 16.6 Phases and freeze
+
+Phases run in order. Each ends with the tests green and the docs page updated
+for anything it changed. No day estimates: the work is done by coding agents,
+and the first plan went from brief to deployed in one night.
+
+| Phase | Work | Done when |
+| --- | --- | --- |
+| 1 | A1 metrics fix, A2 conflict policy and queue protocol | Report regenerated from the existing logs; a no-compliant-action escalation resolves from the console with a chosen action |
+| 2 | A3 facts, spike re-run | New fields on every candidate; preset rules within 0.1 of the Oct 16 spike |
+| 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot |
+| 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor |
+| 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed |
+| 6 | Freeze: docs sweep, section 10 and README corrected, backup video, rehearsal | `mkdocs build --strict` passes; video recorded; no code changes after this point |
+
+Human-paced work: collecting labels in phase 3 and the video and rehearsal in
+phase 6 need the operator's time. Everything else is agent time.
+
+Risks: widening the facts shifts preset answers, caught by the spike re-run;
+the conflict policy changes every on-mode number, so all tables regenerate
+after A2; scope, handled by the freeze phase. Not doing: retraining the
+agent, PyFlyt, click-to-place zones, WebGL.
+
+Decided Oct 17: the conflict policy is least-bad, and the operator may choose
+any candidate in the queue when no compliant action exists. Both are in A2.

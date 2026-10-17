@@ -1,0 +1,39 @@
+# Fly.io config for the Interlock backend: one always-on machine built from the
+# Dockerfile at the repo root. `fly deploy` ships this directory as the build
+# context (.dockerignore applies), so the gitignored checkpoint and Jev cache go
+# along without being committed. The API key is a Fly secret, never in this file:
+#   grep '^TYPESAFE_API_KEY=' backend/.env | fly secrets import
+# CONSOLE_ORIGINS under [env] lists the console's production aliases on Vercel.
+# Deploy with --ha=false: the session is one process, so exactly one machine.
+
+app = "interlock-backend"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ESCALATION_TIMEOUT_S = "0"   # live demo: wait for the operator, never default-deny
+  CONSOLE_ORIGINS = "https://interlock-console-pied.vercel.app,https://interlock-console-sequenzia.vercel.app"   # the console's production aliases on Vercel
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"   # the session lives in memory; never scale to zero
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 200           # every browser on the console holds one WebSocket
+
+  [[http_service.checks]]
+    grace_period = "30s"       # torch and highway-env take a few seconds to import
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"

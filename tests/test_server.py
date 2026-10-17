@@ -228,3 +228,26 @@ def test_eval_latest_reports_absence_and_presence(
     monkeypatch.setattr(server_module, "EVAL_REPORT", present)
     body = client.get("/eval/latest").json()
     assert body["available"] is True and body["sweep"] == []
+
+
+def test_console_origins_enable_cors_for_listed_origins_only(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("backend.logger.LOGS_DIR", tmp_path)
+    monkeypatch.setenv("CONSOLE_ORIGINS", "https://console.example, https://preview.example")
+    assert server_module.console_origins_from_env() == [
+        "https://console.example",
+        "https://preview.example",
+    ]
+    session = Session(policy, JevClient(live=None, cache=JevCache(None)), escalation_timeout_s=None)
+    with TestClient(create_app(session)) as c:
+        listed = c.get("/health", headers={"Origin": "https://console.example"})
+        assert listed.headers["access-control-allow-origin"] == "https://console.example"
+        other = c.get("/health", headers={"Origin": "https://elsewhere.example"})
+        assert "access-control-allow-origin" not in other.headers
+
+
+def test_no_console_origins_keeps_same_origin_only(client: TestClient) -> None:
+    response = client.get("/health", headers={"Origin": "https://console.example"})
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers

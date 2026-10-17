@@ -15,6 +15,7 @@ import {
   YAxis,
   LabelList,
 } from "recharts";
+import { httpUrl } from "../backend-url";
 import { fmtUsd } from "../format";
 import type { EvalReport, Reliability } from "../types";
 
@@ -72,7 +73,7 @@ export function MetricsView() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/eval/latest")
+    fetch(httpUrl("/eval/latest"))
       .then((r) => r.json() as Promise<EvalReport>)
       .then((r) => {
         if (!cancelled) setReport(r);

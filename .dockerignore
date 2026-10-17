@@ -1,0 +1,15 @@
+# Build context for the backend image: the lock, the package, the promoted
+# checkpoint, the eval report and the warm Jev cache. Nothing else, and never
+# backend/.env.
+*
+!pyproject.toml
+!uv.lock
+!.python-version
+!backend/
+**/__pycache__
+backend/.env
+backend/logs/*
+!backend/logs/.gitkeep
+!backend/logs/jev_cache.jsonl
+!models/dqn_highway.zip
+!internal/eval/latest.json

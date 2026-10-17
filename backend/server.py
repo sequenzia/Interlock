@@ -8,6 +8,7 @@ JSONL run from backend/logs/runs/ through the same messages.
     uv run uvicorn backend.server:app --reload
     JEV_MODE=mock uv run uvicorn backend.server:app          # offline
     ESCALATION_TIMEOUT_S=0 uv run uvicorn backend.server:app # wait forever
+    CONSOLE_ORIGINS=https://interlock-console-pied.vercel.app uv run uvicorn backend.server:app  # console on another origin
     uv run interlock console --jev mock --escalation-timeout 0  # both, plus the Vite console
 """
 
@@ -26,6 +27,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.constraints import (
     DEFAULT_ZONE_AHEAD_M,
@@ -446,7 +448,16 @@ def session_from_env() -> Session:
     )
 
 
-def create_app(session: Session | None = None) -> FastAPI:
+def console_origins_from_env() -> list[str]:
+    """Origins allowed to call /health and /eval cross-origin: the deployed console."""
+    return [o.strip() for o in os.environ.get("CONSOLE_ORIGINS", "").split(",") if o.strip()]
+
+
+def create_app(
+    session: Session | None = None, *, console_origins: list[str] | None = None
+) -> FastAPI:
+    """``console_origins`` None reads CONSOLE_ORIGINS; an empty list keeps same-origin only."""
+
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.session = session or session_from_env()
@@ -454,6 +465,11 @@ def create_app(session: Session | None = None) -> FastAPI:
         await app.state.session.close()
 
     app = FastAPI(title="Interlock: shielded RL with Jev", lifespan=lifespan)
+    origins = console_origins_from_env() if console_origins is None else console_origins
+    if origins:
+        # Browsers apply CORS to the fetches only; the WebSocket upgrade is exempt,
+        # so this covers /health and /eval/latest for a console on another origin.
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET"])
 
     @app.get("/health")
     async def health() -> dict[str, Any]:

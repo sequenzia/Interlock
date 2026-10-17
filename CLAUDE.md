@@ -64,6 +64,25 @@ around Oct 23, 2026.
   docs.typesafe.ai.
 - Conventional Commits. Do not commit or push unless asked.
 
+## Deployment
+
+- The console is a static Vite build on Vercel with `frontend/` as the project
+  root. `VITE_BACKEND_URL` is read at build time by `frontend/src/backend-url.ts`;
+  unset means same-origin, which the Vite proxy and the e2e test rely on.
+- The backend is one stateful process and runs as one always-on container from
+  the root `Dockerfile`, never as a serverless function: the session lives in
+  memory and the loop runs between messages. `CONSOLE_ORIGINS` lists the
+  console origins for CORS on the HTTP routes; the WebSocket upgrade is exempt.
+- The backend host is Fly.io: `fly.toml` runs one always-on machine with
+  auto-stop off at https://interlock-backend.fly.dev. `CONSOLE_ORIGINS` lives
+  under its `[env]`; the API key is a Fly secret and never goes in the file.
+  The console is the Vercel project `interlock-console` at
+  https://interlock-console-pied.vercel.app.
+- Linux installs CPU-only torch through `[tool.uv.sources]` in `pyproject.toml`.
+  Keep that when bumping torch, or the image grows by the CUDA libraries.
+- `.dockerignore` is an allowlist. A new runtime file the server reads must be
+  added there and copied in the `Dockerfile`.
+
 ## Commands
 
 Update this section as modules land.
@@ -94,4 +113,8 @@ uv run uvicorn backend.server:app --reload           # server by itself; python 
 cd frontend && pnpm install && pnpm dev              # console by itself on :5173, proxies /ws to :8000
 cd frontend && pnpm typecheck && pnpm build          # strict tsc, then Vite production build
 cd frontend && pnpm test:e2e                         # Playwright smoke test: own mock backend on :8001, Vite on :5174
+docker build --platform linux/amd64 -t interlock-backend .   # backend image: lock, backend/, model, eval report, Jev cache
+docker run --rm -p 8000:8000 --env-file backend/.env -e ESCALATION_TIMEOUT_S=0 interlock-backend
+fly deploy --ha=false                                # backend on Fly.io per fly.toml, one machine; key via: grep '^TYPESAFE_API_KEY=' backend/.env | fly secrets import
+cd frontend && vercel link && vercel env add VITE_BACKEND_URL production && vercel --prod   # console on Vercel
 ```

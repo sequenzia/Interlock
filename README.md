@@ -196,6 +196,74 @@ cd frontend && pnpm typecheck && pnpm build
 cd frontend && pnpm test:e2e           # Playwright smoke test on its own mock backend
 ```
 
+## Deploying for a live demo
+
+The console is a static Vite build and deploys to Vercel as is. The server is
+one stateful process: the simulator, the loaded DQN and the open escalation
+live in memory, and the sim loop runs between messages. That rules out
+serverless hosting for the backend, Vercel included, where instances are
+stateless, scale to zero when idle and close WebSockets at the function's max
+duration. So the backend runs as one always-on container on any host that
+takes a Dockerfile, and the console points at it.
+
+Build and check the backend image locally first:
+
+```
+docker build --platform linux/amd64 -t interlock-backend .
+docker run --rm -p 8000:8000 --env-file backend/.env -e ESCALATION_TIMEOUT_S=0 interlock-backend
+curl http://127.0.0.1:8000/health
+```
+
+The image carries the lock, `backend/`, `models/dqn_highway.zip`, the eval
+report for the metrics tab and the warm Jev cache when
+`backend/logs/jev_cache.jsonl` exists, so demo seeds answer from cache.
+`backend/.env` never enters the image. The container reads the same variables
+from its environment: `TYPESAFE_API_KEY`, `JEV_MODE`, `ESCALATION_TIMEOUT_S`,
+`SEED`, plus two for hosting:
+
+- `CONSOLE_ORIGINS`: comma-separated console origins allowed to fetch
+  `/health` and `/eval/latest` cross-origin, for example
+  `https://interlock-console-pied.vercel.app`. Unset keeps the server same-origin only,
+  which is what the Vite proxy needs locally.
+- `PORT`: listen port, default 8000. Hosts that inject their own port work as is.
+
+Linux resolves the CPU-only torch wheel through `[tool.uv.sources]` in
+`pyproject.toml`, so the image skips the CUDA libraries.
+
+The backend host is Fly.io. `fly.toml` at the repo root describes one
+always-on `shared-cpu-2x` machine with auto-stop off, so the in-memory session
+survives idle minutes. `fly deploy` builds the Dockerfile remotely from this
+directory, so the gitignored checkpoint and cache ship without a commit:
+
+```
+brew install flyctl && fly auth login                          # once
+fly apps create interlock-backend                              # once; another name if taken, then update fly.toml
+grep '^TYPESAFE_API_KEY=' backend/.env | fly secrets import    # the key stays out of the shell history
+fly deploy --ha=false                                          # one machine: the session is one process
+curl https://interlock-backend.fly.dev/health
+```
+
+Deploy the console from `frontend/` with the Vercel CLI once the backend has a
+public https URL:
+
+```
+cd frontend
+vercel link --project interlock-console       # once; the project root is frontend/
+vercel env add VITE_BACKEND_URL production    # https://<backend host>, no trailing slash
+vercel --prod
+```
+
+`VITE_BACKEND_URL` is read at build time by `src/backend-url.ts`: fetches go
+to that origin and the socket to the same host as `wss`. Unset, which is the
+local and e2e case, everything stays on the page's own origin behind the Vite
+proxy. Then add the Vercel production aliases to `CONSOLE_ORIGINS` under `[env]` in
+`fly.toml` and run `fly deploy` again. The live console is
+https://interlock-console-pied.vercel.app and the backend is https://interlock-backend.fly.dev.
+
+One session per backend, by design: every browser on the console URL sees the
+same episode, and any of them can press play, reset or approve. Share the URL
+with the room only if that is the demo you want.
+
 ## Repository layout
 
 ```

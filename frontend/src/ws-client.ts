@@ -1,3 +1,4 @@
+import { wsUrl } from "./backend-url";
 import { useStore } from "./store";
 import type { ClientMessage, ServerMessage } from "./types";
 
@@ -6,11 +7,6 @@ import type { ClientMessage, ServerMessage } from "./types";
 let socket: WebSocket | null = null;
 let generation = 0;
 let retryMs = 500;
-
-function url(): string {
-  const scheme = location.protocol === "https:" ? "wss" : "ws";
-  return `${scheme}://${location.host}/ws`;
-}
 
 function apply(msg: ServerMessage): void {
   const s = useStore.getState();
@@ -45,7 +41,7 @@ function apply(msg: ServerMessage): void {
 
 function open(myGeneration: number): void {
   if (myGeneration !== generation) return;
-  const ws = new WebSocket(url());
+  const ws = new WebSocket(wsUrl());
   socket = ws;
   ws.onopen = () => {
     if (myGeneration !== generation) {

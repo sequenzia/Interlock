@@ -28,6 +28,7 @@ around Thursday, Oct 23, with a live demo and a backup video.
 | Plan location | This file plus CLAUDE.md | Reviewed before any code |
 | Writing style | No em dashes anywhere: docs, slides, UI copy | Brief's preference |
 | Project name | Interlock; "shield" stays the lowercase technical term for the mechanism | A wordmark built on "shield" reads as a brand, not a technique; a safety interlock permits an action only when a condition holds, with a supervised override |
+| Hosting for the live demo | Console on Vercel as a static build; backend as one always-on container built from the root Dockerfile | The session is one stateful process whose loop runs between messages. Vercel functions and containers are stateless, scale to zero when idle and close WebSockets at the max duration, so the backend cannot live there |
 
 ## 2. Confirmed Jev facts
 
@@ -555,3 +556,37 @@ mid-episode zone drop.
 - [x] Jev model pinned to `jev-1.13.0`.
 - [x] N for the passing-lane rule is 40 m (`facts.SLOWER_AHEAD_RANGE_M`).
 - [ ] Install ffmpeg via Homebrew if QuickTime screen recording is not enough for the backup video.
+- [ ] After the talk: `fly apps destroy interlock-backend`. The machine is always-on by design and bills around ten dollars a month while it exists.
+- [x] Backend host: Fly.io, `fly.toml` at the repo root, app `interlock-backend` in `iad` (Oct 16).
+- [x] Console deployed Oct 16: Vercel project `interlock-console`, https://interlock-console-pied.vercel.app, `VITE_BACKEND_URL=https://interlock-backend.fly.dev`. `CONSOLE_ORIGINS` carries both production aliases in `fly.toml`.
+
+## 15. Deployment (added Oct 16)
+
+Two deployables, built from the same repo:
+
+- Console: static Vite build, Vercel project rooted at `frontend/`.
+  `VITE_BACKEND_URL` is a build-time variable read by
+  `frontend/src/backend-url.ts`. Set, the fetches go to that origin and the
+  socket to the same host as `wss`. Unset, everything is same-origin, which
+  is the local Vite proxy and the e2e mock backend.
+- Backend: the root `Dockerfile` on Fly.io, one always-on `shared-cpu-2x`
+  machine with auto-stop off (`fly.toml`). `.dockerignore` is
+  an allowlist: lock, `backend/`, `models/dqn_highway.zip`,
+  `internal/eval/latest.json` and `backend/logs/jev_cache.jsonl` when
+  present, so the demo seeds hit the warm cache. `backend/.env` stays out;
+  the host injects `TYPESAFE_API_KEY`, `JEV_MODE`, `ESCALATION_TIMEOUT_S`
+  (0 for the live demo), `SEED`, `CONSOLE_ORIGINS` and `PORT`.
+  `[tool.uv.sources]` pins CPU-only torch on Linux.
+
+`CONSOLE_ORIGINS` is a comma-separated list of console origins; it adds CORS
+to `/health` and `/eval/latest` only, since browsers do not apply CORS to the
+WebSocket upgrade. Unset, the server stays same-origin only.
+
+Order of operations: deploy the backend, put its https URL in
+`VITE_BACKEND_URL` and deploy the console, then put the console's URL in
+`CONSOLE_ORIGINS` and restart the backend. Verified Oct 16 with the image
+running locally: health, CORS for the listed origin only, the eval report,
+and one shielded step over the socket.
+
+Known limit: one session per backend. Every browser on the URL shares the
+episode and the controls. A read-only viewer mode is a feature, not a config.

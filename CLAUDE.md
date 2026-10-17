@@ -43,6 +43,10 @@ around Oct 23, 2026.
   the shield's decision, including in mock or offline mode.
 - When Jev is unreachable and a question is not cached, the shield escalates
   with p = 0.5 flagged "judge unavailable". Never fake a judgment.
+- The shield acts on its own only with a confidently safe action. When no
+  candidate is below the allow threshold it escalates with reason
+  `no_compliant_action` and offers every candidate; it never silently runs a
+  last resort. Plan section 16.1 records why.
 - The JSONL log record in the plan is the contract between backend, UI and
   eval. Change it in the plan first, then in `backend/logger.py`, then in
   the frontend types.

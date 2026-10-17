@@ -63,7 +63,7 @@ This starts the WebSocket server on port 8000 and the Vite dev server on port 51
 1. The status strip shows a green dot, `live` and `jev mock`. The rules panel says "No rules yet".
 2. Click the "+ Speed limit 25 m/s" chip. The rule appears with `checker speed_limit`.
 3. Press "step" (or ++n++). Each candidate action is judged. If the cache has no answer for this state, the step escalates with a "judge unavailable" badge and the simulation pauses with a "waiting on operator" badge.
-4. Read the card in the approval queue: the proposed action, its facts in plain sentences, the rule and the probability. Press "approve" (++a++) or "deny" (++d++). Deny executes the fallback named on the card.
+4. Read the card in the approval queue: the reason, the proposed action, its facts in plain sentences, the rule and the probability. Press "approve" (++a++) or "deny" (++d++), or press ++1++ to ++5++ to run any candidate from the list. Deny executes the fallback named on the card.
 5. Press "play" (++space++) and watch the decisions strip fill in. Click any tick to open the inspector for that step.
 6. Click "drop work zone ahead". A hatched zone appears in lane 3 and the lane-closed rule joins the list.
 

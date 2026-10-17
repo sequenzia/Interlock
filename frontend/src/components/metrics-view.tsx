@@ -191,7 +191,7 @@ export function MetricsView() {
       </div>
       <div className="text-[11px] text-zinc-500">
         generated {report.generated_at} · {on?.aggregate.latency_ms_p50 ?? "-"} ms p50 / {on?.aggregate.latency_ms_p95 ?? "-"} ms p95 per step live ·{" "}
-        operator {on?.aggregate.human.approve ?? 0} approved, {on?.aggregate.human.deny ?? 0} denied (simulated by the checkers)
+        operator {on?.aggregate.human.approve ?? 0} approved, {on?.aggregate.human.deny ?? 0} denied, {on?.aggregate.human.override ?? 0} overridden (simulated by the checkers)
       </div>
     </div>
   );

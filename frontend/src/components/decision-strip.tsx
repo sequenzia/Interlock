@@ -33,7 +33,7 @@ export function DecisionStrip() {
                 background: r ? DECISION_COLOR[r.decision] : "#27272a",
                 opacity: r?.escalated ? 1 : r ? 0.85 : 0.6,
               }}
-              title={r ? `step ${r.step}: ${r.decision} -> ${r.executed}${r.human ? ` (${r.human.decision})` : ""}` : undefined}
+              title={r ? `step ${r.step}: ${r.decision} -> ${r.executed}${r.human ? ` (${r.human.decision}${r.human.action ? ` ${r.human.action}` : ""})` : ""}` : undefined}
               aria-label={r ? `inspect step ${r.step}` : undefined}
             />
           );

@@ -7,7 +7,7 @@ from backend.shield import Thresholds, decide
 PLAN_KEYS = {
     "run_id", "episode", "step", "seed", "source", "shield_on", "thresholds", "ego", "vehicles",
     "zones", "constraints", "candidates", "decision", "executed", "fired_constraint", "escalated",
-    "human", "all_blocked", "judge", "reward", "crashed",
+    "human", "all_blocked", "escalation_reason", "fallback", "judge", "reward", "crashed",
 }  # fmt: skip
 
 
@@ -40,6 +40,7 @@ def test_record_has_exactly_the_plan_keys_and_roundtrips(tmp_path: Path) -> None
         decision=decision,
         escalated=False,
         human=None,
+        fallback={"action": decision.fallback, "kind": decision.fallback_kind},
         judge={
             "model": "jev-latest",
             "source": "live",
@@ -56,6 +57,8 @@ def test_record_has_exactly_the_plan_keys_and_roundtrips(tmp_path: Path) -> None
         "IDLE",
         "c1",
     )
+    assert record["fallback"] == {"action": "IDLE", "kind": "safe"}
+    assert record["escalation_reason"] is None
     path = tmp_path / "run.jsonl"
     with JsonlLogger(path) as log:
         log.write(record)

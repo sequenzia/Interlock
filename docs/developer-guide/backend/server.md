@@ -89,7 +89,7 @@ Message bodies are specified in [WebSocket protocol](../contracts/websocket-prot
 | `set_thresholds` | Build a new `Thresholds` (which validates `0 <= t_allow <= t_block <= 1`), broadcast `state` |
 | `add_constraint`, `toggle_constraint`, `remove_constraint` | Mutate the store, broadcast `constraints` |
 | `drop_zone` | `store.drop_zone` at the ego's current x with optional lane, ahead, length and name, broadcast `constraints` |
-| `resolve` | `resolve(escalation_id, decision)` |
+| `resolve` | `resolve(escalation_id, decision, action)` |
 | `load_replay` | `load_replay(run_id)` |
 | `load_live` | `reset(current seed)` |
 | anything else | `error` with "unknown message type" |
@@ -130,24 +130,24 @@ sequenceDiagram
   participant H as Session.resolve
   R->>S: Escalation
   S->>S: pending = esc, pending_future = Future, expires_at = now + timeout
-  S-->>B: escalation {id, action, sentences, p, fallback, expires_at, timeout_s}
+  S-->>B: escalation {id, action, sentences, p, reason, candidates, fallback, fallback_kind, expires_at, timeout_s}
   S-->>B: state {paused_on_escalation_id}
   S->>S: await wait_for(shield(future), timeout_s)
-  B->>H: resolve {escalation_id, decision}
+  B->>H: resolve {escalation_id, decision, action?}
   H->>H: check id matches pending.id
   H->>S: future.set_result(decision)
   S->>S: clear pending, pending_future, expires_at
   S-->>B: state {paused_on_escalation_id: null}
-  S->>R: "approve" or "deny"
+  S->>R: Answer(approve | deny | override, action)
   Note over R: shield.resolve applies the answer, env.step runs
 ```
 
 Details that matter:
 
 - `asyncio.shield` wraps the Future so a timeout cancels the wait, not the Future itself; the `finally` block clears the pending fields either way.
-- A `TimeoutError` becomes `"deny"`, so an unattended session falls back. With `ESCALATION_TIMEOUT_S=0` there is no timeout and the sim waits indefinitely, which is the setting for a live demo.
-- `resolve()` raises `ValueError` for a decision other than `approve` or `deny`, and for an id that does not match the open escalation. The handler turns that into an `error` reply. A second click on a stale card is therefore harmless.
-- `escalation_msg` strips `ground_truth` from the dataclass before sending. The checker's label never reaches the operator.
+- A `TimeoutError` becomes `Answer("deny")`, so an unattended session runs the fallback: the safe action, the least-bad one, or the last resort. With `ESCALATION_TIMEOUT_S=0` there is no timeout and the sim waits indefinitely, which is the setting for a live demo.
+- `resolve()` raises `ValueError` for a decision other than `approve`, `deny` or `override`, for an override whose `action` is not one of the escalation's candidates, and for an id that does not match the open escalation. The handler turns that into an `error` reply. A second click on a stale card is therefore harmless.
+- `escalation_msg` strips `ground_truth` and `violations_by_action` from the dataclass before sending. The checker's labels never reach the operator.
 
 ## Reset, replay and cancellation
 

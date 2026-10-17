@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { DECISION_CLASS, DECISION_LABEL, fmtMs, fmtP, fmtUsd } from "../format";
+import { DECISION_CLASS, DECISION_LABEL, FALLBACK_LABEL, REASON_LABEL, fmtMs, fmtP, fmtUsd } from "../format";
 import { selectInspected, useStore } from "../store";
 import type { ActionName, Candidate, LogRecord } from "../types";
 import { send } from "../ws-client";
@@ -66,9 +66,16 @@ export function InspectorDrawer() {
               fired {fired} "{textOf(fired)}"
             </span>
           )}
+          {record.escalated && (
+            <span className="badge border-zinc-600 text-zinc-300" title="why it escalated and what deny would have run">
+              {record.escalation_reason ? REASON_LABEL[record.escalation_reason] : "escalated"}
+              {record.fallback && ` · deny runs ${record.fallback.action} (${FALLBACK_LABEL[record.fallback.kind]})`}
+            </span>
+          )}
           {record.human && (
             <span className="badge border-violet-500/40 text-violet-200">
-              operator {record.human.decision} in {fmtMs(record.human.latency_ms)}
+              operator {record.human.decision}
+              {record.human.action && ` ${record.human.action}`} in {fmtMs(record.human.latency_ms)}
             </span>
           )}
         </span>

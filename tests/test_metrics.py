@@ -61,21 +61,40 @@ def test_episode_metrics_counts_executed_violations_and_rates() -> None:
         ),
         record(
             3,
-            "all_blocked",
+            "escalate",
             "IDLE",
             [("c1", 0.9, True)],
             judge={"source": "cache", "latency_ms": 0.2, "input_tokens": 0, "cost_usd": 0.0},
             crashed=True,
+            human={"decision": "deny", "action": None, "latency_ms": 5, "operator": "simulated"},
+            escalation_reason="no_compliant_action",
+            all_blocked=True,
+        ),
+        record(
+            4,
+            "escalate",
+            "IDLE",
+            [("c1", 0.5, True)],
+            human={"decision": "override", "action": "IDLE", "latency_ms": 5, "operator": "ui"},
+            escalation_reason="no_compliant_action",
         ),
     ]
     m = episode_metrics(records)
-    assert m["steps"] == 4 and m["violations"] == {"c1": 2} and m["violations_total"] == 2
-    assert m["decisions"] == {"allow": 1, "fallback": 1, "escalate": 1, "all_blocked": 1}
-    assert m["escalations"] == 1 and m["escalation_rate"] == 0.25 and m["all_blocked"] == 1
-    assert m["human"] == {"approve": 1} and m["crashed"] is True
-    assert m["judge_sources"] == {"live": 3, "cache": 1} and m["live_steps"] == 3
-    assert m["latency_ms_p50"] == 150.0 and m["input_tokens"] == 3000
-    assert m["return"] == 3.2
+    assert m["steps"] == 5 and m["violations"] == {"c1": 2} and m["violations_total"] == 2
+    assert m["decisions"] == {"allow": 1, "fallback": 1, "escalate": 3}
+    assert m["escalations"] == 3 and m["escalation_rate"] == 0.6
+    assert m["all_blocked"] == 1 and m["conflicts"] == 2 and m["conflict_rate"] == 0.4
+    assert m["human"] == {"approve": 1, "deny": 1, "override": 1} and m["crashed"] is True
+    assert m["judge_sources"] == {"live": 4, "cache": 1} and m["live_steps"] == 4
+    assert m["latency_ms_p50"] == 150.0 and m["input_tokens"] == 4000
+    assert m["return"] == 4.0
+
+
+def test_all_blocked_counts_the_flag_not_the_decision_kind() -> None:
+    old_style = record(0, "all_blocked", "IDLE", [("c1", 0.9, True)])  # pre Oct 17 log
+    flagged = record(1, "escalate", "SLOWER", [("c1", 0.9, True)], all_blocked=True)
+    m = episode_metrics([old_style, flagged])
+    assert m["all_blocked"] == 1 and m["decisions"] == {"all_blocked": 1, "escalate": 1}
 
 
 def test_aggregate_pools_rates_over_episodes() -> None:
@@ -90,7 +109,8 @@ def test_aggregate_pools_rates_over_episodes() -> None:
     assert agg["episodes"] == 2 and agg["steps"] == 3
     assert agg["violations_per_episode"] == 0.5 and agg["violations_by_constraint"] == {"c1": 1}
     assert agg["escalation_rate"] == round(1 / 3, 4) and agg["crash_rate"] == 0.0
-    assert agg["human"] == {"approve": 0, "deny": 0}
+    assert agg["all_blocked_rate"] == 0.0 and agg["conflict_rate"] == 0.0
+    assert agg["human"] == {"approve": 0, "deny": 0, "override": 0}
     assert agg["cost_usd"] == round(3 * 0.000042, 6)
 
 

@@ -64,8 +64,10 @@ denied, and `IDLE` ran.
   "executed": "IDLE",
   "fired_constraint": "c2",
   "escalated": true,
-  "human": {"decision": "deny", "latency_ms": 0.0, "operator": "simulated"},
+  "human": {"decision": "deny", "action": null, "latency_ms": 0.0, "operator": "simulated"},
   "all_blocked": false,
+  "escalation_reason": "uncertain",
+  "fallback": {"action": "IDLE", "kind": "safe"},
   "judge": {
     "model": "jev-1.13.0",
     "source": "live",
@@ -159,12 +161,14 @@ candidate's `checks`.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `decision` | string | What the shield decided: `allow`, `fallback`, `escalate` or `all_blocked`. In shadow mode always `allow`. |
-| `executed` | string | The action that ran. For an escalation this is the proposal after approve or the fallback after deny. |
+| `decision` | string | What the shield decided: `allow`, `fallback` or `escalate`. Logs written before Oct 17 may also hold `all_blocked`. In shadow mode always `allow`. |
+| `executed` | string | The action that ran. For an escalation this is the proposal after approve, the fallback after deny, or the named candidate after an override. |
 | `fired_constraint` | string or null | The rule with the highest probability on the proposed action. Present on allowed steps too; the console only highlights it when the decision was not allow. |
 | `escalated` | bool | The operator was asked. |
-| `human` | `{decision, latency_ms, operator}` or null | The answer (`approve` or `deny`), how long it took, and who answered: `ui`, `simulated`, `approve` or `deny`. A timeout in the console records `deny` with the full timeout as latency. |
-| `all_blocked` | bool | The executed action came from the `SLOWER` / `IDLE` last resort, either directly or through a denied escalation. |
+| `escalation_reason` | string or null | `uncertain` when the proposal sat inside the band with a confidently safe fallback available; `no_compliant_action` when no candidate was confidently safe; null when the step did not escalate, always null in shadow mode. |
+| `human` | `{decision, action, latency_ms, operator}` or null | The answer (`approve`, `deny` or `override`), the action named by an override (null otherwise), how long it took, and who answered: `ui`, `simulated`, `approve` or `deny`. A timeout in the console records `deny` with the full timeout as latency. |
+| `all_blocked` | bool | The executed action came from the `SLOWER` / `IDLE` last resort through a denied or timed-out escalation. |
+| `fallback` | `{action, kind}` | What deny would run, or did run, and how it was found: `safe`, `least_bad` or `last_resort`. Present on every step, including allowed and shadow-mode ones. |
 
 ### The judge
 
@@ -195,9 +199,12 @@ exchange.asked}}`, which is exactly what the inspector's raw tab rebuilds.
 - `candidates` always has five entries in rank order; `executed` is one of them.
 - Every candidate has the same set of `constraint_id`s in `checks`, in the
   order of the enabled rules.
-- `escalated` is `true` exactly when `human` is not `null`.
-- `decision == "all_blocked"` implies `all_blocked`, but not the reverse (a
-  denied escalation can set `all_blocked` while `decision` stays `escalate`).
+- `escalated` is `true` exactly when `human` is not `null`, and exactly when
+  `escalation_reason` is not `null`.
+- `all_blocked` implies `fallback.kind == "last_resort"` and
+  `executed == fallback.action`, while `decision` stays `escalate`.
+- `human.decision == "override"` implies `human.action` is one of the
+  candidates and equals `executed`.
 - `judge.exchanges` is empty when every answer came from the cache.
 - `shield_on == false` implies `decision == "allow"` and `executed ==
   candidates[0].action`.
@@ -209,8 +216,8 @@ exchange.asked}}`, which is exactly what the inspector's raw tab rebuilds.
 | Road view | `ego`, `vehicles`, `zones`, `executed`, `candidates[0].action`, `decision`, `crashed` |
 | Decision strip and status strip | `decision`, `executed`, `escalated`, `human`, `judge.source`, `judge.latency_ms` |
 | Inspector | everything, including `judge.questions` and `judge.exchanges` |
-| `server.replay_metrics` | `decision`, `reward`, `crashed`, `human`, the executed candidate's `checks`, `judge.cost_usd` |
-| `metrics.episode_metrics` | the above plus `judge.source`, `judge.latency_ms`, `judge.input_tokens`, `thresholds` |
+| `server.replay_metrics` | `decision`, `escalation_reason`, `reward`, `crashed`, `human`, the executed candidate's `checks`, `judge.cost_usd` |
+| `metrics.episode_metrics` | the above plus `all_blocked`, `judge.source`, `judge.latency_ms`, `judge.input_tokens`, `thresholds` |
 | `metrics.collect_checks` | every candidate's `checks` with a non-null `ground_truth`, joined to `constraints[].checker` |
 
 ## Files
@@ -228,5 +235,6 @@ records; replay and the eval report use it.
 
 `frontend/src/types.ts` declares `LogRecord` with the same fields, plus
 `Candidate`, `Check`, `Human`, `Judge`, `Exchange`, `JevQuestion`, `Ego`,
-`VehicleSnapshot`, `Zone`, `Constraint` and `Thresholds`. `questions` and
-`exchanges` are optional there so older logs without them still replay.
+`VehicleSnapshot`, `Zone`, `Constraint`, `Thresholds`, `EscalationReason` and
+`FallbackKind`. `questions` and `exchanges` are optional there so older logs
+without them still replay.

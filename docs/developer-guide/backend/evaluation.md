@@ -68,7 +68,8 @@ One episode's counters from its records. Raises on an empty list.
 | `violations_total` | Sum of the above |
 | `decisions` | Count per `decision` kind |
 | `escalations`, `escalation_rate` | `decisions["escalate"]` and that over `steps` |
-| `all_blocked` | `decisions["all_blocked"]` |
+| `all_blocked` | Records with the `all_blocked` flag set (before Oct 17 this counted the decision kind, which missed denied escalations that ended in the last resort) |
+| `conflicts`, `conflict_rate` | Records with `escalation_reason == "no_compliant_action"`, and that count over steps |
 | `human` | Count per operator answer where `human` is set |
 | `judge_sources` | Count per `judge.source` |
 | `live_steps` | Steps whose `judge.source` was `live` |

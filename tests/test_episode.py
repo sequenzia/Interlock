@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from backend.constraints import ConstraintStore
 from backend.env import make_env
-from backend.episode import OPERATORS, EpisodeRunner
+from backend.episode import OPERATORS, EpisodeRunner, Escalation, simulated_operator
 from backend.jev_client import JevCache, JevClient
 from backend.logger import JsonlLogger, read_log
 from backend.policy import Policy
@@ -49,9 +49,11 @@ def test_mock_shield_on_escalates_every_step_and_logs(policy: Policy, tmp_path: 
     assert len(records) == 4 and summary["steps"] == 4
     assert all(set(r) == PLAN_KEYS for r in records)
     assert all(r["decision"] == "escalate" and r["escalated"] for r in records)
+    assert all(r["escalation_reason"] == "no_compliant_action" for r in records)  # p 0.5 everywhere
+    assert all(r["fallback"]["kind"] == "least_bad" for r in records)
     assert all(r["judge"]["source"] == "unavailable" for r in records)
     assert all(r["human"]["operator"] == "simulated" for r in records)
-    assert summary["decisions"] == {"escalate": 4}
+    assert summary["decisions"] == {"escalate": 4} and summary["conflicts"] == 4
     assert sum(summary["human"].values()) == 4
     assert summary["judge_sources"] == {"unavailable": 4}
     for r in records:
@@ -60,16 +62,74 @@ def test_mock_shield_on_escalates_every_step_and_logs(policy: Policy, tmp_path: 
         assert r["ego"]["lane"] in (1, 2, 3, 4) and len(r["vehicles"]) == 30
 
 
-def test_simulated_operator_denies_true_violations(policy: Policy, tmp_path: Path) -> None:
+def test_simulated_operator_overrides_conflicts_with_the_fewest_violations(
+    policy: Policy, tmp_path: Path
+) -> None:
     runner = make_runner(policy, tmp_path, shield_on=True)
     asyncio.run(runner.run(seed=0, max_steps=6))
     runner.close()
     for r in read_log(tmp_path / "run.jsonl"):
-        top = r["candidates"][0]
-        if any(c["ground_truth"] for c in top["checks"]):
-            assert r["human"]["decision"] == "deny" and r["executed"] != top["action"]
+        counts = {
+            c["action"]: sum(bool(k["ground_truth"]) for k in c["checks"]) for c in r["candidates"]
+        }
+        top = r["candidates"][0]["action"]
+        if counts[top] == min(counts.values()):
+            assert r["human"]["decision"] == "approve" and r["executed"] == top
         else:
-            assert r["human"]["decision"] == "approve" and r["executed"] == top["action"]
+            assert r["human"]["decision"] == "override" and r["executed"] == r["human"]["action"]
+            assert counts[r["executed"]] == min(counts.values())
+
+
+def escalation(
+    reason: str, ground_truth: bool | None, by_action: dict[str, int | None]
+) -> Escalation:
+    return Escalation(
+        id="e",
+        step=0,
+        action="FASTER",
+        sentences=[],
+        constraint_id="c1",
+        constraint_text="Speed limit 25 m/s",
+        p=0.5,
+        q_rank=0,
+        fallback="IDLE",
+        fallback_kind="least_bad",
+        judge_unavailable=False,
+        reason=reason,  # type: ignore[arg-type]
+        candidates=[
+            {"action": a, "rank": i, "p": 0.5, "constraint_id": "c1", "noop": False}
+            for i, a in enumerate(by_action)
+        ],
+        ground_truth=ground_truth,
+        violations_by_action=by_action,
+    )
+
+
+def test_simulated_operator_paths() -> None:
+    uncertain = {"FASTER": 1, "IDLE": 0}
+    assert (
+        asyncio.run(simulated_operator(escalation("uncertain", True, uncertain))).decision == "deny"
+    )
+    assert (
+        asyncio.run(simulated_operator(escalation("uncertain", None, uncertain))).decision == "deny"
+    )
+    assert (
+        asyncio.run(simulated_operator(escalation("uncertain", False, uncertain))).decision
+        == "approve"
+    )
+    conflict = {"FASTER": 1, "IDLE": 1, "LANE_RIGHT": 0, "SLOWER": 0}
+    answer = asyncio.run(simulated_operator(escalation("no_compliant_action", True, conflict)))
+    assert (answer.decision, answer.action) == ("override", "LANE_RIGHT")  # fewest, then rank
+    tie = {"FASTER": 1, "IDLE": 1}
+    assert (
+        asyncio.run(simulated_operator(escalation("no_compliant_action", True, tie))).decision
+        == "approve"
+    )
+    unknown = {"FASTER": None, "IDLE": None}
+    assert (
+        asyncio.run(simulated_operator(escalation("no_compliant_action", None, unknown))).decision
+        == "deny"
+    )
 
 
 def test_shield_off_runs_in_shadow(policy: Policy, tmp_path: Path) -> None:
@@ -80,6 +140,7 @@ def test_shield_off_runs_in_shadow(policy: Policy, tmp_path: Path) -> None:
     assert summary["shield_on"] is False and summary["decisions"] == {"allow": 4}
     for r in records:
         assert r["executed"] == r["candidates"][0]["action"] and r["human"] is None
+        assert r["escalation_reason"] is None and r["fallback"]["kind"] == "least_bad"
         assert len(r["candidates"][0]["checks"]) == 4  # judge and checkers still ran
 
 

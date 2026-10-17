@@ -67,7 +67,7 @@ from one code path.
 | Stage | Shield on | Shield off |
 | --- | --- | --- |
 | Rank, facts, Jev requests, checker labels, decision | Same | Same, at the same cost and latency |
-| What executes | Allow runs the top action; fallback runs the next confidently safe one, or SLOWER; escalate pauses and asks | Always the top action; the decision is overwritten to "allow" |
+| What executes | Allow runs the top action; fallback runs the next confidently safe one; anything else pauses and asks, with every candidate on offer when none is confidently safe | Always the top action; the decision is overwritten to "allow" |
 | Operator | Pauses on an escalation until an answer or the timeout | Never consulted, never pauses |
 | Log record | Full | Same probabilities, labels and fired rule; only the kind, executed action and human fields differ |
 | Violations counted | On the executed action | On the top action |

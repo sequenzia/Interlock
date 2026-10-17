@@ -129,6 +129,28 @@ def new_run_dir(root: Path, label: str) -> Path:
     return root / f"{stamp}_{label}"
 
 
+def load_run(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Read a run directory and recompute its metrics from the seed logs.
+
+    The record is the source of truth and metrics.json is a cache of it, so a
+    change in metrics.py reaches old runs through ``interlock eval --report``
+    with no Jev cost. The rewritten metrics.json keeps the run's own fields.
+    """
+    stored: dict[str, Any] = json.loads((path / "metrics.json").read_text())
+    logs = sorted(path.glob("seed*.jsonl"), key=lambda p: int(p.stem[4:]))
+    per_seed = [read_log(p) for p in logs]
+    per_seed = [records for records in per_seed if records]
+    if not per_seed:
+        return stored, []
+    all_records = [r for records in per_seed for r in records]
+    episodes = [episode_metrics(records) for records in per_seed]
+    stored.update(
+        episodes=episodes, aggregate=aggregate(episodes), calibration=calibration(all_records)
+    )
+    (path / "metrics.json").write_text(json.dumps(stored, indent=1))
+    return stored, all_records
+
+
 def newest_runs(root: Path) -> dict[str, Path]:
     """Newest run directory per configuration label."""
     found: dict[str, Path] = {}
@@ -150,9 +172,11 @@ def build_report(
     runs = newest_runs(root)
     if not runs:
         raise SystemExit(f"no eval runs under {root}")
-    loaded = {
-        label: json.loads((path / "metrics.json").read_text()) for label, path in runs.items()
-    }
+    loaded: dict[str, dict[str, Any]] = {}
+    all_records: list[dict[str, Any]] = []
+    for label, path in runs.items():
+        loaded[label], records = load_run(path)
+        all_records.extend(records)
     off_label = config_label(False, thresholds, None)
     on_label = config_label(True, thresholds, None)
     sweep_points = []
@@ -167,6 +191,7 @@ def build_report(
                     "violations_per_episode": agg["violations_per_episode"],
                     "escalation_rate": agg["escalation_rate"],
                     "all_blocked_rate": agg["all_blocked_rate"],
+                    "conflict_rate": agg.get("conflict_rate", 0.0),
                     "crash_rate": agg["crash_rate"],
                     "mean_return": agg["mean_return"],
                     "cost_per_episode_usd": agg["cost_per_episode_usd"],
@@ -174,12 +199,6 @@ def build_report(
                 }
             )
     sweep_points.sort(key=lambda p: p["t_allow"])
-    all_records = [
-        r
-        for path in runs.values()
-        for jsonl in sorted(path.glob("seed*.jsonl"))
-        for r in read_log(jsonl)
-    ]
     cal = calibration(all_records)
     report: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -217,7 +236,8 @@ def print_summary(report: dict[str, Any]) -> None:
     print(
         f"{report['label']}: {agg['episodes']} episodes | violations/episode {agg['violations_per_episode']:.2f} | "
         f"return {agg['mean_return']:.2f} | crash {agg['crash_rate']:.0%} | escalation {agg['escalation_rate']:.1%} | "
-        f"all-blocked {agg['all_blocked_rate']:.1%} | p50 {agg['latency_ms_p50']:.0f} ms | ${agg['cost_usd']:.3f} | "
+        f"all-blocked {agg['all_blocked_rate']:.1%} | conflicts {agg.get('conflict_rate', 0.0):.1%} | "
+        f"p50 {agg['latency_ms_p50']:.0f} ms | ${agg['cost_usd']:.3f} | "
         f"{report['wall_seconds']:.0f} s",
         flush=True,
     )

@@ -64,6 +64,7 @@ Keys are ignored while the cursor is in a text box, a slider or a select.
 | ++n++ | one step |
 | ++a++ | approve the open escalation |
 | ++d++ | deny the open escalation |
+| ++1++ to ++5++ | override the open escalation with the candidate of that rank |
 | ++arrow-left++ | select the previous step (from live, the latest step) |
 | ++arrow-right++ | select the next step; past the last step returns to live |
 | ++esc++ | deselect and follow live |

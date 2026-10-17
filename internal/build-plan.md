@@ -165,15 +165,30 @@ shielded/
 ```
 p_viol(a) = max over enabled constraints c of p[a][c]
 top = ranked[0]
-if p_viol(top) <  T_ALLOW: allow top
-if p_viol(top) >  T_BLOCK: fallback = first a in ranked[1:] with p_viol(a) < T_ALLOW
-                           if fallback exists: execute it
-                           else: execute SLOWER if p_viol(SLOWER) <= T_BLOCK else IDLE,
-                                 mark all_blocked
-else:                      escalate top; approve -> execute top; deny -> fallback path
+fallback = safe:        first a in ranked[1:] with p_viol(a) < T_ALLOW
+        or least_bad:   the a in ranked[1:] with the lowest p_viol(a) <= T_BLOCK
+                        that changes the state (no lane change at the road edge,
+                        no speed change at the end of the range); ties to rank
+        or last_resort: SLOWER if p_viol(SLOWER) <= T_BLOCK else IDLE
+if p_viol(top) < T_ALLOW:   allow top
+elif fallback is not safe:  escalate top, reason no_compliant_action
+elif p_viol(top) > T_BLOCK: execute the safe fallback            (kind fallback)
+else:                       escalate top, reason uncertain
+approve  -> execute top
+deny     -> execute the fallback; all_blocked when it was the last resort
+override -> execute the action the operator named
 ```
 
 Defaults `T_ALLOW = 0.2`, `T_BLOCK = 0.8`, editable live and swept on Day 5.
+
+Revised Oct 17 (section 16.1): the shield acts on its own only when it holds
+a confidently safe action. When nothing is confidently safe it escalates with
+reason `no_compliant_action` and the queue offers every candidate, so a
+jointly unsatisfiable state reaches a person instead of looping on a no-op
+last resort. The decision kind `all_blocked` is no longer produced; the
+`all_blocked` flag still marks an executed last resort after a deny or a
+timeout. The fallback's kind is recorded so the log says whether deny would
+have run a safe action, the least-bad one or the last resort.
 
 Shield off still runs facts, Jev and checkers in shadow and executes `top`
 unconditionally. Shadow mode means the before/after comparison and the
@@ -272,9 +287,19 @@ extra facts; those steps escalate by design.
 ### 5.6 Escalation
 
 Queue item: step, candidate action, its sentences, the constraint with the
-highest p, that p, Q-value rank, and a deadline. Operator approves or denies.
-Each resolution is appended to the log record as `human: {decision,
-latency_ms, operator: "ui" | "simulated"}` and becomes a labeled example.
+highest p, that p, Q-value rank, the fallback deny would run, and a deadline.
+Operator approves or denies. Each resolution is appended to the log record as
+`human: {decision, latency_ms, operator: "ui" | "simulated"}` and becomes a
+labeled example.
+
+Revised Oct 17: the item also carries `reason` (`uncertain` or
+`no_compliant_action`) and `candidates`, every ranked action with its worst p,
+the rule behind it and whether it is a no-op. The operator may also
+**override** by naming any candidate; `human` becomes `{decision: "approve" |
+"deny" | "override", action, latency_ms, operator}`. The simulated operator
+overrides a `no_compliant_action` escalation with the candidate that breaks
+the fewest rules by ground truth, ties to the policy's ranking, and approves
+when that is the proposal; with no labels at all it denies.
 
 ### 5.6a Zone lifecycle (added Oct 16)
 
@@ -339,6 +364,7 @@ One line per step. This is the contract between backend, UI and eval.
   ],
   "decision": "fallback", "executed": "IDLE", "fired_constraint": "c1",
   "escalated": false, "human": null, "all_blocked": false,
+  "escalation_reason": null, "fallback": {"action": "IDLE", "kind": "safe"},
   "judge": {"model": "jev-1.13.0", "source": "live", "latency_ms": 140,
             "input_tokens": 1210, "cost_usd": 0.0000508,
             "questions": {"c1": {"type": "noul", "instructions": "...", "criteria": {"true": "...", "false": "..."}}},
@@ -356,6 +382,14 @@ candidate's `facts`, so the inspector can rebuild the exact request body without
 storing it twice. Cache hits produce no exchange. Added Oct 16 for the Day 4
 inspector.
 
+Added Oct 17: `escalation_reason` is `"uncertain"`, `"no_compliant_action"`
+or null when the step did not escalate (shield off always null). `fallback`
+names what deny would run and its kind, `"safe"`, `"least_bad"` or
+`"last_resort"`. When a step escalated, `human` is `{"decision": "approve" |
+"deny" | "override", "action": "LANE_RIGHT" | null, "latency_ms": 2140,
+"operator": "ui" | "simulated" | "approve" | "deny"}`; `action` is set only
+for an override.
+
 ## 8. WebSocket protocol
 
 Single endpoint `/ws`. JSON messages with a `type` field.
@@ -369,7 +403,7 @@ Client to server: `play`, `pause`, `step`, `reset {seed}`, `set_speed
 {steps_per_sec}`, `set_shield {on}`, `set_thresholds {t_allow, t_block}`,
 `add_constraint {text, checker?}`, `toggle_constraint {id, enabled}`,
 `remove_constraint {id}`, `drop_zone {lane, ahead_m, length_m, name}`,
-`resolve {escalation_id, decision}`, `load_replay {run_id}`.
+`resolve {escalation_id, decision, action?}`, `load_replay {run_id}`.
 
 Server loop: an asyncio task advances the sim at `steps_per_sec` (default 2)
 while playing, awaits an `asyncio.Event` while an escalation is open, and
@@ -403,10 +437,11 @@ Observed while verifying: once the ego is inside a closed lane, no exit scores
 as confidently safe (lane changes sit at 0.2 to 0.5 on the gap rule), so every
 step escalates and deny only means SLOWER. The operator can approve or deny the
 policy's proposal but cannot pick the lane change that would fix it.
-Candidate for Day 5 if time allows: an "override" resolution that lets the
-operator choose any ranked candidate, logged as `human.decision = "override"`
-with the chosen action. Until then the presenter should keep the ego out of
-the closed lane rather than drive through it.
+Built Oct 17 (section 16.2): the `escalation` payload carries `reason` and
+`candidates` (action, rank, worst p, the rule behind it, no-op flag), and
+`resolve` accepts `decision: "override"` with `action` naming one of those
+candidates. The server rejects an override whose action is not in the open
+escalation. Logged as `human.decision = "override"` with `human.action`.
 
 ## 9. UI layout
 
@@ -455,11 +490,14 @@ from the checkers, live `jev-1.13.0`, concurrency 2. One run of everything took
 | Configuration | Violations per episode | Return | Crash rate | Escalated steps | All-blocked steps |
 | --- | --- | --- | --- | --- | --- |
 | Shield off | 58.1 | 50.7 | 40% | 0% | 0% |
-| On, 0.1 / 0.9 | 2.85 | 45.1 | 10% | 49.9% | 18.8% |
-| On, 0.2 / 0.8 (default) | 2.65 | 41.4 | 25% | 23.9% | 0.2% |
-| On, 0.3 / 0.7 | 2.65 | 41.6 | 30% | 18.5% | 0.9% |
+| On, 0.1 / 0.9 | 2.85 | 45.1 | 10% | 49.9% | 28.7% |
+| On, 0.2 / 0.8 (default) | 2.65 | 41.4 | 25% | 23.9% | 5.2% |
+| On, 0.3 / 0.7 | 2.65 | 41.6 | 30% | 18.5% | 5.0% |
 | On, 0.4 / 0.6 | 1.25 | 42.0 | 40% | 6.6% | 1.3% |
 | On, 0.5 / 0.5 | 1.85 | 41.7 | 30% | 0.2% | 0.6% |
+
+All-blocked column recomputed from the records on Oct 17 (section 16.1); the
+Oct 16 table read 18.8%, 0.2% and 0.9% in the first three rows.
 
 By rule at the default thresholds, shield off to on: speed limit 1030 to 0,
 lane change gap 124 to 1, left lane for passing 8 to 52. The two crisp rules
@@ -481,7 +519,7 @@ between 0.3 and 0.6.
 
 Reading the sweep: 0.4 / 0.6 is the knee, 1.25 violations per episode with
 6.6% of steps escalated, but its crash rate matches shield off. 0.1 / 0.9 has
-the lowest crash rate because 19% of steps hit the all-blocked path and the car
+the lowest crash rate because 29% of steps hit the all-blocked path and the car
 simply drives slower. The simulated operator is perfect, which flatters the
 high-escalation settings; a human will not be. Decision: keep 0.2 / 0.8 as the
 demo default and show the curve; name 0.4 / 0.6 as the operating point when
@@ -626,9 +664,11 @@ steps Jev scored low and the shield allowed. The logs under
   violation.
 - `all_blocked_rate` in `metrics.py` counts only decision kind `all_blocked`.
   It misses resolved escalations whose fallback was the last resort, where the
-  kind stays `escalate` and only the flag is true. The true rate at 0.2 / 0.8
-  is at least 52 of 1035 steps, about 5%, not 0.2%. The sweep column in
-  section 10 is undercounted for every on configuration.
+  kind stays `escalate` and only the flag is true. Recomputed from the records
+  on Oct 17: 5.2% at 0.2 / 0.8 (not 0.2%), 28.7% at 0.1 / 0.9 (not 18.8%),
+  5.0% at 0.3 / 0.7 (not 0.9%); the 0.4 / 0.6 and 0.5 / 0.5 rows were already
+  right. Section 10's table is corrected, and `interlock eval --report` now
+  recomputes every run's metrics from its seed logs.
 - Passing-rule calibration is underconfident, not undiscriminating: true
   violations score 0.3 to 0.8 and never above 0.9; non-violations sit mostly
   below 0.3 with a shoulder at 0.4 to 0.6. At T_BLOCK 0.8 a passing violation
@@ -636,27 +676,28 @@ steps Jev scored low and the shield allowed. The logs under
 
 Consequences: item A starts with the shield's conflict policy, not the fact
 schema. The passing rule stays as the fuzzy-rule example because the
-underconfidence is real. The README and `docs/user-guide/evaluation.md` say
-only that the fuzzy rule leaks, which stands; any all-blocked figure they carry
-regenerates at the freeze.
+underconfidence is real. The README says only that the fuzzy rule leaks,
+which stands. `docs/user-guide/evaluation.md` repeated the old reading and the
+old all-blocked column; both were corrected on Oct 17.
 
 ### 16.2 Item A: a rule set worth a model
 
 1. Fix `all_blocked_rate` to count the flag. Re-run `interlock eval --report`
    over the existing logs, no Jev cost, and update the section 10 table.
-2. Conflict policy in `shield.py`. Recommended: when no lower-ranked action is
-   confidently safe, execute the candidate with the lowest worst-p that is not
-   above T_BLOCK, flagged `least_bad`; keep SLOWER only when nothing
-   qualifies. When the last resort would not change the state (SLOWER at the
-   floor, lane change at the edge), escalate with reason `no_compliant_action`
-   and let the operator pick any candidate. Alternative considered and
-   rejected Oct 17: rule priorities typed by the operator; least-bad plus the
-   operator's choice covers the demo without a new concept to explain.
-   Contracts: the escalation message gains `candidates` with each action's
-   worst p and rule; the resolve message gains an optional `action`; the log
-   record's `human` gains `action` and `decision` gains the value `choose`;
-   `Decision.kind` gains `least_bad`. Plan sections 7 and 8 first, then
-   `logger.py`, then `frontend/src/types.ts`.
+2. Conflict policy in `shield.py`, as built: the fallback search gains a
+   least-bad tier between the safe action and the last resort, the lowest
+   worst-p lower-ranked action at or below T_BLOCK that changes the state.
+   The shield executes on its own only with a confidently safe action; when
+   nothing is confidently safe it escalates with reason `no_compliant_action`
+   and the queue offers every candidate, so the operator can override with any
+   of them. Deny runs the fallback, least-bad included. Alternative considered
+   and rejected Oct 17: rule priorities typed by the operator; least-bad plus
+   the operator's override covers the demo without a new concept to explain.
+   Contracts, in sections 5.2, 5.6, 7 and 8: the escalation message gains
+   `reason` and `candidates`; the resolve message gains an optional `action`;
+   the record gains `escalation_reason` and `fallback {action, kind}` and
+   `human` gains `action` with `decision` value `override`. The decision kind
+   `all_blocked` is no longer produced; the flag remains.
 3. Fact schema additions in `facts.py`, all computed in code:
    `headway_s_after` (gap ahead over speed after), `time_to_collision_ahead_s`
    (gap over closing speed when closing, else null), `being_tailgated` (behind

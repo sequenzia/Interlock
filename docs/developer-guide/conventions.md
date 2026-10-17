@@ -32,7 +32,7 @@ The rules the codebase follows, so a change reads like the code around it. CLAUD
 | Constraint ids | `c1`, `c2`, ... assigned by `ConstraintStore` and stable for the session |
 | Run ids | `<UTC stamp>_seed<N>_<on|off>`, for example `2026-10-18T14-02-11_seed7_on`; also the JSONL filename |
 | Eval labels | `<on|off>_ta<t_allow>_tb<t_block>` with an optional `_zone<N>` suffix |
-| Decisions | `allow`, `fallback`, `escalate`, `all_blocked` in code and records; `DECISION_LABEL` maps them to UI words |
+| Decisions | `allow`, `fallback`, `escalate` in code and records, plus `all_blocked` in records written before Oct 17; `DECISION_LABEL` maps them to UI words |
 | Judge sources | `live`, `cache`, `unavailable` |
 
 ## Writing

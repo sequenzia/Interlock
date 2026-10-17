@@ -40,11 +40,13 @@ One per run directory. The label encodes the configuration: `on_ta0.20_tb0.80`, 
 | `crashed` | bool | |
 | `violations` | `{constraint_id: int}` | Executed-action violations per rule |
 | `violations_total` | int | |
-| `decisions` | `{kind: int}` | Counts of `allow`, `fallback`, `escalate`, `all_blocked` |
+| `decisions` | `{kind: int}` | Counts of `allow`, `fallback`, `escalate`; `all_blocked` appears only for logs written before Oct 17 |
 | `escalations` | int | |
 | `escalation_rate` | number | `escalations / steps` |
-| `all_blocked` | int | |
-| `human` | `{approve: int, deny: int}` | Simulated operator answers |
+| `all_blocked` | int | Records whose `all_blocked` flag is set: an executed last resort after a deny or a timeout |
+| `conflicts` | int | Records with `escalation_reason == "no_compliant_action"`; 0 for logs written before Oct 17, which have no reason field |
+| `conflict_rate` | number | `conflicts / steps` |
+| `human` | `{approve: int, deny: int, override: int}` | Simulated operator answers; only keys that occurred are present per episode |
 | `judge_sources` | `{live, cache, unavailable: int}` | Step-level judge source counts |
 | `live_steps` | int | Steps with `judge.source == "live"` |
 | `latency_ms_p50`, `latency_ms_p95` | number | Over live steps only |
@@ -79,8 +81,8 @@ Example (seed 0, shield on, default thresholds):
 | `mean_return`, `mean_return_std` | |
 | `crash_rate` | Share of episodes that crashed |
 | `mean_steps` | |
-| `escalation_rate`, `all_blocked_rate` | Pooled over steps |
-| `human` | `{approve, deny}` summed |
+| `escalation_rate`, `all_blocked_rate`, `conflict_rate` | Pooled over steps |
+| `human` | `{approve, deny, override}` summed |
 | `live_steps` | |
 | `latency_ms_p50` | Median of per-episode p50s over episodes with live steps |
 | `latency_ms_p95` | Max of per-episode p95s |
@@ -121,11 +123,18 @@ The report `build_report` writes from the newest run per label.
 ```json
 {
   "label": "on_ta0.20_tb0.80", "t_allow": 0.2, "t_block": 0.8,
-  "violations_per_episode": 2.65, "escalation_rate": 0.2386, "all_blocked_rate": 0.0019,
+  "violations_per_episode": 2.65, "escalation_rate": 0.2386, "all_blocked_rate": 0.0522,
+  "conflict_rate": 0.0,
   "crash_rate": 0.25, "mean_return": 41.442, "cost_per_episode_usd": 0.006734,
-  "human": {"approve": 121, "deny": 126}
+  "human": {"approve": 121, "deny": 126, "override": 0}
 }
 ```
+
+`build_report` recomputes `episodes`, `aggregate` and `calibration` from the
+run's `seed*.jsonl` files and rewrites its `metrics.json` before aggregating,
+so a change in `metrics.py` reaches old runs with `interlock eval --report`
+and no Jev cost. The record is the source of truth; `metrics.json` is a
+cache of it.
 
 ## `GET /eval/latest`
 
@@ -152,7 +161,7 @@ The console shows that message in the metrics tab. In the container the file is 
 | `EpisodeMetrics` | `seed`, `steps`, `return`, `crashed`, `violations_total`, `escalations`, `all_blocked` |
 | `AggregateMetrics` | `episodes`, `steps`, `violations_per_episode` and `_std`, `violations_by_constraint`, `mean_return`, `crash_rate`, `escalation_rate`, `all_blocked_rate`, `human`, `latency_ms_p50`, `latency_ms_p95`, `cost_usd`, `cost_per_episode_usd` |
 | `RunReport` | `label`, `shield_on`, `thresholds`, `seeds`, `jev_mode`, `created`, `episodes`, `aggregate` |
-| `SweepPoint` | Everything in the sweep entry except `human` |
+| `SweepPoint` | Everything in the sweep entry except `human` and `conflict_rate` |
 | `ReliabilityBin`, `Reliability` | As above |
 | `EvalReport` | `available`, `message?`, `generated_at?`, `thresholds_default?`, `before_after?`, `sweep?`, `calibration?` |
 

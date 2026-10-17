@@ -15,7 +15,7 @@ The strip at the bottom of the left column has one tick per step, 60 for a full 
 | violet | escalated |
 | rose | all blocked |
 
-An escalated step is drawn at full opacity, the others slightly dimmer. Hover a tick for a tooltip such as `step 12: escalate -> SLOWER (deny)`. Click a tick to select it: it grows taller with a white ring, the road view jumps to that step, the strip shows "inspecting 12", and the inspector opens. Click the same tick again or press ++esc++ to deselect and follow live.
+An escalated step is drawn at full opacity, the others slightly dimmer. Hover a tick for a tooltip such as `step 12: escalate -> SLOWER (deny)` or `step 31: escalate -> FASTER (override FASTER)`. Click a tick to select it: it grows taller with a white ring, the road view jumps to that step, the strip shows "inspecting 12", and the inspector opens. Click the same tick again or press ++esc++ to deselect and follow live.
 
 ## Scrubbing
 
@@ -30,7 +30,8 @@ While a step is selected the road view shows that step's vehicles and zones with
 | "Inspector · step N" | the selected step |
 | Decision badge | the outcome, with `-> ACTION` when the executed action differs from the proposal |
 | `fired c2 "..."` | the rule with the highest probability on the proposed action, shown unless the step was allowed |
-| "operator approve in 1840 ms" | the human answer and how long it took, for escalated steps |
+| "uncertain · deny runs IDLE (safe)" or "no compliant action · deny runs IDLE (least bad)" | why the step escalated and the fallback the shield had ready, with its kind: safe, least bad or last resort |
+| "operator approve in 1840 ms" | the human answer and how long it took, for escalated steps; an override reads "operator override LANE_RIGHT in 2140 ms" |
 | `jev live · 160 ms · jev-1.13.0 · $0.0002 · reward 0.83` | the judge source for the step, wall-clock latency for all five requests, model id, cost in dollars, task reward |
 
 ## The candidates table

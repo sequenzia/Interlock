@@ -32,7 +32,7 @@ Scripts in `package.json`: `dev`, `build` (`tsc` then `vite build`), `typecheck`
 | `src/components/road-view.tsx` | Canvas 2D road, ego-centered, interpolated between steps |
 | `src/components/decision-strip.tsx` | One tick per step, click to inspect |
 | `src/components/inspector-drawer.tsx` | Candidates, probability grid, facts, raw Jev exchange |
-| `src/components/approval-queue.tsx` | The open escalation with approve and deny |
+| `src/components/approval-queue.tsx` | The open escalation with approve, deny and override |
 | `src/components/constraint-panel.tsx` | Rules, presets, zones, thresholds |
 | `src/components/metrics-view.tsx` | The evaluation report as tiles and charts |
 | `e2e/smoke.spec.ts` | Two Playwright tests |
@@ -105,6 +105,7 @@ Browsers do not apply CORS to the WebSocket upgrade, so the cross-origin case ne
 | ++space++ | `pause` when playing, else `play`; default scrolling prevented |
 | ++n++ | `step` |
 | ++a++, ++d++ | `resolve` the open escalation as approve or deny |
+| ++1++ to ++5++ | `resolve` the open escalation with the candidate of that rank: rank 1 approves, the rest override |
 | ++arrow-left++ | Select the previous step; from live, select the last step |
 | ++arrow-right++ | Select the next step; past the last step returns to live |
 | ++esc++ | Deselect, follow live again |

@@ -166,6 +166,24 @@ def for_candidates(env: Any, actions: list[str], zones: list[Zone]) -> dict[str,
     return {action: facts_for_action(env, action, zones) for action in actions}
 
 
+def noop_actions(candidates: dict[str, Facts]) -> frozenset[str]:
+    """Actions that leave the ego's lane and target speed unchanged.
+
+    A lane change at the road edge and a speed change at the end of the speed
+    range do nothing, so the shield never treats them as a way out of a
+    conflict. IDLE is a choice, not a no-op.
+    """
+    out: set[str] = set()
+    for action, f in candidates.items():
+        if action in ("LANE_LEFT", "LANE_RIGHT") and f["action"]["lane_after"] == f["ego"]["lane"]:
+            out.add(action)
+        if action in ("FASTER", "SLOWER") and (
+            abs(f["action"]["target_speed_after_mps"] - f["ego"]["target_speed_mps"]) < 0.05
+        ):
+            out.add(action)
+    return frozenset(out)
+
+
 def snapshot(env: Any) -> dict[str, Any]:
     """Render snapshot for the log record: ego plus every other vehicle."""
     u = env.unwrapped

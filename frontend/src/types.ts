@@ -4,7 +4,9 @@
 export type ActionName = "LANE_LEFT" | "IDLE" | "LANE_RIGHT" | "FASTER" | "SLOWER";
 export type DecisionKind = "allow" | "fallback" | "escalate" | "all_blocked";
 export type JudgeSource = "live" | "cache" | "unavailable";
-export type OperatorAnswer = "approve" | "deny";
+export type OperatorAnswer = "approve" | "deny" | "override";
+export type EscalationReason = "uncertain" | "no_compliant_action";
+export type FallbackKind = "safe" | "least_bad" | "last_resort";
 
 export interface Thresholds {
   t_allow: number;
@@ -42,8 +44,14 @@ export interface Candidate {
 
 export interface Human {
   decision: OperatorAnswer;
+  action: ActionName | null; // set only for an override
   latency_ms: number;
   operator: string;
+}
+
+export interface FallbackChoice {
+  action: ActionName;
+  kind: FallbackKind;
 }
 
 export interface JevQuestion {
@@ -103,9 +111,19 @@ export interface LogRecord {
   escalated: boolean;
   human: Human | null;
   all_blocked: boolean;
+  escalation_reason: EscalationReason | null;
+  fallback: FallbackChoice;
   judge: Judge;
   reward: number;
   crashed: boolean;
+}
+
+export interface EscalationCandidate {
+  action: ActionName;
+  rank: number;
+  p: number; // worst p(violation) across enabled rules
+  constraint_id: string | null; // the rule behind that p
+  noop: boolean; // the action would not change lane or target speed
 }
 
 export interface Escalation {
@@ -118,7 +136,10 @@ export interface Escalation {
   p: number;
   q_rank: number;
   fallback: ActionName;
+  fallback_kind: FallbackKind;
   judge_unavailable: boolean;
+  reason: EscalationReason;
+  candidates: EscalationCandidate[]; // every ranked action, rank 0 is the proposal
   expires_at: number | null;
   timeout_s: number | null;
 }
@@ -148,6 +169,7 @@ export interface Metrics {
   violations: Record<string, number>;
   violations_total: number;
   human: Record<string, number>;
+  conflicts?: number; // escalations with no compliant action
   cost_usd: number;
   judge_sources?: Record<string, number>;
   latency_ms_p50?: number;
@@ -206,7 +228,7 @@ export type ClientMessage =
   | { type: "toggle_constraint"; id: string; enabled: boolean }
   | { type: "remove_constraint"; id: string }
   | { type: "drop_zone"; lane?: number; ahead_m?: number; length_m?: number; name?: string }
-  | { type: "resolve"; escalation_id: string; decision: OperatorAnswer }
+  | { type: "resolve"; escalation_id: string; decision: OperatorAnswer; action?: ActionName }
   | { type: "load_replay"; run_id: string }
   | { type: "load_live" };
 
@@ -257,6 +279,7 @@ export interface SweepPoint {
   violations_per_episode: number;
   escalation_rate: number;
   all_blocked_rate: number;
+  conflict_rate?: number;
   crash_rate: number;
   mean_return: number;
   cost_per_episode_usd: number;

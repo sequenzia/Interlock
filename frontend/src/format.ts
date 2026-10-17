@@ -1,4 +1,4 @@
-import type { DecisionKind } from "./types";
+import type { DecisionKind, EscalationReason, FallbackKind } from "./types";
 
 export const fmtP = (p: number): string => p.toFixed(2);
 export const fmtMs = (ms: number): string => `${Math.round(ms)} ms`;
@@ -25,4 +25,15 @@ export const DECISION_COLOR: Record<DecisionKind, string> = {
   fallback: "#fbbf24",
   escalate: "#a78bfa",
   all_blocked: "#fb7185",
+};
+
+export const REASON_LABEL: Record<EscalationReason, string> = {
+  uncertain: "uncertain",
+  no_compliant_action: "no compliant action",
+};
+
+export const FALLBACK_LABEL: Record<FallbackKind, string> = {
+  safe: "safe",
+  least_bad: "least bad",
+  last_resort: "last resort",
 };

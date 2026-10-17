@@ -37,7 +37,7 @@ flowchart LR
 | Fact extractor | `backend/facts.py` | Turns the simulator state plus one candidate action into JSON facts with units in the field names, and the same facts as plain sentences for people. All geometry happens here. |
 | Constraint store | `backend/constraints.py` | Operator rules as plain-English strings, optional checker ids, work zones, and the lifecycle that ties the lane-closed rule to its zone. |
 | Judge | `backend/jev_client.py` | One Jev request per candidate action with one yes/no question per enabled rule. A content-addressed cache in front, a mock mode that serves only the cache, and an explicit "unavailable" answer when there is no judge. |
-| Shield | `backend/shield.py` | Pure functions over the ranked actions and the probability grid. Two thresholds produce allow, fallback, escalate or all blocked. |
+| Shield | `backend/shield.py` | Pure functions over the ranked actions and the probability grid. Two thresholds produce allow, fallback or escalate, and the shield only acts alone with a confidently safe action. |
 | Checkers | `backend/checkers.py` | Closed-form ground truth per (candidate, rule) for scoring and calibration. Never consulted by the shield. |
 | Episode loop | `backend/episode.py` | `EpisodeRunner.step()`, the one place the loop above runs. Takes an operator callback for escalations. |
 | Log | `backend/logger.py` | One JSONL record per step. The contract between backend, console and evaluation. |
@@ -84,7 +84,7 @@ sequenceDiagram
   R->>J: check(candidates, enabled rules)
   J-->>R: p[action][rule], sources, exchanges
   R->>D: decide(ranked, p, thresholds)
-  D-->>R: allow / fallback / escalate / all_blocked
+  D-->>R: allow / fallback / escalate
   alt escalate and shield on
     R->>O: Escalation(step, action, sentences, rule, p, fallback)
     O-->>R: approve or deny

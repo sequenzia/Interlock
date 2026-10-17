@@ -38,12 +38,12 @@ from backend.constraints import (
     ConstraintStore,
 )
 from backend.env import ACTION_NAMES, DEFAULT_CONFIG
-from backend.episode import EpisodeRunner, Escalation, OperatorAnswer
+from backend.episode import EpisodeRunner, Escalation
 from backend.jev_client import DEFAULT_CACHE_PATH, JevClient, make_client
 from backend.logger import JsonlLogger, default_log_path, read_log
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
 from backend.policy import Policy
-from backend.shield import Thresholds
+from backend.shield import Answer, Thresholds
 
 log = logging.getLogger("shield.server")
 RUNS_DIR = LOGS_DIR / "runs"
@@ -65,12 +65,14 @@ def replay_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     human: dict[str, int] = {}
     total_reward = 0.0
     crashed = False
+    conflicts = 0
     for r in records:
         decisions[r["decision"]] = decisions.get(r["decision"], 0) + 1
         total_reward += r["reward"]
         crashed = crashed or r["crashed"]
         if r["human"]:
             human[r["human"]["decision"]] = human.get(r["human"]["decision"], 0) + 1
+        conflicts += r.get("escalation_reason") == "no_compliant_action"
         executed = next((c for c in r["candidates"] if c["action"] == r["executed"]), None)
         for check in executed["checks"] if executed else []:
             if check["ground_truth"]:
@@ -83,6 +85,7 @@ def replay_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
         "return": round(total_reward, 3),
         "crashed": crashed,
         "decisions": decisions,
+        "conflicts": conflicts,
         "violations": violations,
         "violations_total": sum(violations.values()),
         "human": human,
@@ -119,7 +122,7 @@ class Session:
         self.timeout_s = escalation_timeout_s or None
         self.source = "live"
         self.pending: Escalation | None = None
-        self.pending_future: asyncio.Future[OperatorAnswer] | None = None
+        self.pending_future: asyncio.Future[Answer] | None = None
         self.pending_expires_at: float | None = None
         self.logger: JsonlLogger | None = None
         self.replay: list[dict[str, Any]] = []
@@ -183,7 +186,8 @@ class Session:
         return {"type": "metrics", **self.runner.summary()}
 
     def escalation_msg(self, esc: Escalation) -> dict[str, Any]:
-        payload = {k: v for k, v in asdict(esc).items() if k != "ground_truth"}
+        hidden = {"ground_truth", "violations_by_action"}
+        payload = {k: v for k, v in asdict(esc).items() if k not in hidden}
         payload["expires_at"] = self.pending_expires_at
         payload["timeout_s"] = self.timeout_s
         return {"type": "escalation", "escalation": payload}
@@ -257,7 +261,9 @@ class Session:
                     )
                     await self.broadcast(self.constraints_msg())
                 case "resolve":
-                    await self.resolve(str(msg["escalation_id"]), msg["decision"])
+                    await self.resolve(
+                        str(msg["escalation_id"]), str(msg["decision"]), msg.get("action")
+                    )
                 case "load_replay":
                     await self.load_replay(str(msg["run_id"]))
                 case "load_live":
@@ -334,7 +340,7 @@ class Session:
             self.playing = False
         await self.broadcast(self.state())
 
-    async def _operator(self, escalation: Escalation) -> OperatorAnswer:
+    async def _operator(self, escalation: Escalation) -> Answer:
         loop = asyncio.get_running_loop()
         self.pending = escalation
         self.pending_future = loop.create_future()
@@ -342,11 +348,11 @@ class Session:
         await self.broadcast(self.escalation_msg(escalation))
         await self.broadcast(self.state())
         try:
-            answer: OperatorAnswer = await asyncio.wait_for(
+            answer: Answer = await asyncio.wait_for(
                 asyncio.shield(self.pending_future), timeout=self.timeout_s
             )
         except TimeoutError:
-            answer = "deny"
+            answer = Answer("deny")
         finally:
             self.pending = None
             self.pending_future = None
@@ -354,13 +360,19 @@ class Session:
         await self.broadcast(self.state())
         return answer
 
-    async def resolve(self, escalation_id: str, decision: str) -> None:
-        if decision not in ("approve", "deny"):
-            raise ValueError(f"decision must be approve or deny, got {decision!r}")
+    async def resolve(self, escalation_id: str, decision: str, action: Any = None) -> None:
+        if decision not in ("approve", "deny", "override"):
+            raise ValueError(f"decision must be approve, deny or override, got {decision!r}")
         if self.pending is None or self.pending.id != escalation_id:
             raise ValueError(f"no open escalation {escalation_id}")
+        if decision == "override":
+            offered = [c["action"] for c in self.pending.candidates]
+            if action not in offered:
+                raise ValueError(f"override needs one of {offered}, got {action!r}")
+        else:
+            action = None
         if self.pending_future is not None and not self.pending_future.done():
-            self.pending_future.set_result(decision)  # type: ignore[arg-type]
+            self.pending_future.set_result(Answer(decision, action))  # type: ignore[arg-type]
 
     async def _cancel_inflight(self) -> None:
         self.playing = False

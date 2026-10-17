@@ -33,9 +33,9 @@ same episode, and a command from any of them applies to all.
 | `state` | `playing`, `paused_on_escalation_id`, `shield_on`, `source` (`live` or `replay`), `judge_mode` (`live` or `mock`), `episode`, `seed`, `run_id`, `speed`, `step`, `total_steps` (replay only, else `null`), `done`, `thresholds` | After every step and every transition: play, pause, speed, shield, thresholds, escalation open or closed, reset, replay load. |
 | `history` | `records`: list of log records | On connect. In replay, the records already streamed. |
 | `step` | `record`: one log record | After each live step or each replayed record. |
-| `escalation` | `escalation`: `id`, `step`, `action`, `sentences`, `constraint_id`, `constraint_text`, `p`, `q_rank`, `fallback`, `judge_unavailable`, `expires_at` (epoch seconds or `null`), `timeout_s` (`null` when waiting forever) | When the shield escalates, and on connect while one is open. `ground_truth` is stripped before sending. |
+| `escalation` | `escalation`: `id`, `step`, `action`, `sentences`, `constraint_id`, `constraint_text`, `p`, `q_rank`, `fallback`, `fallback_kind` (`safe`, `least_bad` or `last_resort`), `judge_unavailable`, `reason` (`uncertain` or `no_compliant_action`), `candidates` (every ranked action as `{action, rank, p, constraint_id, noop}`, rank 0 the proposal), `expires_at` (epoch seconds or `null`), `timeout_s` (`null` when waiting forever) | When the shield escalates, and on connect while one is open. `ground_truth` and `violations_by_action` are stripped before sending. |
 | `constraints` | `constraints`, `zones` | After any rule or zone command, after a step that changed the store (a zone retired), and on each replayed record from the record's own lists. |
-| `metrics` | The runner summary: `run_id`, `seed`, `shield_on`, `judge_mode`, `steps`, `return`, `crashed`, `decisions`, `violations`, `violations_total`, `human`, `judge_sources`, `latency_ms_p50`, `latency_ms_p95`, `input_tokens`, `cost_usd`. In replay, `replay_metrics` recomputed from the records streamed so far, without the latency and token fields. | On connect, after every step, after reset and after a replay load. |
+| `metrics` | The runner summary: `run_id`, `seed`, `shield_on`, `judge_mode`, `steps`, `return`, `crashed`, `decisions`, `conflicts` (escalations with no compliant action), `violations`, `violations_total`, `human` (counts of `approve`, `deny` and `override`), `judge_sources`, `latency_ms_p50`, `latency_ms_p95`, `input_tokens`, `cost_usd`. In replay, `replay_metrics` recomputed from the records streamed so far, without the latency and token fields. | On connect, after every step, after reset and after a replay load. |
 | `error` | `message` | For an unknown message type or a command that raised `KeyError`, `ValueError` or `TypeError`, for example a bad threshold pair or an unknown constraint id. Sent only to the sender. |
 
 A `step` message carries the full [log record](log-record.md), so a client
@@ -56,7 +56,7 @@ needs nothing else to render the road, the timeline and the inspector.
 | `toggle_constraint` | `id`, `enabled` | |
 | `remove_constraint` | `id` | |
 | `drop_zone` | optional `lane`, `ahead_m`, `length_m`, `name` | Places a zone ahead of the ego and arms the lane-closed rule. Defaults are lane 3, 120 m ahead, 200 m long, "work zone". |
-| `resolve` | `escalation_id`, `decision` (`approve` or `deny`) | Answers the open escalation. An id that does not match the open one returns an `error`. |
+| `resolve` | `escalation_id`, `decision` (`approve`, `deny` or `override`), `action` (required for `override`) | Answers the open escalation. Approve runs the proposal, deny the fallback, override the named action. An id that does not match the open one, or an override whose `action` is not one of the escalation's `candidates`, returns an `error`. |
 | `load_replay` | `run_id` | Switch to replaying that run from `backend/logs/runs/`. |
 | `load_live` | | Leave replay by resetting the live episode on its current seed. |
 
@@ -128,6 +128,12 @@ A client adding a preset and answering an escalation:
 {"type": "resolve", "escalation_id": "2026-10-17T01-10-01_seed0_on-4", "decision": "deny"}
 ```
 
+An override names the candidate to run:
+
+```json
+{"type": "resolve", "escalation_id": "2026-10-17T01-10-01_seed0_on-4", "decision": "override", "action": "LANE_RIGHT"}
+```
+
 The server's `escalation` for that step:
 
 ```json
@@ -143,12 +149,26 @@ The server's `escalation` for that step:
     "p": 0.66,
     "q_rank": 0,
     "fallback": "SLOWER",
+    "fallback_kind": "safe",
     "judge_unavailable": false,
+    "reason": "uncertain",
+    "candidates": [
+      {"action": "LANE_LEFT", "rank": 0, "p": 0.66, "constraint_id": "c2", "noop": false},
+      {"action": "IDLE", "rank": 1, "p": 0.31, "constraint_id": "c3", "noop": false},
+      {"action": "SLOWER", "rank": 2, "p": 0.05, "constraint_id": "c1", "noop": false},
+      {"action": "FASTER", "rank": 3, "p": 0.93, "constraint_id": "c1", "noop": false},
+      {"action": "LANE_RIGHT", "rank": 4, "p": 0.04, "constraint_id": "c1", "noop": true}
+    ],
     "expires_at": null,
     "timeout_s": null
   }
 }
 ```
+
+`reason` is `no_compliant_action` when no candidate scores below the allow
+threshold; the console then lists the candidates as the main choice. `noop`
+marks a lane change at the road edge or a speed change at the end of the
+speed range, which the shield never picks as a least-bad fallback.
 
 An error reply:
 

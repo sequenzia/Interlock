@@ -74,7 +74,7 @@ flowchart LR
   POL --> SHIELD[Shield<br/>allow / fallback / escalate]
   JEV --> SHIELD
   SHIELD --> ENV
-  SHIELD --> QUEUE[Approval queue<br/>human approve / deny]
+  SHIELD --> QUEUE[Approval queue<br/>human approve / deny / override]
   QUEUE --> SHIELD
   SHIELD --> LOG[(JSONL decision log)]
   LOG --> UI[Operator console]

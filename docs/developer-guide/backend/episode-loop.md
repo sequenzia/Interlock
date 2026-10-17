@@ -58,19 +58,21 @@ async def step(self) -> StepResult:
    `labels[action][constraint_id]` as `True`, `False` or `None`. These never
    reach the decision; they go into the record and into the simulated
    operator's answer.
-6. **Decide.** `decide(names, check.p, thresholds)` returns a `Decision` of
-   kind `allow`, `fallback`, `escalate` or `all_blocked`. See
-   [Shield algorithm](shield.md).
+6. **Decide.** `facts.noop_actions(candidates)` names the actions that would
+   change nothing, then `decide(names, check.p, thresholds, noop)` returns a
+   `Decision` of kind `allow`, `fallback` or `escalate`, with a reason on
+   escalations. See [Shield algorithm](shield.md).
 7. **Apply the shield mode.**
     - Shield off: the decision is overwritten to `allow` with the proposed
-      action executed and `all_blocked` cleared. Everything above still ran,
-      so the record carries the probabilities and labels the shield would
-      have used. This is shadow mode.
+      action executed, `all_blocked` cleared and the reason dropped.
+      Everything above still ran, so the record carries the probabilities,
+      labels and would-be fallback the shield would have used. This is
+      shadow mode.
     - Shield on and `escalate`: the runner builds an `Escalation`, awaits
       `self.operator(escalation)`, times the wait, records
-      `human = {decision, latency_ms, operator}` and calls
-      `resolve(decision, approved=...)`. Approve executes the proposed action;
-      deny executes the fallback.
+      `human = {decision, action, latency_ms, operator}` and calls
+      `resolve(decision, answer)`. Approve executes the proposed action, deny
+      the fallback, override the candidate the operator named.
     - Shield on and any other kind: the decision stands.
 8. **Snapshot, then act.** `facts.snapshot(env)` captures the ego and every
    other vehicle before `env.step()`, so the record's positions describe the
@@ -100,7 +102,7 @@ flowchart TD
   G -- no --> H[overwrite to allow, execute top]
   G -- yes --> I{kind}
   I -- escalate --> J[await operator, resolve]
-  I -- allow / fallback / all_blocked --> K[keep decision]
+  I -- allow / fallback --> K[keep decision]
   H --> L[snapshot, env.step]
   J --> L
   K --> L
@@ -122,23 +124,30 @@ class Escalation:
     p: float                   # that probability
     q_rank: int                # always 0: the proposal is the top-ranked action
     fallback: str              # what deny would execute
+    fallback_kind: str         # safe | least_bad | last_resort
     judge_unavailable: bool    # any answer this step came from no judge
+    reason: EscalationReason   # uncertain | no_compliant_action
+    candidates: list[dict]     # every ranked action: action, rank, p, constraint_id, noop
     ground_truth: bool | None  # proposed action breaks any enabled rule, per the checkers
+    violations_by_action: dict[str, int | None]  # true labels per candidate
 ```
 
 `ground_truth` is `any()` over the proposed action's labels, or `None` when no
-enabled rule has a checker. It exists for the simulated operator. The server
-strips it before sending the item to the console, so a human never sees the
-answer key.
+enabled rule has a checker; `violations_by_action` counts true labels per
+candidate, `None` when it has none. Both exist for the simulated operator.
+The server strips them before sending the item to the console, so a human
+never sees the answer key. `candidates` is what the queue lists when the
+reason is `no_compliant_action`, and what an override is validated against.
 
 ## Operators
 
-An operator is `Callable[[Escalation], Awaitable[OperatorAnswer]]` where the
-answer is `"approve"` or `"deny"`.
+An operator is `Callable[[Escalation], Awaitable[Answer]]` where `Answer` has
+a `decision` of `"approve"`, `"deny"` or `"override"` and, for an override,
+the `action` to run.
 
 | Name | Behaviour | Used by |
 | --- | --- | --- |
-| `simulated` | Deny when `ground_truth` is `True` or `None`, approve when `False`. | `interlock eval`, the default for `interlock run` |
+| `simulated` | Uncertain: deny when `ground_truth` is `True` or `None`, approve when `False`. No compliant action: override with the candidate that breaks the fewest rules, ties to the ranking, approving when that is the proposal; with no labels at all, deny. | `interlock eval`, the default for `interlock run` |
 | `approve` | Always approve. | `interlock run --operator approve` |
 | `deny` | Always deny. | `interlock run --operator deny` |
 | `Session._operator` | Publish the item over the socket and await a future the UI resolves; a timeout denies. | The console |
@@ -157,6 +166,7 @@ message during a live episode:
 | `run_id`, `seed`, `shield_on`, `judge_mode` | Identity of the run |
 | `steps`, `return`, `crashed` | Length, summed reward, whether a crash ended it |
 | `decisions` | Count per decision kind |
+| `conflicts` | Escalations with reason `no_compliant_action` |
 | `violations`, `violations_total` | Executed-action violations per rule id (every rule in the store, zero when none) and their sum |
 | `human` | Count per operator answer |
 | `judge_sources` | Steps per step-level source: `live`, `cache`, `unavailable` |

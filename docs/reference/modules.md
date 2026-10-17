@@ -63,6 +63,7 @@ Simulator state plus one action to facts JSON and sentences. See [Facts](../deve
 | `target_speed_after` | `(ego: Any, action: str) -> float` |
 | `facts_for_action` | `(env: Any, action: str, zones: list[Zone]) -> Facts` |
 | `for_candidates` | `(env: Any, actions: list[str], zones: list[Zone]) -> dict[str, Facts]` |
+| `noop_actions` | `(candidates: dict[str, Facts]) -> frozenset[str]`, lane changes at the road edge and speed changes at the end of the range |
 | `snapshot` | `(env: Any) -> dict[str, Any]`, ego and vehicle positions for the log record |
 | `sentences` | `(f: Facts) -> list[str]` |
 
@@ -123,13 +124,18 @@ Pure decision functions. See [Shield algorithm](../developer-guide/backend/shiel
 
 | Name | Signature |
 | --- | --- |
-| `DecisionKind` | `Literal["allow", "fallback", "escalate", "all_blocked"]` |
+| `DecisionKind` | `Literal["allow", "fallback", "escalate", "all_blocked"]`; `all_blocked` is only read from logs written before Oct 17 |
+| `FallbackKind` | `Literal["safe", "least_bad", "last_resort"]` |
+| `EscalationReason` | `Literal["uncertain", "no_compliant_action"]` |
+| `OperatorDecision` | `Literal["approve", "deny", "override"]` |
 | `Thresholds` | frozen dataclass: `t_allow: float = 0.2`, `t_block: float = 0.8`; validates in `__post_init__` |
-| `Decision` | frozen dataclass: `kind`, `proposed: str`, `executed: str`, `fired_constraint: str \| None`, `p_proposed: float`, `p_viol: dict[str, float]`, `fallback: str`, `fallback_all_blocked: bool`, `all_blocked: bool = False` |
+| `Fallback` | frozen dataclass: `action: str`, `kind: FallbackKind` |
+| `Answer` | frozen dataclass: `decision: OperatorDecision`, `action: str \| None = None` |
+| `Decision` | frozen dataclass: `kind`, `proposed: str`, `executed: str`, `fired_constraint: str \| None`, `p_proposed: float`, `p_viol: dict[str, float]`, `fallback: str`, `fallback_kind: FallbackKind`, `reason: EscalationReason \| None = None`, `all_blocked: bool = False` |
 | `violation_probability` | `(p_for_action: dict[str, float]) -> tuple[float, str \| None]` |
-| `fallback_action` | `(ranked: list[str], p: PGrid, thresholds: Thresholds) -> tuple[str, bool]` |
-| `decide` | `(ranked: list[str], p: PGrid, thresholds: Thresholds) -> Decision` |
-| `resolve` | `(decision: Decision, approved: bool) -> Decision`, raises `ValueError` unless `kind == "escalate"` |
+| `fallback_action` | `(ranked: list[str], p: PGrid, thresholds: Thresholds, noop: frozenset[str] = frozenset()) -> Fallback` |
+| `decide` | `(ranked: list[str], p: PGrid, thresholds: Thresholds, noop: frozenset[str] = frozenset()) -> Decision` |
+| `resolve` | `(decision: Decision, answer: Answer) -> Decision`, raises `ValueError` unless `kind == "escalate"`, or for an override naming an action outside `p_viol` |
 
 ### `backend/checkers.py`
 
@@ -152,7 +158,7 @@ The JSONL record. See [Log record](../developer-guide/contracts/log-record.md). 
 | --- | --- |
 | `make_run_id` | `(seed: int, shield_on: bool, now: datetime \| None = None) -> str` |
 | `default_log_path` | `(run_id: str) -> Path`, `backend/logs/runs/<run_id>.jsonl` |
-| `build_record` | keyword-only `(run_id, episode, step, seed, source, shield_on, thresholds: Thresholds, snapshot, zones, constraints, candidates, decision: Decision, escalated, human, judge, reward, crashed) -> dict[str, Any]` |
+| `build_record` | keyword-only `(run_id, episode, step, seed, source, shield_on, thresholds: Thresholds, snapshot, zones, constraints, candidates, decision: Decision, escalated, human, fallback: dict[str, str], judge, reward, crashed) -> dict[str, Any]` |
 | `JsonlLogger` | `__init__(path: Path)`, `write(record: dict[str, Any]) -> None` (flushes), `close() -> None`, context manager |
 | `read_log` | `(path: Path) -> list[dict[str, Any]]` |
 
@@ -162,12 +168,12 @@ The per-step loop shared by the CLI and the server. See [Per-step loop](../devel
 
 | Name | Signature |
 | --- | --- |
-| `Escalation` | frozen dataclass: `id: str`, `step: int`, `action: str`, `sentences: list[str]`, `constraint_id: str \| None`, `constraint_text: str \| None`, `p: float`, `q_rank: int`, `fallback: str`, `judge_unavailable: bool`, `ground_truth: bool \| None` |
-| `Operator` | `Callable[[Escalation], Awaitable[OperatorAnswer]]` |
-| `simulated_operator`, `always_approve`, `always_deny` | each `async (escalation: Escalation) -> OperatorAnswer` |
+| `Escalation` | frozen dataclass: `id: str`, `step: int`, `action: str`, `sentences: list[str]`, `constraint_id: str \| None`, `constraint_text: str \| None`, `p: float`, `q_rank: int`, `fallback: str`, `fallback_kind: str`, `judge_unavailable: bool`, `reason: EscalationReason`, `candidates: list[dict[str, Any]]`, `ground_truth: bool \| None`, `violations_by_action: dict[str, int \| None]` |
+| `Operator` | `Callable[[Escalation], Awaitable[Answer]]` |
+| `simulated_operator`, `always_approve`, `always_deny` | each `async (escalation: Escalation) -> Answer` |
 | `OPERATORS` | `{"simulated", "approve", "deny"}` to the three above |
 | `StepResult` | dataclass: `record: dict[str, Any]`, `escalation: Escalation \| None`, `terminated: bool`, `truncated: bool`; property `done` |
-| `Totals` | dataclass of running counters: `steps`, `reward`, `crashed`, `decisions`, `violations`, `human`, `sources`, `latencies_ms`, `input_tokens`, `cost_usd` |
+| `Totals` | dataclass of running counters: `steps`, `reward`, `crashed`, `decisions`, `conflicts`, `violations`, `human`, `sources`, `latencies_ms`, `input_tokens`, `cost_usd` |
 | `EpisodeRunner.__init__` | keyword-only `(policy: Policy, judge: JevClient, store: ConstraintStore, thresholds: Thresholds \| None = None, shield_on: bool = True, operator: Operator \| None = None, operator_name: str = "simulated", logger: JsonlLogger \| None = None, env_config: dict[str, Any] \| None = None, source: str = "live")` |
 | `EpisodeRunner.reset` | `(seed: int) -> dict[str, Any]`, returns the first snapshot |
 | `EpisodeRunner.ego_x_m` | property `-> float` |

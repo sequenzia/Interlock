@@ -48,9 +48,9 @@ The "shield on" badge toggles the shield for subsequent steps. You can flip it m
 
 The badge at the right of the status strip is the latest step's outcome. `fallback -> IDLE` means the top action was confidently a violation and IDLE was the first lower-ranked action that was confidently safe. `escalated -> SLOWER` means the operator denied and the fallback ran. `allowed` with no arrow means the policy's own choice ran.
 
-## All blocked
+## No compliant action
 
-When the top action is a confident violation and no lower-ranked action is confidently safe, the shield executes SLOWER as a last resort, or IDLE if SLOWER itself scores above the block threshold. The step is shown as "all blocked" in rose. A deny on an escalation can land in the same place. It is rare at the default thresholds and common at very wide ones such as 0.1 and 0.9.
+When no candidate at all is confidently safe, the shield does not pick for you. It escalates with the reason "no compliant action" and the approval queue lists every candidate so you can choose one; see [Approval queue](approval-queue.md). A deny on such a card runs the least-bad candidate, the lower-ranked action with the lowest probability that is not a confident violation and would actually change something. Only when nothing qualifies does the shield fall back to SLOWER, or IDLE if SLOWER itself scores above the block threshold, and that step is marked all blocked. "All blocked" in rose on the timeline therefore only appears in logs from before this change; current runs show such steps as escalations.
 
 !!! warning "The shield enforces rules, not collision safety"
     The policy's own crash avoidance is what keeps the car out of accidents. A deny or an all-blocked step can override a lane change the policy wanted for exactly that reason. This is why the hosted demo runs with no escalation timeout and why a following-distance rule is a sensible addition to the rule set.

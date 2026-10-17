@@ -165,3 +165,22 @@ def test_edge_lane_changes_are_described_as_no_ops() -> None:
     f = facts_for_action(env, "LANE_RIGHT", zones=[])
     assert f["action"]["lane_after"] == 4 and "changes nothing" in f["action"]["meaning"]
     env.close()
+
+
+def test_noop_actions_are_edge_lane_changes_and_speed_changes_at_the_range_end() -> None:
+    from backend.facts import noop_actions
+
+    def cand(action: str, lane: int, lane_after: int, target: float, after: float) -> dict:
+        return {
+            "ego": {"lane": lane, "target_speed_mps": target},
+            "action": {"name": action, "lane_after": lane_after, "target_speed_after_mps": after},
+        }
+
+    candidates = {
+        "LANE_LEFT": cand("LANE_LEFT", 1, 1, 20.0, 20.0),
+        "LANE_RIGHT": cand("LANE_RIGHT", 1, 2, 20.0, 20.0),
+        "SLOWER": cand("SLOWER", 1, 1, 20.0, 20.0),
+        "FASTER": cand("FASTER", 1, 1, 20.0, 25.0),
+        "IDLE": cand("IDLE", 1, 1, 20.0, 20.0),
+    }
+    assert noop_actions(candidates) == frozenset({"LANE_LEFT", "SLOWER"})

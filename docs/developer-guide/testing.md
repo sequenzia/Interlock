@@ -26,12 +26,12 @@ cd frontend && pnpm test:e2e
 | `test_constraints.py` | Preset checker inference including typed variants, ids and toggling, empty text rejection, zone drop and retirement |
 | `test_checkers.py` | Each checker on crafted facts, free-text rules label `None`, `label_all` covers every pair |
 | `test_jev_client.py` | Question text, cache key dependencies, mock-mode misses at 0.5, caching and replay of live answers, outage after a warm cache, no constraints means no request, `make_client` modes, the judge record |
-| `test_shield.py` | Every branch of `decide`, `fallback_action` and `resolve`, inclusive band edges, threshold validation |
+| `test_shield.py` | Every branch of `decide`, the three fallback tiers with the no-op exclusion and rank tie-break, the no-compliant-action escalation, `resolve` for approve, deny, override and a bad override, inclusive band edges, threshold validation |
 | `test_logger.py` | Run id format, the record has exactly the contract keys, JSONL round trip |
-| `test_episode.py` | Mock shield-on escalates every step and logs, the simulated operator denies true violations, shield off in shadow, no rules means allow, a mid-episode zone drop appears in the facts, a passed zone retires its rule |
-| `test_metrics.py` | Episode counters and rates, pooled aggregates, reliability bins and ECE |
+| `test_episode.py` | Mock shield-on escalates every step as no compliant action and logs, the simulated operator overrides conflicts with the fewest-violation candidate and denies true violations when uncertain, shield off in shadow, no rules means allow, a mid-episode zone drop appears in the facts, a passed zone retires its rule |
+| `test_metrics.py` | Episode counters and rates, the all-blocked flag counted over old and new records, conflicts, pooled aggregates, reliability bins and ECE |
 | `test_evaluate.py` | Configuration labels and a full `run_config` plus `build_report` in a temp directory |
-| `test_server.py` | Connect greeting, history for late joiners, the escalation round trip with the mock judge, play and pause, shield and threshold and speed and reset commands, constraint broadcasts, a step record over the socket, replay streaming, reset during an open escalation, `/eval/latest`, CORS with and without `CONSOLE_ORIGINS` |
+| `test_server.py` | Connect greeting, history for late joiners, the escalation round trip with the mock judge, an override that executes a named candidate and an error for one outside the candidates, play and pause, shield and threshold and speed and reset commands, constraint broadcasts, a step record over the socket, replay streaming, reset during an open escalation, `/eval/latest`, CORS with and without `CONSOLE_ORIGINS` |
 | `test_cli.py` | Subcommand dispatch, module flags, `--help`, usage errors, console flags to environment, child process supervision and reaping |
 
 ## Shared patterns

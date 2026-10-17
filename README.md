@@ -72,10 +72,11 @@ Each simulation step:
 4. The shield takes the top-ranked action's worst probability across rules and
    applies two thresholds, by default 0.2 and 0.8:
    - below the allow threshold: execute it;
-   - above the block threshold: execute the first lower-ranked action that is
-     confidently safe, or SLOWER as a last resort;
-   - in between: pause the simulation and ask the operator. Deny runs the
-     fallback.
+   - above the block threshold, with a lower-ranked action that is confidently
+     safe: execute that one;
+   - otherwise: pause the simulation and ask the operator. Approve runs the
+     proposal, deny runs the fallback, and when no candidate is confidently
+     safe the queue lists all five so the operator can pick one.
 5. Ground-truth checkers label every candidate against every rule for scoring.
    They never influence the decision.
 6. One JSONL record per step holds the facts, Q-values, every probability, the

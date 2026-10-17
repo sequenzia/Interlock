@@ -12,7 +12,7 @@ import statistics
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal
+from typing import Any
 
 from backend import checkers
 from backend import facts as fact_extractor
@@ -21,9 +21,15 @@ from backend.env import ACTION_INDEX, make_env
 from backend.jev_client import JevClient
 from backend.logger import JsonlLogger, build_record, make_run_id
 from backend.policy import Policy
-from backend.shield import Decision, Thresholds, decide, resolve
-
-OperatorAnswer = Literal["approve", "deny"]
+from backend.shield import (
+    Answer,
+    Decision,
+    EscalationReason,
+    Thresholds,
+    decide,
+    resolve,
+    violation_probability,
+)
 
 
 @dataclass(frozen=True)
@@ -39,26 +45,44 @@ class Escalation:
     p: float
     q_rank: int
     fallback: str
+    fallback_kind: str
     judge_unavailable: bool
+    reason: EscalationReason
+    candidates: list[dict[str, Any]]  # every ranked action: action, rank, p, constraint_id, noop
     ground_truth: (
         bool | None
     )  # proposed action breaks any enabled rule; for the simulated operator, never shown
+    violations_by_action: dict[str, int | None]  # true labels per candidate; never shown
 
 
-Operator = Callable[[Escalation], Awaitable[OperatorAnswer]]
+Operator = Callable[[Escalation], Awaitable[Answer]]
 
 
-async def simulated_operator(escalation: Escalation) -> OperatorAnswer:
-    """Answers with the ground-truth checker; unknown labels are denied."""
-    return "deny" if escalation.ground_truth in (True, None) else "approve"
+async def simulated_operator(escalation: Escalation) -> Answer:
+    """Answers with the ground-truth checker.
+
+    Uncertain: deny a true or unknown violation, approve otherwise. No compliant
+    action: override with the candidate that breaks the fewest rules, ties to the
+    policy's ranking, approving when that is the proposal; no labels at all denies.
+    """
+    if escalation.reason == "no_compliant_action":
+        counts = {a: n for a, n in escalation.violations_by_action.items() if n is not None}
+        if not counts:
+            return Answer("deny")
+        fewest = min(counts.values())
+        action = next(
+            c["action"] for c in escalation.candidates if counts.get(c["action"]) == fewest
+        )
+        return Answer("approve") if action == escalation.action else Answer("override", action)
+    return Answer("deny") if escalation.ground_truth in (True, None) else Answer("approve")
 
 
-async def always_approve(escalation: Escalation) -> OperatorAnswer:
-    return "approve"
+async def always_approve(escalation: Escalation) -> Answer:
+    return Answer("approve")
 
 
-async def always_deny(escalation: Escalation) -> OperatorAnswer:
-    return "deny"
+async def always_deny(escalation: Escalation) -> Answer:
+    return Answer("deny")
 
 
 OPERATORS: dict[str, Operator] = {
@@ -86,6 +110,7 @@ class Totals:
     reward: float = 0.0
     crashed: bool = False
     decisions: dict[str, int] = field(default_factory=dict)
+    conflicts: int = 0  # escalations with no compliant action
     violations: dict[str, int] = field(
         default_factory=dict
     )  # constraint id -> executed-action violations
@@ -148,26 +173,30 @@ class EpisodeRunner:
         enabled = self.store.enabled()
         check = await self.judge.check(candidates, enabled)
         labels = checkers.label_all(candidates, enabled)
-        decision = decide(names, check.p, self.thresholds)
+        noop = fact_extractor.noop_actions(candidates)
+        decision = decide(names, check.p, self.thresholds, noop)
 
         escalation: Escalation | None = None
         human: dict[str, Any] | None = None
         escalated = False
         if not self.shield_on:
             decision = replace(
-                decision, kind="allow", executed=decision.proposed, all_blocked=False
+                decision, kind="allow", executed=decision.proposed, all_blocked=False, reason=None
             )
         elif decision.kind == "escalate":
             escalated = True
-            escalation = self._escalation(decision, candidates, labels, check.judge_unavailable)
+            escalation = self._escalation(
+                decision, candidates, labels, check.p, noop, check.judge_unavailable
+            )
             started = time.perf_counter()
             answer = await self.operator(escalation)
             human = {
-                "decision": answer,
+                "decision": answer.decision,
+                "action": answer.action,
                 "latency_ms": round((time.perf_counter() - started) * 1000, 1),
                 "operator": self.operator_name,
             }
-            decision = resolve(decision, approved=answer == "approve")
+            decision = resolve(decision, answer)
 
         snapshot = fact_extractor.snapshot(self.env)
         self._obs, reward, terminated, truncated, info = self.env.step(
@@ -205,6 +234,7 @@ class EpisodeRunner:
             decision=decision,
             escalated=escalated,
             human=human,
+            fallback={"action": decision.fallback, "kind": decision.fallback_kind},
             judge=check.judge_record(),
             reward=float(reward),
             crashed=bool(info["crashed"]),
@@ -222,11 +252,28 @@ class EpisodeRunner:
         decision: Decision,
         candidates: dict[str, Any],
         labels: dict[str, dict[str, bool | None]],
+        p: dict[str, dict[str, float]],
+        noop: frozenset[str],
         judge_unavailable: bool,
     ) -> Escalation:
         cid = decision.fired_constraint
         proposed_labels = [v for v in labels[decision.proposed].values() if v is not None]
         ground_truth = any(proposed_labels) if proposed_labels else None
+        ranked_candidates = []
+        violations_by_action: dict[str, int | None] = {}
+        for rank, action in enumerate(decision.p_viol):
+            worst_p, worst_cid = violation_probability(p.get(action, {}))
+            ranked_candidates.append(
+                {
+                    "action": action,
+                    "rank": rank,
+                    "p": worst_p,
+                    "constraint_id": worst_cid,
+                    "noop": action in noop,
+                }
+            )
+            known = [v for v in labels[action].values() if v is not None]
+            violations_by_action[action] = sum(known) if known else None
         return Escalation(
             id=f"{self.run_id}-{self.step_index}",
             step=self.step_index,
@@ -237,8 +284,12 @@ class EpisodeRunner:
             p=decision.p_proposed,
             q_rank=0,
             fallback=decision.fallback,
+            fallback_kind=decision.fallback_kind,
             judge_unavailable=judge_unavailable,
+            reason=decision.reason or "uncertain",
+            candidates=ranked_candidates,
             ground_truth=ground_truth,
+            violations_by_action=violations_by_action,
         )
 
     def _account(
@@ -254,6 +305,8 @@ class EpisodeRunner:
         t.reward += record["reward"]
         t.crashed = t.crashed or record["crashed"]
         t.decisions[record["decision"]] = t.decisions.get(record["decision"], 0) + 1
+        if record["escalation_reason"] == "no_compliant_action":
+            t.conflicts += 1
         for cid, violated in executed_labels.items():
             if violated:
                 t.violations[cid] = t.violations.get(cid, 0) + 1
@@ -278,6 +331,7 @@ class EpisodeRunner:
             "return": round(t.reward, 3),
             "crashed": t.crashed,
             "decisions": dict(sorted(t.decisions.items())),
+            "conflicts": t.conflicts,
             "violations": {
                 cid: t.violations.get(cid, 0) for cid in [c.id for c in self.store.constraints]
             },

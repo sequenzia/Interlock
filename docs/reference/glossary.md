@@ -6,7 +6,13 @@ Terms as Interlock uses them, with the page that covers each one.
 : One of the five highway-env meta-actions the policy chooses from: `LANE_LEFT`, `IDLE`, `LANE_RIGHT`, `FASTER`, `SLOWER`. Index order comes from highway-env. See [Training and policy](../developer-guide/backend/training.md).
 
 **All blocked**
-: The decision kind when the top action is a confident violation and no lower-ranked action is confidently safe. The shield executes `SLOWER` if its probability is at or below the block threshold, otherwise `IDLE`, and flags the step. See [Shield algorithm](../developer-guide/backend/shield.md).
+: The flag on a step whose executed action was the `SLOWER` / `IDLE` last resort, reached through a denied or timed-out escalation. Logs written before Oct 17 also used it as a decision kind. See [Shield algorithm](../developer-guide/backend/shield.md).
+
+**No compliant action**
+: The escalation reason when no candidate's violation probability is below the allow threshold. The shield asks the operator instead of executing a last resort on its own, and the queue lists every candidate so the operator can override. See [Approval queue](../user-guide/console/approval-queue.md).
+
+**Least bad**
+: The fallback tier between a confidently safe action and the last resort: the lower-ranked action with the lowest violation probability that is not a confident violation and would change the state. What deny runs when nothing is confidently safe.
 
 **Allow**
 : The decision kind when the top action's violation probability is below `t_allow`. The policy's choice runs unchanged.

@@ -119,6 +119,41 @@ def test_escalation_round_trip_with_mock_judge(client: TestClient) -> None:
         assert state["paused_on_escalation_id"] is None and state["step"] == 1
 
 
+def test_override_executes_a_named_candidate_and_rejects_others(client: TestClient) -> None:
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "add_constraint", "text": "Speed limit 25 m/s"})
+        recv_until(ws, "constraints")
+        ws.send_json({"type": "step"})
+        esc = recv_until(ws, "escalation")["escalation"]
+        assert esc["reason"] == "no_compliant_action" and "violations_by_action" not in esc
+        assert [c["rank"] for c in esc["candidates"]] == [0, 1, 2, 3, 4]
+        assert esc["candidates"][0]["action"] == esc["action"]
+        ws.send_json(
+            {
+                "type": "resolve",
+                "escalation_id": esc["id"],
+                "decision": "override",
+                "action": "BRAKE",
+            }
+        )
+        assert "override needs one of" in recv_until(ws, "error")["message"]
+        chosen = esc["candidates"][2]["action"]
+        ws.send_json(
+            {
+                "type": "resolve",
+                "escalation_id": esc["id"],
+                "decision": "override",
+                "action": chosen,
+            }
+        )
+        step = recv_until(ws, "step")["record"]
+        assert step["executed"] == chosen and step["escalation_reason"] == "no_compliant_action"
+        assert step["human"]["decision"] == "override" and step["human"]["action"] == chosen
+        assert step["fallback"]["kind"] == "least_bad"
+        assert recv_until(ws, "metrics")["conflicts"] == 1
+
+
 def test_shield_toggle_thresholds_speed_and_reset(client: TestClient) -> None:
     with client.websocket_connect("/ws") as ws:
         drain_greeting(ws)

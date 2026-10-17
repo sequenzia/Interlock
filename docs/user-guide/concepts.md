@@ -13,7 +13,8 @@ flowchart LR
   POL[Policy proposes<br/>top-ranked action] --> J[Jev scores<br/>p of violation per rule]
   J --> D{worst p across<br/>enabled rules}
   D -->|below allow threshold| A[Allow:<br/>execute it]
-  D -->|above block threshold| F[Fallback:<br/>next confidently safe action,<br/>else SLOWER]
+  D -->|above block threshold,<br/>safe action available| F[Fallback:<br/>next confidently safe action]
+  D -->|nothing confidently safe| E
   D -->|in between| E[Escalate:<br/>pause and ask the operator]
   E -->|approve| A
   E -->|deny| F
@@ -41,8 +42,9 @@ For the policy's top-ranked action the shield takes the highest p across the ena
 | Worst p | Outcome | What executes |
 | --- | --- | --- |
 | below 0.2 | allow | the proposed action |
-| above 0.8 | fallback | the next action in the policy's own ranking whose worst p is below 0.2; if none, SLOWER (or IDLE), flagged "all blocked" |
-| 0.2 to 0.8 inclusive | escalate | the simulation pauses; approve runs the proposal, deny runs the fallback |
+| above 0.8, with a lower-ranked action below 0.2 | fallback | the first such action in the policy's own ranking |
+| 0.2 to 0.8 inclusive, with such an action available | escalate, uncertain | the simulation pauses; approve runs the proposal, deny runs the fallback, override runs the candidate the operator names |
+| any value, with no action below 0.2 | escalate, no compliant action | the simulation pauses and the queue lists every candidate; deny runs the least-bad one, or SLOWER as a last resort flagged "all blocked" |
 
 All five actions are judged in the same step, so falling back costs no extra round trip. The thresholds are live controls in the console and the evaluation sweeps them to show the tradeoff between violations and how often a person is asked. See [Shield algorithm](../developer-guide/backend/shield.md) for the exact rules.
 

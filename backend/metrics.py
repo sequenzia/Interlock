@@ -40,8 +40,12 @@ def episode_metrics(records: list[Record]) -> dict[str, Any]:
     crashed = False
     tokens = 0
     cost = 0.0
+    all_blocked = 0
+    conflicts = 0
     for r in records:
         decisions[r["decision"]] = decisions.get(r["decision"], 0) + 1
+        all_blocked += bool(r.get("all_blocked"))
+        conflicts += r.get("escalation_reason") == "no_compliant_action"
         total_reward += r["reward"]
         crashed = crashed or r["crashed"]
         if r["human"]:
@@ -71,7 +75,9 @@ def episode_metrics(records: list[Record]) -> dict[str, Any]:
         "decisions": decisions,
         "escalations": escalations,
         "escalation_rate": round(escalations / steps, 4),
-        "all_blocked": decisions.get("all_blocked", 0),
+        "all_blocked": all_blocked,
+        "conflicts": conflicts,
+        "conflict_rate": round(conflicts / steps, 4),
         "human": human,
         "judge_sources": sources,
         "live_steps": len(live_latencies),
@@ -106,7 +112,10 @@ def aggregate(episodes: list[dict[str, Any]]) -> dict[str, Any]:
         "mean_steps": round(steps / len(episodes), 1),
         "escalation_rate": round(sum(e["escalations"] for e in episodes) / steps, 4),
         "all_blocked_rate": round(sum(e["all_blocked"] for e in episodes) / steps, 4),
-        "human": {k: sum(e["human"].get(k, 0) for e in episodes) for k in ("approve", "deny")},
+        "conflict_rate": round(sum(e.get("conflicts", 0) for e in episodes) / steps, 4),
+        "human": {
+            k: sum(e["human"].get(k, 0) for e in episodes) for k in ("approve", "deny", "override")
+        },
         "live_steps": sum(e["live_steps"] for e in episodes),
         "latency_ms_p50": round(
             statistics.median([e["latency_ms_p50"] for e in episodes if e["live_steps"]] or [0.0]),

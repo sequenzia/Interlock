@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ApprovalQueue } from "./components/approval-queue";
+import { ApprovalQueue, resolveWithRank } from "./components/approval-queue";
 import { ConstraintPanel } from "./components/constraint-panel";
 import { DecisionStrip } from "./components/decision-strip";
 import { InspectorDrawer } from "./components/inspector-drawer";
@@ -35,6 +35,8 @@ export function App() {
         send({ type: "resolve", escalation_id: escalation.id, decision: "approve" });
       } else if (e.key === "d" && escalation) {
         send({ type: "resolve", escalation_id: escalation.id, decision: "deny" });
+      } else if (escalation && /^[1-5]$/.test(e.key)) {
+        resolveWithRank(escalation, Number(e.key) - 1);
       }
     };
     window.addEventListener("keydown", onKey);

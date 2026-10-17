@@ -83,7 +83,13 @@ def plot_before_after(before: dict[str, Any], after: dict[str, Any], path: Path)
         )
         _style(ax, title, ylabel, "seed")
         ax.set_xticks(list(x), [str(s) for s in seeds])
-        ax.legend(frameon=False, fontsize=8, labelcolor=TEXT_2, loc="upper left", bbox_to_anchor=(1.0, 1.0))
+        ax.legend(
+            frameon=False,
+            fontsize=8,
+            labelcolor=TEXT_2,
+            loc="upper left",
+            bbox_to_anchor=(1.0, 1.0),
+        )
     a_off, a_on = before["aggregate"], after["aggregate"]
     ax1.text(
         0.0,

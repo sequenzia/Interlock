@@ -69,8 +69,8 @@ def test_hello_state_and_metrics_on_connect(client: TestClient) -> None:
         assert state["type"] == "state"
         assert state["playing"] is False and state["step"] == 0 and state["source"] == "live"
         assert state["judge_mode"] == "mock" and state["thresholds"] == {
-            "t_allow": 0.2,
-            "t_block": 0.8,
+            "t_allow": 0.3,
+            "t_block": 0.7,
         }
         assert ws.receive_json() == {"type": "history", "records": []}
         assert ws.receive_json()["type"] == "metrics"
@@ -168,8 +168,8 @@ def test_shield_toggle_thresholds_speed_and_reset(client: TestClient) -> None:
         drain_greeting(ws)
         ws.send_json({"type": "set_shield", "on": False})
         assert recv_until(ws, "state")["shield_on"] is False
-        ws.send_json({"type": "set_thresholds", "t_allow": 0.3, "t_block": 0.7})
-        assert recv_until(ws, "state")["thresholds"] == {"t_allow": 0.3, "t_block": 0.7}
+        ws.send_json({"type": "set_thresholds", "t_allow": 0.25, "t_block": 0.75})
+        assert recv_until(ws, "state")["thresholds"] == {"t_allow": 0.25, "t_block": 0.75}
         ws.send_json({"type": "set_thresholds", "t_allow": 0.9, "t_block": 0.1})
         assert "set_thresholds" in recv_until(ws, "error")["message"]
         ws.send_json({"type": "set_speed", "steps_per_sec": 4})

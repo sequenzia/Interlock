@@ -48,7 +48,8 @@ STANDING_RULES = [r for r in PRESETS if r != CHECKER_LANE_CLOSED]
 
 
 def config_label(shield_on: bool, thresholds: Thresholds, zone_at_step: int | None) -> str:
-    label = f"{'on' if shield_on else 'off'}_ta{thresholds.t_allow:.2f}_tb{thresholds.t_block:.2f}"
+    """The run label. Shield-off runs carry no thresholds: they change nothing there."""
+    label = f"on_ta{thresholds.t_allow:.2f}_tb{thresholds.t_block:.2f}" if shield_on else "off"
     return f"{label}_zone{zone_at_step}" if zone_at_step is not None else label
 
 
@@ -157,10 +158,18 @@ def load_run(
 
 
 def newest_runs(root: Path) -> dict[str, Path]:
-    """Newest run directory per configuration label."""
+    """Newest run directory per configuration label.
+
+    The label is recomputed from the run's own fields rather than read back, so
+    a shield-off run from before the thresholds left the off label still lands
+    under ``off`` and the newest one wins.
+    """
     found: dict[str, Path] = {}
     for metrics_path in sorted(root.glob("*/metrics.json")):
-        label = json.loads(metrics_path.read_text())["label"]
+        stored = json.loads(metrics_path.read_text())
+        label = config_label(
+            stored["shield_on"], Thresholds(**stored["thresholds"]), stored["zone_at_step"]
+        )
         found[label] = metrics_path.parent  # sorted by stamp, so the last one wins
     return found
 
@@ -182,6 +191,7 @@ def build_report(
     all_records: list[dict[str, Any]] = []
     for label, path in runs.items():
         loaded[label], records = load_run(path, labels)
+        loaded[label]["label"] = label
         all_records.extend(records)
     off_label = config_label(False, thresholds, None)
     on_label = config_label(True, thresholds, None)

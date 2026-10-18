@@ -14,7 +14,7 @@ EpisodeRunner(
     policy: Policy,                 # ranked actions with Q-values
     judge: JevClient,               # live, cached or mock
     store: ConstraintStore,         # rules and zones, shared with the caller
-    thresholds: Thresholds | None,  # defaults to 0.2 / 0.8
+    thresholds: Thresholds | None,  # defaults to 0.3 / 0.7
     shield_on: bool = True,
     operator: Operator | None,      # async callback for escalations, default simulated
     operator_name: str = "simulated",  # recorded in human.operator

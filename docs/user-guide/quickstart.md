@@ -11,7 +11,7 @@ uv run interlock run --shield on
 The first line echoes the configuration:
 
 ```text
-shield on | seed 0 | jev live | rules ['Speed limit 25 m/s', 'No lane change if a vehicle is within 10 m in the target lane', 'Keep the left lane for passing only'] | thresholds 0.2/0.8 | operator simulated | log backend/logs/runs/2026-10-17T01-27-46_seed0_on.jsonl
+shield on | seed 0 | jev live | rules ['Speed limit 25 m/s', 'No lane change if a vehicle is within 10 m in the target lane', 'Keep the left lane for passing only'] | thresholds 0.3/0.7 | operator simulated | log backend/logs/runs/2026-10-17T01-27-46_seed0_on.jsonl
 ```
 
 `jev live` appears when the key is set, otherwise `jev mock`. The three standing rules are the presets minus the lane-closed rule, which only arrives with a zone. The operator is simulated: escalations are answered from the ground-truth checkers.

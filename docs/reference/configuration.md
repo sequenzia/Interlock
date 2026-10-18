@@ -103,7 +103,7 @@ One of `--mode`, `--sweep`, `--all` or `--report` is required.
 
 | Constant | Value | File | Meaning |
 | --- | --- | --- | --- |
-| `Thresholds()` | `t_allow 0.2`, `t_block 0.8` | `backend/shield.py` | Defaults; validated `0 <= t_allow <= t_block <= 1` |
+| `Thresholds()` | `t_allow 0.3`, `t_block 0.7` | `backend/shield.py` | Defaults; validated `0 <= t_allow <= t_block <= 1` |
 | `DEFAULT_STEPS_PER_SEC` | `2.0` | `backend/server.py` | Play speed; `set_speed` clamps to 0.1 to 10 |
 | `DEFAULT_ESCALATION_TIMEOUT_S` | `20.0` | `backend/server.py` | |
 | `DEFAULT_MODEL` | `jev-1.13.0` | `backend/jev_client.py` | Pinned Jev model |

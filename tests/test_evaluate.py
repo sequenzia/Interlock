@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from backend.env import make_env
-from backend.evaluate import build_report, config_label, new_run_dir, run_config
+from backend.evaluate import build_report, config_label, new_run_dir, newest_runs, run_config
 from backend.jev_client import JevCache, JevClient
 from backend.policy import Policy
 from backend.shield import Thresholds
@@ -20,23 +20,47 @@ def policy() -> Iterator[Policy]:
 
 
 def test_config_labels() -> None:
-    assert config_label(False, Thresholds(), None) == "off_ta0.20_tb0.80"
+    assert config_label(False, Thresholds(), None) == "off"
+    assert config_label(False, Thresholds(0.2, 0.8), 10) == "off_zone10"
     assert config_label(True, Thresholds(0.3, 0.7), 10) == "on_ta0.30_tb0.70_zone10"
+
+
+def test_newest_runs_recomputes_labels_and_keeps_the_newest_per_label(tmp_path: Path) -> None:
+    runs = (
+        ("2026-10-17T23-31-12", "off_ta0.20_tb0.80", False),  # stored label from before
+        ("2026-10-18T02-02-22", "off_ta0.30_tb0.70", False),
+        ("2026-10-18T02-06-19", "on_ta0.30_tb0.70", True),
+    )
+    for stamp, label, shield_on in runs:
+        d = tmp_path / f"{stamp}_{label}"
+        d.mkdir()
+        metrics = {
+            "label": label,
+            "shield_on": shield_on,
+            "thresholds": {"t_allow": 0.3, "t_block": 0.7},
+            "zone_at_step": None,
+        }
+        (d / "metrics.json").write_text(json.dumps(metrics))
+    assert {k: v.name for k, v in newest_runs(tmp_path).items()} == {
+        "off": "2026-10-18T02-02-22_off_ta0.30_tb0.70",
+        "on_ta0.30_tb0.70": "2026-10-18T02-06-19_on_ta0.30_tb0.70",
+    }
 
 
 def test_run_config_and_report_end_to_end(policy: Policy, tmp_path: Path) -> None:
     judge = JevClient(live=None, cache=JevCache(None))
     root = tmp_path / "eval"
     seeds = [0, 1]
-    for shield_on in (False, True):
-        out_dir = new_run_dir(root, config_label(shield_on, Thresholds(), None))
+    # The baseline passes another pair, which the off label leaves out.
+    for shield_on, thresholds in ((False, Thresholds(0.2, 0.8)), (True, Thresholds())):
+        out_dir = new_run_dir(root, config_label(shield_on, thresholds, None))
         report = asyncio.run(
             run_config(
                 policy,
                 judge,
                 seeds,
                 shield_on=shield_on,
-                thresholds=Thresholds(),
+                thresholds=thresholds,
                 out_dir=out_dir,
                 max_steps=4,
                 quiet=True,
@@ -64,9 +88,10 @@ def test_run_config_and_report_end_to_end(policy: Policy, tmp_path: Path) -> Non
     assert out["label"] == "on_ta0.50_tb0.50"
 
     latest = build_report(root, report_path=tmp_path / "latest.json", plots_dir=tmp_path / "plots")
-    assert latest["before_after"]["off"]["label"] == "off_ta0.20_tb0.80"
-    assert latest["before_after"]["on"]["label"] == "on_ta0.20_tb0.80"
-    assert [p["t_allow"] for p in latest["sweep"]] == [0.2, 0.5]
+    assert latest["thresholds_default"] == {"t_allow": 0.3, "t_block": 0.7}
+    assert latest["before_after"]["off"]["label"] == "off"
+    assert latest["before_after"]["on"]["label"] == "on_ta0.30_tb0.70"
+    assert [p["t_allow"] for p in latest["sweep"]] == [0.3, 0.5]
     assert latest["calibration"]["overall"]["n"] > 0
     assert set(latest["plots"]) == {"before_after", "tradeoff", "calibration"}
     for png in latest["plots"].values():

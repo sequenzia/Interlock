@@ -129,7 +129,7 @@ Terms as Interlock uses them, with the page that covers each one.
 : The sum of highway-env reward over an episode. The shield lowers it; that is the cost of safety.
 
 **Thresholds**
-: `t_allow` and `t_block`, defaults 0.2 and 0.8. Below `t_allow` allows, above `t_block` blocks, between them escalates. See [Rules and zones](../user-guide/console/rules-and-zones.md).
+: `t_allow` and `t_block`, defaults 0.3 and 0.7. Below `t_allow` allows, above `t_block` blocks, between them escalates. See [Rules and zones](../user-guide/console/rules-and-zones.md).
 
 **TypeSafe**
 : The vendor of Jev. The API key lives in `backend/.env` as `TYPESAFE_API_KEY`.

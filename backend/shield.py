@@ -23,8 +23,8 @@ PGrid = dict[str, dict[str, float]]  # action -> constraint id -> p(violation)
 
 @dataclass(frozen=True)
 class Thresholds:
-    t_allow: float = 0.2
-    t_block: float = 0.8
+    t_allow: float = 0.3
+    t_block: float = 0.7
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.t_allow <= self.t_block <= 1.0:

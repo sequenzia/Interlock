@@ -72,7 +72,7 @@ def test_last_resort_prefers_slower_then_idle() -> None:
     assert d.fallback_kind == "last_resort" and d.all_blocked is False
 
 
-@pytest.mark.parametrize("p_top", [0.2, 0.5, 0.8])
+@pytest.mark.parametrize("p_top", [TH.t_allow, 0.5, TH.t_block])
 def test_uncertain_band_is_inclusive_and_escalates(p_top: float) -> None:
     d = decide(RANKED, grid(FASTER=p_top, LANE_LEFT=0.1), TH)
     assert (d.kind, d.reason, d.executed, d.fallback) == (

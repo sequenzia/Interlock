@@ -13,7 +13,7 @@ confidently safe action, and otherwise asks a person.
 | --- | --- | --- |
 | `ranked` | `list[str]` | The five action names in Q-value order, best first. |
 | `p` | `dict[str, dict[str, float]]` | `p[action][constraint_id]` is Jev's probability that executing `action` violates that rule. Only enabled rules appear. |
-| `thresholds` | `Thresholds` | `t_allow` and `t_block`, defaults 0.2 and 0.8. |
+| `thresholds` | `Thresholds` | `t_allow` and `t_block`, defaults 0.3 and 0.7. |
 | `noop` | `frozenset[str]` | Actions that would leave the ego's lane and target speed unchanged: a lane change at the road edge, a speed change at the end of the range. Computed by `facts.noop_actions`. |
 
 `Thresholds` is a frozen dataclass that validates

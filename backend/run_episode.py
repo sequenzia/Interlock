@@ -122,8 +122,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--zone-at-step", type=int, default=None, help="drop the default work zone at this step"
     )
-    parser.add_argument("--t-allow", type=float, default=0.2)
-    parser.add_argument("--t-block", type=float, default=0.8)
+    parser.add_argument("--t-allow", type=float, default=Thresholds().t_allow)
+    parser.add_argument("--t-block", type=float, default=Thresholds().t_block)
     parser.add_argument("--operator", choices=sorted(OPERATORS), default="simulated")
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument(

@@ -25,7 +25,7 @@ def test_subcommands_dispatch_to_their_modules():
 def test_run_flags_are_the_module_flags():
     args = parse("run", "--shield", "off", "--seed", "3", "--jev", "mock", "--zone-at-step", "10")
     assert (args.shield, args.seed, args.jev, args.zone_at_step) == ("off", 3, "mock", 10)
-    assert (args.rules, args.operator, args.t_allow, args.t_block) == ("all", "simulated", 0.2, 0.8)
+    assert (args.rules, args.operator, args.t_allow, args.t_block) == ("all", "simulated", 0.3, 0.7)
 
 
 @pytest.mark.parametrize(

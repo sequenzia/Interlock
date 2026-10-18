@@ -65,7 +65,7 @@ See [CLI internals](backend/cli.md).
 
 ## Change defaults
 
-- **Thresholds.** `Thresholds` in `backend/shield.py` holds the defaults (0.2 and 0.8) and validates `0 <= t_allow <= t_block <= 1`. `run_episode.add_arguments` repeats the numbers as flag defaults and `backend/evaluate.py` uses `DEFAULT_THRESHOLDS = Thresholds()` plus the `SWEEP` list. The console reads thresholds from every `state` message, so it needs nothing.
+- **Thresholds.** `Thresholds` in `backend/shield.py` holds the defaults (0.3 and 0.7, moved from 0.2 and 0.8 on Oct 17 after the sweep) and validates `0 <= t_allow <= t_block <= 1`. `run_episode.add_arguments` and `backend/evaluate.py` read their flag defaults from `Thresholds()`, and `evaluate.py` adds the `SWEEP` list. The console reads thresholds from every `state` message, so it needs nothing.
 - **Environment config.** `DEFAULT_CONFIG` in `backend/env.py` (`lanes_count` 4, `duration` 60, `vehicles_count` 30, `policy_frequency` 1) is sent in `hello`, so the road view's lane count and the timeline's length follow it. The policy was trained on this configuration; changing it means retraining with `interlock train` and re-running the evaluation. `facts.STEP_SECONDS` assumes `policy_frequency` 1.
 
 ## Swap the environment

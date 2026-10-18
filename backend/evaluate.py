@@ -36,7 +36,7 @@ from backend.logger import JsonlLogger, read_log
 from backend.metrics import aggregate, calibration, episode_metrics
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
 from backend.policy import Policy
-from backend.shield import Thresholds
+from backend.shield import DEFAULT_FLOOR_S, Thresholds
 from backend.train import parse_seed_range
 
 EVAL_DIR = LOGS_DIR / "eval"
@@ -47,9 +47,18 @@ DEFAULT_THRESHOLDS = Thresholds()
 STANDING_RULES = [r for r in PRESETS if r != CHECKER_LANE_CLOSED]
 
 
-def config_label(shield_on: bool, thresholds: Thresholds, zone_at_step: int | None) -> str:
-    """The run label. Shield-off runs carry no thresholds: they change nothing there."""
+def config_label(
+    shield_on: bool,
+    thresholds: Thresholds,
+    zone_at_step: int | None,
+    floor_s: float = DEFAULT_FLOOR_S,
+) -> str:
+    """The run label. Shield-off runs carry no thresholds and no floor: neither applies there."""
     label = f"on_ta{thresholds.t_allow:.2f}_tb{thresholds.t_block:.2f}" if shield_on else "off"
+    if shield_on and floor_s <= 0:
+        label += "_nofloor"
+    elif shield_on and floor_s != DEFAULT_FLOOR_S:
+        label += f"_floor{floor_s:g}"
     return f"{label}_zone{zone_at_step}" if zone_at_step is not None else label
 
 
@@ -61,6 +70,7 @@ async def run_config(
     shield_on: bool,
     thresholds: Thresholds,
     out_dir: Path,
+    floor_s: float = DEFAULT_FLOOR_S,
     zone_at_step: int | None = None,
     rules: list[str] | None = None,
     concurrency: int = 3,
@@ -83,6 +93,7 @@ async def run_config(
                 judge=judge,
                 store=store,
                 thresholds=thresholds,
+                floor_s=floor_s,
                 shield_on=shield_on,
                 operator=simulated_operator,
                 operator_name="simulated",
@@ -112,6 +123,7 @@ async def run_config(
         "label": out_dir.name.split("_", 1)[1] if "_" in out_dir.name else out_dir.name,
         "shield_on": shield_on,
         "thresholds": {"t_allow": thresholds.t_allow, "t_block": thresholds.t_block},
+        "floor_s": floor_s if shield_on else 0.0,
         "zone_at_step": zone_at_step,
         "seeds": seeds,
         "jev_mode": judge.mode,
@@ -162,16 +174,34 @@ def newest_runs(root: Path) -> dict[str, Path]:
 
     The label is recomputed from the run's own fields rather than read back, so
     a shield-off run from before the thresholds left the off label still lands
-    under ``off`` and the newest one wins.
+    under ``off`` and the newest one wins. A run without a ``floor_s`` field
+    predates the floor and is labeled ``_nofloor``.
     """
     found: dict[str, Path] = {}
     for metrics_path in sorted(root.glob("*/metrics.json")):
         stored = json.loads(metrics_path.read_text())
         label = config_label(
-            stored["shield_on"], Thresholds(**stored["thresholds"]), stored["zone_at_step"]
+            stored["shield_on"],
+            Thresholds(**stored["thresholds"]),
+            stored["zone_at_step"],
+            stored.get("floor_s", 0.0),
         )
         found[label] = metrics_path.parent  # sorted by stamp, so the last one wins
     return found
+
+
+def _floor_cells(rep: dict[str, Any]) -> dict[str, Any]:
+    """The numbers the floor comparison quotes for one run."""
+    agg = rep["aggregate"]
+    return {
+        "label": rep["label"],
+        "crash_rate": agg["crash_rate"],
+        "violations_per_episode": agg["violations_per_episode"],
+        "mean_return": agg["mean_return"],
+        "escalation_rate": agg["escalation_rate"],
+        "floored_rate": agg.get("floored_rate", 0.0),
+        "floor_all_rate": agg.get("floor_all_rate", 0.0),
+    }
 
 
 def build_report(
@@ -192,29 +222,50 @@ def build_report(
     for label, path in runs.items():
         loaded[label], records = load_run(path, labels)
         loaded[label]["label"] = label
-        all_records.extend(records)
+        rep = loaded[label]
+        # The calibration pool is the baseline plus the default system: shield-off
+        # runs and shield-on runs at the default floor. Floor variants would only
+        # repeat the same states with the same cached answers.
+        if not rep["shield_on"] or rep.get("floor_s", 0.0) == DEFAULT_FLOOR_S:
+            all_records.extend(records)
     off_label = config_label(False, thresholds, None)
     on_label = config_label(True, thresholds, None)
     sweep_points = []
+    by_pair: dict[tuple[float, float], dict[str, Any]] = {}
     for label, rep in sorted(loaded.items()):
-        if rep["shield_on"] and rep["zone_at_step"] is None:
-            agg = rep["aggregate"]
-            sweep_points.append(
-                {
-                    "label": label,
-                    "t_allow": rep["thresholds"]["t_allow"],
-                    "t_block": rep["thresholds"]["t_block"],
-                    "violations_per_episode": agg["violations_per_episode"],
-                    "escalation_rate": agg["escalation_rate"],
-                    "all_blocked_rate": agg["all_blocked_rate"],
-                    "conflict_rate": agg.get("conflict_rate", 0.0),
-                    "crash_rate": agg["crash_rate"],
-                    "mean_return": agg["mean_return"],
-                    "cost_per_episode_usd": agg["cost_per_episode_usd"],
-                    "human": agg["human"],
-                }
-            )
+        if not rep["shield_on"] or rep["zone_at_step"] is not None:
+            continue
+        floor_s = rep.get("floor_s", 0.0)
+        pair = (rep["thresholds"]["t_allow"], rep["thresholds"]["t_block"])
+        row = by_pair.setdefault(pair, {"t_allow": pair[0], "t_block": pair[1], "by_floor": {}})
+        row["by_floor"][f"{floor_s:g}"] = _floor_cells(rep)
+        if (
+            floor_s != DEFAULT_FLOOR_S
+        ):  # the sweep is the default system; other floors sit beside it
+            continue
+        agg = rep["aggregate"]
+        sweep_points.append(
+            {
+                "label": label,
+                "t_allow": pair[0],
+                "t_block": pair[1],
+                "violations_per_episode": agg["violations_per_episode"],
+                "escalation_rate": agg["escalation_rate"],
+                "all_blocked_rate": agg["all_blocked_rate"],
+                "conflict_rate": agg.get("conflict_rate", 0.0),
+                "floored_rate": agg.get("floored_rate", 0.0),
+                "crash_rate": agg["crash_rate"],
+                "mean_return": agg["mean_return"],
+                "cost_per_episode_usd": agg["cost_per_episode_usd"],
+                "human": agg["human"],
+            }
+        )
     sweep_points.sort(key=lambda p: p["t_allow"])
+    floor_rows = sorted(
+        (r for r in by_pair.values() if len(r["by_floor"]) > 1), key=lambda r: r["t_allow"]
+    )
+    baseline_path = report_path.parent / "baseline.json"
+    baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
     cal = calibration(all_records, labels=labels)
     report: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -225,6 +276,8 @@ def build_report(
             "on": loaded.get(on_label),
         },
         "sweep": sweep_points,
+        "floor": {"floor_s": DEFAULT_FLOOR_S, "rows": floor_rows},
+        "baseline": baseline,
         "calibration": cal,
         "plots": {},
     }
@@ -242,6 +295,8 @@ def build_report(
         report["plots"]["calibration"] = str(
             plots.plot_calibration(cal, plots_dir / "calibration.png")
         )
+    if baseline and baseline.get("models"):
+        report["plots"]["baseline"] = str(plots.plot_baseline(baseline, plots_dir / "baseline.png"))
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=1))
     return report
@@ -253,6 +308,7 @@ def print_summary(report: dict[str, Any]) -> None:
         f"{report['label']}: {agg['episodes']} episodes | violations/episode {agg['violations_per_episode']:.2f} | "
         f"return {agg['mean_return']:.2f} | crash {agg['crash_rate']:.0%} | escalation {agg['escalation_rate']:.1%} | "
         f"all-blocked {agg['all_blocked_rate']:.1%} | conflicts {agg.get('conflict_rate', 0.0):.1%} | "
+        f"floored {agg.get('floored_rate', 0.0):.1%} | "
         f"p50 {agg['latency_ms_p50']:.0f} ms | ${agg['cost_usd']:.3f} | "
         f"{report['wall_seconds']:.0f} s",
         flush=True,
@@ -285,7 +341,7 @@ async def main_async(args: argparse.Namespace) -> int:
             configs.extend((True, Thresholds(a, b)) for a, b in SWEEP)
     try:
         for shield_on, thresholds in configs:
-            label = config_label(shield_on, thresholds, args.zone_at_step)
+            label = config_label(shield_on, thresholds, args.zone_at_step, args.floor_s)
             print(f"\n== {label} ==", flush=True)
             report = await run_config(
                 policy,
@@ -294,6 +350,7 @@ async def main_async(args: argparse.Namespace) -> int:
                 shield_on=shield_on,
                 thresholds=thresholds,
                 out_dir=new_run_dir(args.out, label),
+                floor_s=args.floor_s,
                 zone_at_step=args.zone_at_step,
                 concurrency=args.concurrency,
                 max_steps=args.max_steps,
@@ -318,6 +375,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--t-allow", type=float, default=DEFAULT_THRESHOLDS.t_allow)
     parser.add_argument("--t-block", type=float, default=DEFAULT_THRESHOLDS.t_block)
+    parser.add_argument(
+        "--floor-s",
+        type=float,
+        default=DEFAULT_FLOOR_S,
+        help="time to collision floor in seconds for shield-on runs; 0 disables",
+    )
     parser.add_argument(
         "--sweep", action="store_true", help="shield on over the five threshold pairs"
     )

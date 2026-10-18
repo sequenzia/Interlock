@@ -5,6 +5,7 @@ import { DecisionStrip } from "./components/decision-strip";
 import { InspectorDrawer } from "./components/inspector-drawer";
 import { MetricsView } from "./components/metrics-view";
 import { RoadView } from "./components/road-view";
+import { TwinStrip } from "./components/twin-strip";
 import { StatusStrip } from "./components/status-strip";
 import { useStore } from "./store";
 import { connect, send } from "./ws-client";
@@ -52,6 +53,7 @@ export function App() {
       <div className="flex min-h-0 flex-1 gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <RoadView />
+          <TwinStrip />
           <InspectorDrawer />
           <DecisionStrip />
         </div>

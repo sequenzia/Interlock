@@ -11,14 +11,16 @@ no-op last resort (plan section 16.1).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import Any, Literal
 
 DecisionKind = Literal["allow", "fallback", "escalate", "all_blocked"]
 FallbackKind = Literal["safe", "least_bad", "last_resort"]
 EscalationReason = Literal["uncertain", "no_compliant_action"]
 OperatorDecision = Literal["approve", "deny", "override"]
 PGrid = dict[str, dict[str, float]]  # action -> constraint id -> p(violation)
+DEFAULT_FLOOR_S = 2.0  # time to collision ahead under which a candidate never runs; one step is 1 s
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,17 @@ class Answer:
 
     decision: OperatorDecision
     action: str | None = None
+
+
+@dataclass(frozen=True)
+class Floor:
+    """What the physics floor did this step. Plan section 16.4."""
+
+    applied: bool  # the executable set was filtered: shield on and a floor above 0
+    removed: tuple[str, ...]  # candidates under the floor, in ranking order
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"applied": self.applied, "removed": list(self.removed)}
 
 
 @dataclass(frozen=True)
@@ -89,7 +102,12 @@ def fallback_action(
     if eligible:
         return Fallback(min(eligible, key=lambda a: p_of[a]), "least_bad")
     slower_p = violation_probability(p.get("SLOWER", {}))[0]
-    return Fallback("SLOWER" if slower_p <= thresholds.t_block else "IDLE", "last_resort")
+    preferred = "SLOWER" if slower_p <= thresholds.t_block else "IDLE"
+    for action in (preferred, "SLOWER", "IDLE"):  # the floor may have removed either
+        if action in ranked:
+            return Fallback(action, "last_resort")
+    p_all = {action: violation_probability(p.get(action, {}))[0] for action in ranked}
+    return Fallback(min(ranked, key=lambda a: (p_all[a], ranked.index(a))), "last_resort")
 
 
 def decide(
@@ -108,6 +126,30 @@ def decide(
     if p_top > thresholds.t_block:
         return Decision("fallback", top, fb.action, fired, p_top, p_viol, fb.action, fb.kind)
     return Decision("escalate", top, top, fired, p_top, p_viol, fb.action, fb.kind, "uncertain")
+
+
+def under_floor(candidates: Mapping[str, Any], floor_s: float) -> tuple[str, ...]:
+    """Candidates whose time to collision ahead after the action is under ``floor_s``.
+
+    Reads ``lane_after_action.time_to_collision_ahead_s`` from the facts; null means
+    nothing ahead or not closing, so the candidate stays. A floor of 0 removes nothing.
+    """
+    if floor_s <= 0:
+        return ()
+    removed = []
+    for action, facts in candidates.items():
+        ttc = facts.get("lane_after_action", {}).get("time_to_collision_ahead_s")
+        if ttc is not None and ttc < floor_s:
+            removed.append(action)
+    return tuple(removed)
+
+
+def floor_decision(ranked: list[str], p: PGrid) -> Decision:
+    """Every candidate is under the floor: SLOWER runs as the physical last resort."""
+    top = ranked[0]
+    p_viol = {action: violation_probability(p.get(action, {}))[0] for action in ranked}
+    p_top, fired = violation_probability(p.get(top, {}))
+    return Decision("fallback", top, "SLOWER", fired, p_top, p_viol, "SLOWER", "last_resort")
 
 
 def resolve(decision: Decision, answer: Answer) -> Decision:

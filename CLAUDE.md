@@ -52,13 +52,17 @@ around Oct 23, 2026.
   candidate is below the allow threshold it escalates with reason
   `no_compliant_action` and offers every candidate; it never silently runs a
   last resort. Plan section 16.1 records why.
+- The physics floor is code, not a rule. A candidate whose time to collision
+  ahead is under `FLOOR_S` (default 2.0 s) never runs with the shield on, and
+  no console message changes the floor. Plan section 16.4.
 - The JSONL log record in the plan is the contract between backend, UI and
   eval. Change it in the plan first, then in `backend/logger.py`, then in
   the frontend types.
 - Jev questions are positive assertions with the rule text verbatim. No
   negation in instructions or criteria.
-- `TYPESAFE_API_KEY` comes from `backend/.env`, which is gitignored. Never
-  commit it, never log it.
+- `TYPESAFE_API_KEY` and `ANTHROPIC_API_KEY` (with `ANTHROPIC_WORKSPACE_ID` when
+  the key is not workspace-scoped) come from `backend/.env`, which is
+  gitignored. Never commit them, never log them.
 - No em dashes in docs, slides, UI copy or commit messages.
 - The project is Interlock. "Shield" stays the lowercase technical term for
   the mechanism. Never use it as a name in the header, page title or packages.
@@ -101,7 +105,9 @@ around Oct 23, 2026.
   `docs` group (`uv sync --only-group docs`), so torch never enters the runner.
   Pages must be set to the GitHub Actions source once in the repo settings.
 - `.dockerignore` is an allowlist. A new runtime file the server reads must be
-  added there and copied in the `Dockerfile`.
+  added there and copied in the `Dockerfile`. It lets the shield-off logs
+  through (`backend/logs/eval/*_off/seed*.jsonl`, `backend/logs/runs/*_off.jsonl`)
+  so the deployed console can draw the unshielded twin.
 
 ## Commands
 
@@ -117,12 +123,15 @@ uv run interlock train --timesteps 100000            # long run
 uv run interlock train --eval-only models/dqn_highway_20k.zip   # greedy rollouts over --eval-seeds
 uv run interlock train --eval-only models/dqn_highway_20k.zip --promote  # copy to dqn_highway.zip
 uv run interlock label --run backend/logs/eval/<stamp>_on_ta0.30_tb0.70 --rule dense_traffic   # hand-label a fuzzy rule, then eval --report
+uv run interlock baseline --dry-run                  # sample 2,000 logged checks, print one chat request, send nothing
+uv run interlock baseline --models claude-haiku-5-5,claude-sonnet-5-5   # chat-LLM baseline; needs ANTHROPIC_API_KEY, reads backend/prices.json if present, then eval --report
 uv run interlock spike                               # Day 1 Jev spike, writes internal/jev-spike-results.md
 uv run interlock spike --dry-run                     # validate every spike request offline, no key needed
 uv run interlock run --shield on                     # headless shielded episode, logs to backend/logs/runs/
-uv run interlock run --shield off --seed 3           # shadow mode on another seed
+uv run interlock run --shield off --seed 3           # shadow mode on another seed; also warms the unshielded twin for seed 3
 uv run interlock run --jev mock --zone-at-step 10    # offline, drop the work zone mid-episode
 uv run interlock run --rules speed_limit --operator approve --max-steps 20
+uv run interlock run --floor-s 0                     # no physics floor (default 2 s); eval and console take the same flag
 uv run interlock eval --seeds 0-19 --mode on         # one configuration, writes backend/logs/eval/<stamp>_<label>/
 uv run interlock eval --seeds 0-19 --all --concurrency 2  # off + 5-pair sweep + report, ~8 min, ~$0.75 live
 uv run interlock eval --report                       # rebuild internal/eval/latest.json and internal/plots/*.png

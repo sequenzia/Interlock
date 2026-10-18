@@ -44,7 +44,8 @@ from backend.jev_client import DEFAULT_CACHE_PATH, JevClient, make_client
 from backend.logger import JsonlLogger, default_log_path, read_log
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
 from backend.policy import Policy
-from backend.shield import Answer, Thresholds
+from backend.shield import DEFAULT_FLOOR_S, Answer, Thresholds
+from backend.twin import find_twin_log, twin_message
 
 log = logging.getLogger("shield.server")
 RUNS_DIR = LOGS_DIR / "runs"
@@ -105,6 +106,7 @@ class Session:
         seed: int = 0,
         steps_per_sec: float = DEFAULT_STEPS_PER_SEC,
         escalation_timeout_s: float | None = DEFAULT_ESCALATION_TIMEOUT_S,
+        floor_s: float = DEFAULT_FLOOR_S,
     ) -> None:
         self.judge = judge
         self.store = ConstraintStore()
@@ -112,6 +114,7 @@ class Session:
             policy=policy,
             judge=judge,
             store=self.store,
+            floor_s=floor_s,
             operator=self._operator,
             operator_name="ui",
             source=judge.mode,
@@ -175,7 +178,13 @@ class Session:
             "total_steps": None if self.source == "live" else len(self.replay),
             "done": self.done,
             "thresholds": {"t_allow": th.t_allow, "t_block": th.t_block},
+            "floor_s": self.runner.floor_s,
         }
+
+    def twin_msg(self) -> dict[str, Any]:
+        """The shield-off run of the current seed, or an empty twin when none is logged."""
+        seed = self.runner.seed if self.source == "live" else int(self.replay[0]["seed"])
+        return twin_message(seed, find_twin_log(seed))
 
     def constraints_msg(self) -> dict[str, Any]:
         return {"type": "constraints", **self.store.snapshot()}
@@ -215,6 +224,7 @@ class Session:
         await self.send(ws, self.state())
         await self.send(ws, self.history_msg())
         await self.send(ws, self.metrics_msg())
+        await self.send(ws, self.twin_msg())
         if self.pending is not None:
             await self.send(ws, self.escalation_msg(self.pending))
 
@@ -407,6 +417,7 @@ class Session:
         await self.broadcast(self.hello())
         await self.broadcast(self.state())
         await self.broadcast(self.metrics_msg())
+        await self.broadcast(self.twin_msg())
 
     async def load_replay(self, run_id: str) -> None:
         path = RUNS_DIR / f"{Path(run_id).name}.jsonl"
@@ -429,6 +440,7 @@ class Session:
             }
         )
         await self.broadcast(self.metrics_msg())
+        await self.broadcast(self.twin_msg())
 
     async def close(self) -> None:
         await self._cancel_inflight()
@@ -445,22 +457,25 @@ def session_from_env() -> Session:
         mode = "live" if os.environ.get("TYPESAFE_API_KEY") else "mock"
     timeout = float(os.environ.get("ESCALATION_TIMEOUT_S", DEFAULT_ESCALATION_TIMEOUT_S))
     model_path = Path(os.environ.get("MODEL_PATH", DEFAULT_MODEL_PATH))
+    floor_s = float(os.environ.get("FLOOR_S", DEFAULT_FLOOR_S))
     cache_path = (
         Path(os.environ["JEV_CACHE_PATH"])
         if os.environ.get("JEV_CACHE_PATH")
         else DEFAULT_CACHE_PATH
     )
     log.info(
-        "session: jev %s, model %s, escalation timeout %s s",
+        "session: jev %s, model %s, escalation timeout %s s, floor %s s",
         mode,
         model_path.name,
         timeout or "none",
+        floor_s,
     )
     return Session(
         Policy.load(model_path),
         make_client(mode, cache_path=cache_path),  # type: ignore[arg-type]
         seed=int(os.environ.get("SEED", "0")),
         escalation_timeout_s=timeout,
+        floor_s=floor_s,
     )
 
 

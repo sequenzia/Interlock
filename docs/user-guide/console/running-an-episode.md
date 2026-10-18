@@ -44,6 +44,10 @@ The "shield on" badge toggles the shield for subsequent steps. You can flip it m
 - `CRASH` in rose above the ego marks the step that ended the episode in a collision.
 - The line above the road repeats the step, lane, longitudinal position in metres, the decision, the blocked action if any, and the executed action.
 
+## The unshielded twin
+
+Under the road view, when the seed has a shield-off log, a faded strip replays the unshielded run of the same seed in step with the live one. With the shield off the policy's top action always executes, so that run depends only on the seed and the checkpoint; it is the baseline the live run is being compared with, on screen. Its title counts the twin's violations so far against the same scored rules and marks where it crashed. Reset to a seed without a log and the strip disappears. See [Tour](tour.md#unshielded-twin).
+
 ## The decision badge
 
 The badge at the right of the status strip is the latest step's outcome. `fallback -> IDLE` means the top action was confidently a violation and IDLE was the first lower-ranked action that was confidently safe. `escalated -> SLOWER` means the operator denied and the fallback ran. `allowed` with no arrow means the policy's own choice ran.

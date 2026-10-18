@@ -32,7 +32,7 @@ from pathlib import Path
 from types import FrameType, ModuleType
 from typing import Any
 
-from backend import evaluate, label, run_episode, train
+from backend import baseline_llm, evaluate, label, run_episode, train
 from backend.paths import REPO_DIR
 from backend.spike import jev_spike
 
@@ -98,6 +98,13 @@ def add_console_arguments(parser: argparse.ArgumentParser) -> None:
         help="sets MODEL_PATH (default models/dqn_highway.zip)",
     )
     parser.add_argument(
+        "--floor-s",
+        type=float,
+        default=None,
+        metavar="S",
+        help="sets FLOOR_S, the time to collision floor (default 2.0; 0 disables)",
+    )
+    parser.add_argument(
         "--cache",
         type=Path,
         default=None,
@@ -120,6 +127,7 @@ def server_env(args: argparse.Namespace) -> dict[str, str]:
         "ESCALATION_TIMEOUT_S": args.escalation_timeout,
         "MODEL_PATH": args.model_path,
         "JEV_CACHE_PATH": args.cache,
+        "FLOOR_S": args.floor_s,
     }
     env = dict(os.environ)
     env.update({key: str(value) for key, value in overrides.items() if value is not None})
@@ -240,6 +248,7 @@ def build_parser() -> argparse.ArgumentParser:
     add("train", train, "train the DQN on task reward alone, or evaluate a checkpoint")
     add("spike", jev_spike, "Day 1 Jev checklist, writes internal/jev-spike-results.md")
     add("label", label, "hand-label candidates against a rule with no checker, for calibration")
+    add("baseline", baseline_llm, "chat-LLM baseline on logged checks, offline for Jev")
     console = commands.add_parser(
         "console",
         help="start the WebSocket server and the React console together",

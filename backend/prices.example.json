@@ -1,0 +1,5 @@
+{
+  "_note": "Copy to backend/prices.json (gitignored) and fill in USD per million tokens from https://www.anthropic.com/pricing. interlock baseline reads it when present; a model missing here gets no cost.",
+  "claude-haiku-5-5": {"input_per_mtok": null, "output_per_mtok": null},
+  "claude-sonnet-5-5": {"input_per_mtok": null, "output_per_mtok": null}
+}

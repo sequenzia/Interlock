@@ -92,6 +92,11 @@ export interface VehicleSnapshot {
   speed_mps: number;
 }
 
+export interface FloorRecord {
+  applied: boolean; // shield on and a floor above 0: the executable set was filtered
+  removed: ActionName[]; // candidates under the time-to-collision floor, in rank order
+}
+
 export interface LogRecord {
   run_id: string;
   episode: number;
@@ -113,6 +118,7 @@ export interface LogRecord {
   all_blocked: boolean;
   escalation_reason: EscalationReason | null;
   fallback: FallbackChoice;
+  floor?: FloorRecord; // absent in logs written before Oct 17
   judge: Judge;
   reward: number;
   crashed: boolean;
@@ -158,6 +164,7 @@ export interface SessionState {
   total_steps: number | null;
   done: boolean;
   thresholds: Thresholds;
+  floor_s: number; // time-to-collision floor in seconds, 0 when off; set at launch
 }
 
 export interface Metrics {
@@ -207,6 +214,25 @@ export interface Hello {
   zones: Zone[];
 }
 
+export interface TwinStep {
+  step: number;
+  ego: Ego;
+  vehicles: VehicleSnapshot[];
+  executed: ActionName;
+  violations: number;
+  violations_so_far: number;
+  crashed: boolean;
+}
+
+export interface Twin {
+  seed: number;
+  run_id: string | null;
+  rules: number;
+  steps: TwinStep[]; // empty when no shield-off log exists for the seed
+  violations_total: number;
+  crashed_at: number | null;
+}
+
 export type ServerMessage =
   | ({ type: "hello" } & Hello)
   | ({ type: "state" } & SessionState)
@@ -215,6 +241,7 @@ export type ServerMessage =
   | { type: "escalation"; escalation: Escalation }
   | { type: "constraints"; constraints: Constraint[]; zones: Zone[] }
   | ({ type: "metrics" } & Metrics)
+  | ({ type: "twin" } & Twin)
   | { type: "error"; message: string };
 
 export type ClientMessage =
@@ -281,9 +308,48 @@ export interface SweepPoint {
   escalation_rate: number;
   all_blocked_rate: number;
   conflict_rate?: number;
+  floored_rate?: number;
   crash_rate: number;
   mean_return: number;
   cost_per_episode_usd: number;
+}
+
+export interface FloorCells {
+  label: string;
+  crash_rate: number;
+  violations_per_episode: number;
+  mean_return: number;
+  escalation_rate: number;
+  floored_rate: number;
+  floor_all_rate: number;
+}
+
+export interface FloorRow {
+  t_allow: number;
+  t_block: number;
+  by_floor: Record<string, FloorCells>; // keyed by the floor in seconds as text: "0", "1", "2"
+}
+
+export interface JudgeSummary {
+  overall: Reliability;
+  by_group: Record<string, Reliability>;
+  answered?: number;
+  failed?: number;
+  live?: number;
+  cached?: number;
+  latency_ms_p50?: number | null;
+  latency_ms_p95?: number | null;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: number | null;
+}
+
+export interface Baseline {
+  generated_at: string;
+  checks: number;
+  strata: Record<string, { violation: number; ok: number }>;
+  jev: JudgeSummary;
+  models: Record<string, JudgeSummary>;
 }
 
 export interface ReliabilityBin {
@@ -311,5 +377,7 @@ export interface EvalReport {
   thresholds_default?: Thresholds;
   before_after?: { off: RunReport | null; on: RunReport | null };
   sweep?: SweepPoint[];
+  floor?: { floor_s: number; rows: FloorRow[] };
+  baseline?: Baseline | null;
   calibration?: { overall: Reliability; by_checker: Record<string, Reliability> };
 }

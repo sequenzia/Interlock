@@ -69,10 +69,11 @@ The report shape is in [Evaluation report](../contracts/eval-report.md). The met
 `connect(ws)` accepts the socket and sends, in order:
 
 1. `hello`: env config, action names, presets, zone defaults, the list of logged runs and the current constraints and zones.
-2. `state`: playing, pause reason, shield, source, judge mode, seed, run id, speed, step, total steps (replay only), done, thresholds.
+2. `state`: playing, pause reason, shield, source, judge mode, seed, run id, speed, step, total steps (replay only), done, thresholds, floor in seconds.
 3. `history`: every record of the current episode (or the replayed prefix), so a refresh mid-run keeps the timeline.
 4. `metrics`: the runner's running summary, or counters recomputed from the replayed records.
-5. `escalation`: only when one is open, so a late joiner can answer it.
+5. `twin`: the shield-off run of the current seed as a compact strip, from `backend/twin.py`; empty when no such log exists. Also sent after `reset` and after a replay load.
+6. `escalation`: only when one is open, so a late joiner can answer it.
 
 Message bodies are specified in [WebSocket protocol](../contracts/websocket-protocol.md). `disconnect` removes the socket; `broadcast` iterates a copy of `clients` and drops any socket whose send fails.
 

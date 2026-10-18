@@ -44,14 +44,16 @@ in that module's `add_arguments`, so `python -m backend.<module>` and
 | `episode.py` | `EpisodeRunner`, `Escalation`, the three built-in operators, `StepResult`, `Totals`. |
 | `run_episode.py` | Headless episode with per-step output. Behind `interlock run`. |
 | `server.py` | `Session`, `create_app`, `session_from_env`, replay helpers. The WebSocket server. |
+| `twin.py` | Finds the shield-off log for a seed and builds the `twin` message the console draws under the road view. |
 | `metrics.py` | `episode_metrics`, `aggregate`, `collect_checks`, `reliability`, `calibration`. Records in, numbers out. |
 | `evaluate.py` | `run_config`, `build_report`, the sweep. Behind `interlock eval`. |
 | `label.py` | Hand labels for rules without a checker, keyed by facts and rule text. Behind `interlock label`. |
+| `baseline_llm.py` | Chat-LLM baseline: the judge's questions on logged checks, sent to Claude models for one structured JSON number. Behind `interlock baseline`. |
 | `plots.py` | Three matplotlib figures from the report JSON. |
 | `cli.py` | The `interlock` entry point and the `console` subcommand that supervises uvicorn and Vite. |
 | `spike/jev_spike.py` | The offline-checkable Jev probe behind `interlock spike`; writes raw requests under `backend/logs/spike/`. |
 | `.env.example` | Template for `backend/.env`, which holds `TYPESAFE_API_KEY` and is gitignored. |
-| `logs/` | Runtime output, gitignored: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `labels/` (hand labels per rule), `jev_cache.jsonl`. |
+| `logs/` | Runtime output, gitignored: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `labels/` (hand labels per rule), `jev_cache.jsonl`, `baseline_cache.jsonl` (chat-model replies). |
 
 ## frontend/
 
@@ -65,7 +67,7 @@ in that module's `add_arguments`, so `python -m backend.<module>` and
 | `src/backend-url.ts` | `httpUrl()` and `wsUrl()` from `VITE_BACKEND_URL`, same-origin when unset. |
 | `src/format.ts` | Formatting helpers and the decision label, class and color maps. |
 | `src/styles.css` | Tailwind import, theme font, the shared `panel`, `btn`, `chip` and `badge` classes. |
-| `src/components/` | `status-strip`, `road-view`, `decision-strip`, `inspector-drawer`, `approval-queue`, `constraint-panel`, `metrics-view`. |
+| `src/components/` | `status-strip`, `road-view`, `twin-strip`, `decision-strip`, `inspector-drawer`, `approval-queue`, `constraint-panel`, `metrics-view`. |
 | `e2e/smoke.spec.ts` | Two Playwright tests against a mock backend on port 8001 and Vite on 5174. |
 | `vite.config.ts` | React and Tailwind plugins, the dev proxy to `SHIELD_BACKEND`. |
 | `playwright.config.ts` | Starts its own backend and Vite for the smoke test. |

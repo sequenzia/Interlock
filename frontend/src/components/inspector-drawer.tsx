@@ -49,6 +49,7 @@ export function InspectorDrawer() {
   const qMin = Math.min(...qs);
   const qMax = Math.max(...qs);
   const { t_allow, t_block } = record.thresholds;
+  const floored = new Set<string>(record.floor?.removed ?? []);
   const raw = candidateExchange(record, chosen);
   const fired = record.fired_constraint;
 
@@ -118,18 +119,20 @@ export function InspectorDrawer() {
               {record.candidates.map((c) => {
                 const isChosen = c.action === chosen.action;
                 const isExecuted = c.action === record.executed;
+                const isFloored = floored.has(c.action);
                 const width = qMax === qMin ? 100 : ((c.q - qMin) / (qMax - qMin)) * 100;
                 return (
                   <tr
                     key={c.action}
                     onClick={() => setAction(c.action)}
-                    className={`cursor-pointer ${isChosen ? "bg-zinc-800" : "hover:bg-zinc-800/50"}`}
+                    className={`cursor-pointer ${isChosen ? "bg-zinc-800" : "hover:bg-zinc-800/50"} ${isFloored ? "opacity-50" : ""}`}
                   >
                     <td className="px-1 text-zinc-500">{c.rank + 1}</td>
                     <td className="px-1 whitespace-nowrap">
                       <span className={isExecuted ? "font-semibold text-zinc-50" : "text-zinc-300"}>{c.action}</span>
                       {isExecuted && <span className="ml-1 text-[9px] text-emerald-300 uppercase">ran</span>}
                       {c.rank === 0 && !isExecuted && <span className="ml-1 text-[9px] text-rose-300 uppercase">blocked</span>}
+                      {isFloored && <span className="ml-1 text-[9px] text-amber-300 uppercase">floor</span>}
                     </td>
                     <td className="px-1">
                       <div className="flex items-center gap-1">
@@ -162,6 +165,7 @@ export function InspectorDrawer() {
           </table>
           <div className="mt-1 px-1 text-[10px] text-zinc-500">
             cells colored by thresholds {t_allow.toFixed(2)} / {t_block.toFixed(2)} · ● checker says violation · ○ checker says ok
+            {record.floor?.applied && floored.size > 0 && <> · faded rows are under the physics floor and could not run</>}
           </div>
         </div>
         <div className="flex min-h-0 flex-col">

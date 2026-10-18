@@ -198,3 +198,46 @@ def plot_calibration(cal: dict[str, Any], path: Path) -> Path:
     fig.savefig(path, dpi=160, facecolor=SURFACE)
     plt.close(fig)
     return path
+
+
+BASELINE_SERIES = [SERIES["off"], "#7c3aed", "#199e70", "#b45309"]  # one per chat model
+
+
+def plot_baseline(baseline: dict[str, Any], path: Path) -> Path:
+    """Reliability of Jev and each chat model on the same sampled checks."""
+    fig, ax = plt.subplots(figsize=(7.5, 5.0), facecolor=SURFACE)
+    ax.plot([0, 1], [0, 1], color=GRID, linewidth=1, zorder=1)
+    series = [("Jev, from the logs", baseline["jev"], SERIES["on"], "--")]
+    for (model, summary), color in zip(baseline["models"].items(), BASELINE_SERIES, strict=False):
+        series.append((model, summary, color, "-"))
+    for name, summary, color, style in series:
+        rel = summary["overall"]
+        pts = [(b["mean_p"], b["observed"]) for b in rel["bins"] if b["count"]]
+        label = f"{name}: ECE {rel['ece']:.3f}, Brier {rel['brier']:.3f}, acc {rel['accuracy_at_0_5']:.1%}"
+        if summary.get("latency_ms_p50"):
+            label += f", p50 {summary['latency_ms_p50']:.0f} ms"
+        ax.plot(
+            [p for p, _ in pts],
+            [o for _, o in pts],
+            color=color,
+            linewidth=2,
+            linestyle=style,
+            marker="o",
+            markersize=5,
+            markeredgecolor=SURFACE,
+            label=label,
+            zorder=3,
+        )
+    _style(
+        ax,
+        f"Jev against chat models on the same {baseline['checks']} labeled checks",
+        "observed violation rate",
+        "p(violation)",
+    )
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.legend(frameon=False, fontsize=8, labelcolor=TEXT_2, loc="upper left")
+    fig.tight_layout()
+    fig.savefig(path, dpi=160, facecolor=SURFACE)
+    plt.close(fig)
+    return path

@@ -36,7 +36,7 @@ Layer by layer:
 | `CMD` | `exec` so uvicorn is PID 1 and receives signals; `--no-sync` so startup never touches the network; `--host 0.0.0.0` so Fly can reach it |
 
 !!! note "The Jev cache ships when it exists"
-    `backend/logs/jev_cache.jsonl` is inside the `backend/` copy because `.dockerignore` lets it through. When present, the demo seeds answer from cache without a network call. The image carries a snapshot; appends inside the container stay in the container.
+    `backend/logs/jev_cache.jsonl` is inside the `backend/` copy because `.dockerignore` lets it through. When present, the demo seeds answer from cache without a network call. The shield-off logs come along the same way, `backend/logs/eval/*_off/seed*.jsonl` and `backend/logs/runs/*_off.jsonl`, so the unshielded twin shows for every seed the evaluation covered. The image carries a snapshot; appends inside the container stay in the container.
 
 ### `.dockerignore` is an allowlist
 
@@ -51,6 +51,8 @@ backend/.env
 backend/logs/*
 !backend/logs/.gitkeep
 !backend/logs/jev_cache.jsonl
+!backend/logs/runs/*_off.jsonl
+!backend/logs/eval/*_off/seed*.jsonl
 !models/dqn_highway.zip
 !internal/eval/latest.json
 ```

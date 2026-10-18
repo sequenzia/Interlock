@@ -57,14 +57,38 @@ resort at the lowest target speed changes nothing, so a state where every
 action violates some rule repeated itself for dozens of steps while the
 shield kept "falling back" (plan section 16.1).
 
+## The physics floor
+
+Before the rules see anything, the runner drops every candidate whose
+`lane_after_action.time_to_collision_ahead_s` is under the floor, 2.0 s by
+default (`DEFAULT_FLOOR_S`; `--floor-s 0` disables it). Two seconds because a
+step is one second: a 1 s floor fires on the last step, when only SLOWER is
+left and it cannot shed enough speed in time, and it changed nothing in the
+Oct 17 sweep; 2 s fires one step earlier and removed the only shielded crash
+on 20 seeds. `under_floor(candidates,
+floor_s)` returns those actions in ranking order, reading the fact and nothing
+else: a null time to collision means nothing ahead or not closing, so the
+candidate stays. `decide` then runs on the executable set, the ranking minus
+the removed actions, so a floored action is never the proposal, a fallback,
+the last resort or an override target. The last resort falls through SLOWER,
+then IDLE, then the executable action with the lowest probability, ties to
+rank. If the floor removes every candidate, `floor_decision(ranked, p)` runs
+SLOWER as a `fallback` of kind `last_resort`, and the record's
+`floor.removed` names all five.
+
+The floor applies only with the shield on. In shadow mode the record still
+lists what it would have removed, with `applied: false`. It is set at launch
+and the console cannot change it: physical limits live in code, rules in the
+model, judgment calls with the human. Plan section 16.4.
+
 ## Decision rules
 
 ```python
 def decide(ranked, p, thresholds, noop=frozenset()) -> Decision
 ```
 
-With `top = ranked[0]`, `p_top` its violation probability and `fb` the
-fallback:
+With `ranked` the executable set (see above), `top = ranked[0]`, `p_top` its
+violation probability and `fb` the fallback:
 
 | Condition | Kind | Reason | Executed |
 | --- | --- | --- | --- |
@@ -105,8 +129,10 @@ flowchart TD
     policy wanted for safety reasons. A following-distance rule belongs in
     the rule set if that matters, and an unattended default-deny is a bad
     idea in a live run, which is why the deployment sets
-    `ESCALATION_TIMEOUT_S=0`. A code-side time-to-collision floor is planned
-    as item C of the upgrade plan.
+    `ESCALATION_TIMEOUT_S=0`. Since Oct 17 the physics floor above removes
+    the closest calls before the rules see them; it bounds the damage a bad
+    deny can do but it reads time to collision ahead only, not a vehicle
+    alongside during a lane change, so it is not collision avoidance.
 
 ## The Decision value
 

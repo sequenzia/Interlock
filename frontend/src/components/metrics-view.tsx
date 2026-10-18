@@ -17,7 +17,7 @@ import {
 } from "recharts";
 import { httpUrl } from "../backend-url";
 import { fmtUsd } from "../format";
-import type { EvalReport, Reliability } from "../types";
+import type { EvalReport, JudgeSummary, Reliability } from "../types";
 
 // Dark-surface steps of the reference palette: slot 1 blue for shield on,
 // slot 2 orange for shield off, slot 3 aqua for the third checker.
@@ -43,6 +43,7 @@ const CHECKER_LABEL: Record<string, string> = {
   cut_in: "room when moving in",
   dense_traffic: "conservative in dense traffic",
 };
+const BASELINE_COLOR = [OFF, "#a78bfa", AQUA, "#f59e0b"];
 const GRID = "#383835";
 const INK = "#c3c2b7";
 const TOOLTIP = { backgroundColor: "#1a1a19", border: "1px solid #383835", color: "#f0efec", fontSize: 11 };
@@ -73,6 +74,11 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
       <div className="min-h-0 flex-1 p-2">{children}</div>
     </section>
   );
+}
+
+function judgeLabel(name: string, s: JudgeSummary): string {
+  const o = s.overall;
+  return `${name}: ECE ${o.ece.toFixed(3)}, Brier ${o.brier.toFixed(3)}, acc ${(o.accuracy_at_0_5 * 100).toFixed(1)}%`;
 }
 
 function reliabilitySeries(rel: Reliability) {
@@ -118,6 +124,9 @@ export function MetricsView() {
   });
   const sweep = (report.sweep ?? []).map((p) => ({ ...p, label: `${p.t_allow.toFixed(1)}/${p.t_block.toFixed(1)}` }));
   const cal = report.calibration;
+  const floorRows = report.floor?.rows ?? [];
+  const baseline = report.baseline ?? null;
+  const pct = (v: number): string => `${Math.round(v * 100)}%`;
   const checkers = cal ? Object.keys(cal.by_checker).filter((k) => k in CHECKER_COLOR) : [];
 
   return (
@@ -201,6 +210,67 @@ export function MetricsView() {
           )}
         </Panel>
       </div>
+      {floorRows.length > 0 && (
+        <Panel title="The physics floor" subtitle={`a candidate closing on the vehicle ahead in under the floor never runs · default ${report.floor?.floor_s ?? 2} s · one row per threshold pair and floor`}>
+          <table className="w-full text-[11px]">
+            <thead className="text-left text-zinc-500">
+              <tr>
+                <th className="px-1 font-normal">pair</th>
+                <th className="px-1 font-normal">floor</th>
+                <th className="px-1 font-normal">crash rate</th>
+                <th className="px-1 font-normal">violations per episode</th>
+                <th className="px-1 font-normal">task return</th>
+                <th className="px-1 font-normal">steps escalated</th>
+                <th className="px-1 font-normal">steps floored</th>
+              </tr>
+            </thead>
+            <tbody className="tabular-nums">
+              {floorRows.flatMap((r) =>
+                Object.entries(r.by_floor)
+                  .sort(([x], [y]) => Number(x) - Number(y))
+                  .map(([f, c]) => {
+                    return (
+                      <tr key={`${r.t_allow}-${f}`} className="border-t border-zinc-800">
+                        <td className="px-1">{r.t_allow.toFixed(1)} / {r.t_block.toFixed(1)}</td>
+                        <td className="px-1">{Number(f) > 0 ? `${f} s` : "off"}</td>
+                        <td className="px-1">{pct(c.crash_rate)}</td>
+                        <td className="px-1">{c.violations_per_episode.toFixed(2)}</td>
+                        <td className="px-1">{c.mean_return.toFixed(1)}</td>
+                        <td className="px-1">{(c.escalation_rate * 100).toFixed(1)}%</td>
+                        <td className="px-1">{(c.floored_rate * 100).toFixed(1)}%</td>
+                      </tr>
+                    );
+                  }),
+              )}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+      {baseline && (
+        <Panel title="Jev against chat models" subtitle={`${baseline.checks} labeled checks sampled from the logs, stratified by rule and label · Jev's answers come from the logs`}>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+              <CartesianGrid stroke={GRID} />
+              <XAxis type="number" dataKey="p" domain={[0, 1]} tick={{ fill: INK, fontSize: 10 }} axisLine={{ stroke: GRID }} tickLine={false} label={{ value: "p(violation)", fill: INK, fontSize: 10, position: "insideBottom", dy: 8 }} />
+              <YAxis type="number" domain={[0, 1]} tick={{ fill: INK, fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke={GRID} strokeWidth={1} />
+              <Tooltip contentStyle={TOOLTIP} />
+              <Legend wrapperStyle={{ fontSize: 11, color: INK }} />
+              <Line data={reliabilitySeries(baseline.jev.overall)} dataKey="observed" name={judgeLabel("Jev", baseline.jev)} stroke={ON} strokeDasharray="4 3" strokeWidth={2} dot={false} isAnimationActive={false} />
+              {Object.entries(baseline.models).map(([model, s], i) => (
+                <Line key={model} data={reliabilitySeries(s.overall)} dataKey="observed" name={judgeLabel(model, s)} stroke={BASELINE_COLOR[i % BASELINE_COLOR.length]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="mt-1 px-1 text-[10px] text-zinc-500">
+            {Object.entries(baseline.models).map(([model, s]) => (
+              <span key={model} className="mr-3">
+                {model}: {s.answered ?? 0} answered, {s.failed ?? 0} failed, p50 {s.latency_ms_p50 == null ? "n/a" : `${Math.round(s.latency_ms_p50)} ms`}, cost {s.cost_usd == null ? "not priced" : fmtUsd(s.cost_usd)}
+              </span>
+            ))}
+          </div>
+        </Panel>
+      )}
       <div className="text-[11px] text-zinc-500">
         generated {report.generated_at} · {on?.aggregate.latency_ms_p50 ?? "-"} ms p50 / {on?.aggregate.latency_ms_p95 ?? "-"} ms p95 per step live ·{" "}
         operator {on?.aggregate.human.approve ?? 0} approved, {on?.aggregate.human.deny ?? 0} denied, {on?.aggregate.human.override ?? 0} overridden (simulated by the checkers)

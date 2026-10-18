@@ -36,6 +36,12 @@ Each tile shows the shield-off value in orange and the shield-on value in blue, 
 
 **Is p(violation) calibrated?** A reliability diagram. Jev's probabilities are bucketed into ten bins; for each bin the chart plots the mean predicted probability against the observed violation rate from the checkers. The grey diagonal is perfect calibration. One dashed line for all rules together and one solid line per preset rule. The legend carries each line's expected calibration error.
 
+## The floor table
+
+**The physics floor.** Below the charts, when a threshold pair was run with more than one floor, one row per pair and floor shows crash rate, violations per episode, task return, the share of steps escalated and the share of steps on which the floor removed at least one candidate. "off" is a run with no floor.
+
+**Jev against chat models.** When `interlock baseline` has run, a second reliability diagram puts Jev's line next to one line per chat model on the same sampled checks, with ECE, Brier and accuracy in the legend and answered, failed, latency and cost per model underneath.
+
 ## Reading a reliability diagram
 
 - A point on the diagonal means that when Jev said 0.7, about 70% of those checks really were violations.

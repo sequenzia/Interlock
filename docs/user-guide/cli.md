@@ -45,6 +45,7 @@ uv run interlock run --rules speed_limit --operator approve --max-steps 20
 | `--zone-at-step N` | unset | drop the default work zone at step N, which adds the lane-closed rule |
 | `--t-allow P` | `0.3` | allow threshold |
 | `--t-block P` | `0.7` | block threshold |
+| `--floor-s S` | `2.0` | time-to-collision floor in seconds; a candidate under it never runs; `0` disables |
 | `--operator approve|deny|simulated` | `simulated` | who answers escalations; simulated answers from the ground-truth checkers |
 | `--max-steps N` | unset | stop early |
 | `--log PATH` | `backend/logs/runs/<run_id>.jsonl` | where the records go |
@@ -69,6 +70,7 @@ uv run interlock eval --report
 | `--seeds RANGE` | `0-19` | `0-19` or `3,7,11` |
 | `--mode off|on|shadow` | unset | one configuration; `shadow` is an alias of `off` |
 | `--t-allow P`, `--t-block P` | `0.3`, `0.7` | thresholds for `--mode on` |
+| `--floor-s S` | `2.0` | time-to-collision floor for shield-on runs; `0` disables and adds `_nofloor` to the label, any other non-default value adds `_floor<S>` |
 | `--sweep` | off | shield on over the five pairs 0.1/0.9, 0.2/0.8, 0.3/0.7, 0.4/0.6, 0.5/0.5 |
 | `--all` | off | off, then the sweep, then the report |
 | `--report` | off | aggregate the newest run per configuration into the report and plots |
@@ -80,6 +82,30 @@ uv run interlock eval --report
 | `--out DIR` | `backend/logs/eval` | where runs are written |
 
 Each configuration writes `backend/logs/eval/<stamp>_<label>/` with one `seedN.jsonl` per seed and a `metrics.json`. The report rebuilds `internal/eval/latest.json` and `internal/plots/*.png`. Choosing none of `--mode`, `--sweep`, `--all`, `--report` exits with code 2.
+
+## interlock baseline
+
+Ask chat models the judge's own questions on labeled checks sampled from the eval logs, and score them with the same reliability code. Jev's answers come from the logs.
+
+```bash
+uv run interlock baseline --dry-run
+uv run interlock baseline --checks 2000 --models claude-haiku-5-5,claude-sonnet-5-5
+uv run interlock baseline --concurrency 8                  # reads backend/prices.json when it exists
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--checks N` | `2000` | checks to sample, spread evenly over (rule, label) strata and topped up from the rest |
+| `--models LIST` | `claude-haiku-5-5,claude-sonnet-5-5` | comma list of model ids |
+| `--runs DIR` | `backend/logs/eval` | eval runs root; the newest run per label is read |
+| `--seed N` | `0` | sampling seed |
+| `--concurrency N` | `4` | calls in flight per model |
+| `--prices PATH` | `backend/prices.json` when it exists | JSON `{model: {"input_per_mtok": USD, "output_per_mtok": USD}}`; copy `backend/prices.example.json` and fill it from the pricing page. A blank entry is an error; a missing model gets no cost |
+| `--out PATH` | `internal/eval/baseline.json` | where the block goes |
+| `--cache PATH` | `backend/logs/baseline_cache.jsonl` | reply cache; a re-run with the same sample sends nothing |
+| `--dry-run` | off | sample, print the strata and one full request, send nothing; needs no key |
+
+Needs `ANTHROPIC_API_KEY` in `backend/.env` unless `--dry-run`, plus `ANTHROPIC_WORKSPACE_ID` when the key is not scoped to a workspace. Exits 2 when there are no labeled checks or no key, and stops on the first call when the API rejects the key, the workspace or the model. Then `interlock eval --report` folds the block into `latest.json` and draws `baseline.png`.
 
 ## interlock train
 
@@ -165,6 +191,7 @@ uv run interlock console --no-ui
 | `--jev auto|live|mock` | from the shell | `JEV_MODE` |
 | `--seed N` | from the shell | `SEED` for the first episode |
 | `--escalation-timeout S` | from the shell (server default 20) | `ESCALATION_TIMEOUT_S`; 0 waits for the operator |
+| `--floor-s S` | from the shell (server default 2.0) | `FLOOR_S`; the time-to-collision floor, 0 disables |
 | `--model-path PATH` | from the shell | `MODEL_PATH` |
 | `--cache PATH` | from the shell | `JEV_CACHE_PATH`; an empty file makes every step escalate in mock mode |
 

@@ -23,7 +23,7 @@ Runs every seed under one configuration and returns the per-configuration report
 
 ### Labels and directories
 
-`config_label(shield_on, thresholds, zone_at_step)` produces `on_ta0.30_tb0.70`, `off`, or with a zone `on_ta0.30_tb0.70_zone10`; a shield-off label carries no thresholds because they change nothing there. `new_run_dir(root, label)` prefixes a UTC stamp: `backend/logs/eval/2026-10-18T02-06-19_on_ta0.30_tb0.70/`. `newest_runs(root)` globs `*/metrics.json` in sorted order, recomputes each run's label from its `shield_on`, `thresholds` and `zone_at_step` fields rather than reading the stored one, and keeps the last directory per label, so the stamp decides which run is current and an old `off_ta0.20_tb0.80` run counts as `off`.
+`config_label(shield_on, thresholds, zone_at_step)` produces `on_ta0.30_tb0.70`, `off`, `on_ta0.30_tb0.70_nofloor` when `floor_s` is 0, or with a zone `on_ta0.30_tb0.70_zone10`; a shield-off label carries no thresholds and no floor because neither applies there. `new_run_dir(root, label)` prefixes a UTC stamp: `backend/logs/eval/2026-10-18T02-06-19_on_ta0.30_tb0.70/`. `newest_runs(root)` globs `*/metrics.json` in sorted order, recomputes each run's label from its `shield_on`, `thresholds` and `zone_at_step` fields rather than reading the stored one, and keeps the last directory per label, so the stamp decides which run is current and an old `off_ta0.20_tb0.80` run counts as `off`.
 
 ### `build_report(root, report_path, plots_dir, thresholds)`
 
@@ -31,9 +31,9 @@ Aggregates the newest run per label into `internal/eval/latest.json` and the thr
 
 1. Load every newest `metrics.json`.
 2. `before_after.on` is the shield-on run without a zone whose label matches the default thresholds, `before_after.off` is the run labeled `off`. Missing ones are `null`.
-3. `sweep` is every run with `shield_on` and no zone, reduced to the threshold pair and its aggregate rates, sorted by `t_allow`.
-4. `calibration` pools every record of every newest run (all labels, including shield off) through `calibration()`.
-5. Plots: `before_after.png` when both default runs exist, `tradeoff.png` when the sweep is non-empty, `calibration.png` when there is at least one labeled check. The `backend.plots` import sits inside this function so matplotlib never loads on the hot path.
+3. `sweep` is every run with `shield_on`, no zone and the default floor, reduced to the threshold pair and its aggregate rates, sorted by `t_allow`. `floor.rows` groups every shield-on run without a zone by threshold pair and keeps the pairs that were run with more than one floor, keyed by floor; runs without a `floor_s` field count as floor 0. `baseline` is `internal/eval/baseline.json` when it exists.
+4. `calibration` pools the records of the shield-off runs and of the shield-on runs at the default floor (the sweep) through `calibration()`. Runs at other floors are left out: they repeat the same states with the same cached answers.
+5. Plots: `before_after.png` when both default runs exist, `tradeoff.png` when the sweep is non-empty, `calibration.png` when there is at least one labeled check, `baseline.png` when the baseline block has models. The `backend.plots` import sits inside this function so matplotlib never loads on the hot path.
 6. The report is written with `indent=1` and returned.
 
 ### CLI logic

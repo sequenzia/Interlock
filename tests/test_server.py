@@ -26,6 +26,8 @@ def policy() -> Iterator[Policy]:
 def client(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setattr(server_module, "RUNS_DIR", tmp_path / "runs")
     monkeypatch.setattr("backend.logger.LOGS_DIR", tmp_path)
+    monkeypatch.setattr("backend.twin.RUNS_DIR", tmp_path / "runs")
+    monkeypatch.setattr("backend.twin.EVAL_DIR", tmp_path / "eval")
     session = Session(policy, JevClient(live=None, cache=JevCache(None)), escalation_timeout_s=None)
     with TestClient(create_app(session)) as c:
         yield c
@@ -38,6 +40,7 @@ def drain_greeting(ws: Any) -> dict[str, Any]:
     assert ws.receive_json()["type"] == "state"
     assert ws.receive_json()["type"] == "history"
     assert ws.receive_json()["type"] == "metrics"
+    assert ws.receive_json()["type"] == "twin"
     return hello
 
 
@@ -72,8 +75,11 @@ def test_hello_state_and_metrics_on_connect(client: TestClient) -> None:
             "t_allow": 0.3,
             "t_block": 0.7,
         }
+        assert state["floor_s"] == 2.0
         assert ws.receive_json() == {"type": "history", "records": []}
         assert ws.receive_json()["type"] == "metrics"
+        twin = ws.receive_json()
+        assert twin["type"] == "twin" and twin["seed"] == 0 and twin["steps"] == []
     assert client.get("/health").json()["ok"] is True
 
 
@@ -295,3 +301,17 @@ def test_no_console_origins_keeps_same_origin_only(client: TestClient) -> None:
     response = client.get("/health", headers={"Origin": "https://console.example"})
     assert response.status_code == 200
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_reset_sends_the_twin_of_the_new_seed(client: TestClient, tmp_path: Path) -> None:
+    from tests.test_twin import record, write
+
+    write(tmp_path / "runs" / "2026-10-18T01-00-00_seed7_off.jsonl", [record(0, 7, False, True)])
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "reset", "seed": 7})
+        twin = recv_until(ws, "twin")
+        assert twin["seed"] == 7 and twin["run_id"] == "r7" and len(twin["steps"]) == 1
+        assert twin["violations_total"] == 1 and twin["crashed_at"] is None
+        ws.send_json({"type": "reset", "seed": 8})
+        assert recv_until(ws, "twin")["steps"] == []

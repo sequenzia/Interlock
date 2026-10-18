@@ -31,7 +31,7 @@ The rules the codebase follows, so a change reads like the code around it. CLAUD
 | Units | In the field name: `speed_mps`, `vehicle_ahead_gap_m`, `latency_ms`, `cost_usd`, `starts_in_m` |
 | Constraint ids | `c1`, `c2`, ... assigned by `ConstraintStore` and stable for the session |
 | Run ids | `<UTC stamp>_seed<N>_<on|off>`, for example `2026-10-18T14-02-11_seed7_on`; also the JSONL filename |
-| Eval labels | `on_ta<t_allow>_tb<t_block>` or `off`, with an optional `_zone<N>` suffix |
+| Eval labels | `on_ta<t_allow>_tb<t_block>` or `off`, then `_nofloor` when the floor is off or `_floor<S>` for a non-default floor, then an optional `_zone<N>` suffix |
 | Decisions | `allow`, `fallback`, `escalate` in code and records, plus `all_blocked` in records written before Oct 17; `DECISION_LABEL` maps them to UI words |
 | Judge sources | `live`, `cache`, `unavailable` |
 

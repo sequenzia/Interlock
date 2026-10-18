@@ -89,6 +89,9 @@ Terms as Interlock uses them, with the page that covers each one.
 **Operator**
 : Whoever answers escalations. The console records `ui`; headless runs use `simulated` (answers from the checkers), `approve` or `deny`. See [Command line](../user-guide/cli.md).
 
+**Physics floor**
+: A time-to-collision limit in code, 2 seconds by default. A candidate whose time to collision ahead after the action is under it is removed before the rules are consulted, so it can never run, be a fallback or be chosen by an override. If every candidate is under it, SLOWER runs. Set at launch; the console cannot change it. See [Shield algorithm](../developer-guide/backend/shield.md).
+
 **Policy**
 : The Stable-Baselines3 DQN trained on task reward alone. It ranks the five actions by Q-value and knows nothing about rules.
 

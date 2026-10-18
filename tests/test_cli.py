@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from backend import cli, evaluate, label, run_episode, train
+from backend import baseline_llm, cli, evaluate, label, run_episode, train
 from backend.spike import jev_spike
 
 
@@ -19,6 +19,7 @@ def test_subcommands_dispatch_to_their_modules():
     assert parse("train", "--timesteps", "5").func is train.run_cli
     assert parse("spike", "--dry-run").func is jev_spike.run_cli
     assert parse("label", "--run", "x", "--rule", "y").func is label.run_cli
+    assert parse("baseline", "--dry-run").func is baseline_llm.run_cli
     assert parse("console").func is cli.run_console
 
 
@@ -26,10 +27,20 @@ def test_run_flags_are_the_module_flags():
     args = parse("run", "--shield", "off", "--seed", "3", "--jev", "mock", "--zone-at-step", "10")
     assert (args.shield, args.seed, args.jev, args.zone_at_step) == ("off", 3, "mock", 10)
     assert (args.rules, args.operator, args.t_allow, args.t_block) == ("all", "simulated", 0.3, 0.7)
+    assert args.floor_s == 2.0 and parse("run", "--floor-s", "0").floor_s == 0.0
 
 
 @pytest.mark.parametrize(
-    "main", [cli.main, run_episode.main, evaluate.main, train.main, jev_spike.main, label.main]
+    "main",
+    [
+        cli.main,
+        run_episode.main,
+        evaluate.main,
+        train.main,
+        jev_spike.main,
+        label.main,
+        baseline_llm.main,
+    ],
 )
 def test_help_exits_zero(main):
     with pytest.raises(SystemExit) as exc:
@@ -49,12 +60,12 @@ def test_eval_without_a_mode_is_a_usage_error(capsys):
 
 
 def test_console_flags_become_server_environment(monkeypatch):
-    for key in ("JEV_MODE", "SEED", "ESCALATION_TIMEOUT_S", "MODEL_PATH", "JEV_CACHE_PATH"):
+    keys = ("JEV_MODE", "SEED", "ESCALATION_TIMEOUT_S", "MODEL_PATH", "JEV_CACHE_PATH", "FLOOR_S")
+    for key in keys:
         monkeypatch.delenv(key, raising=False)
     bare = cli.server_env(parse("console"))
-    assert not {"JEV_MODE", "SEED", "ESCALATION_TIMEOUT_S", "MODEL_PATH", "JEV_CACHE_PATH"} & set(
-        bare
-    )
+    assert not set(keys) & set(bare)
+    assert cli.server_env(parse("console", "--floor-s", "0"))["FLOOR_S"] == "0.0"
 
     env = cli.server_env(
         parse(

@@ -10,7 +10,7 @@ The eval harness writes three kinds of JSON. All of them are plain outputs of `b
 
 ## Per-configuration `metrics.json`
 
-One per run directory. The label encodes the configuration: `on_ta0.30_tb0.70`, `off`, or `on_ta0.30_tb0.70_zone10` with a zone drop. A shield-off label carries no thresholds because they change nothing with the shield off; runs written before Oct 17 stored `off_ta0.20_tb0.80`, which the report reads as `off`.
+One per run directory. The label encodes the configuration: `on_ta0.30_tb0.70`, `off`, `on_ta0.30_tb0.70_nofloor` when the physics floor was off, `on_ta0.30_tb0.70_floor1` for a non-default floor, or `on_ta0.30_tb0.70_zone10` with a zone drop. `metrics.json` carries `floor_s`; a run without that field predates the floor and is read as `_nofloor`. A shield-off label carries no thresholds because they change nothing with the shield off; runs written before Oct 17 stored `off_ta0.20_tb0.80`, which the report reads as `off`.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -114,9 +114,11 @@ The report `build_report` writes from the newest run per label.
 | `thresholds_default` | `{t_allow, t_block}` | The pair that selects `before_after.on` |
 | `runs` | `{label: directory}` | Which run directory fed each label |
 | `before_after.off`, `before_after.on` | full `metrics.json` or null | `on` is the shield-on run without a zone at the default thresholds; `off` is the newest shield-off run without a zone |
-| `sweep` | object[] | One point per shield-on run without a zone, sorted by `t_allow` |
-| `calibration` | object | Pooled over every record of every newest run |
-| `plots` | `{before_after, tradeoff, calibration: path}` | Only the figures that could be drawn |
+| `sweep` | object[] | One point per shield-on run without a zone at the default floor, sorted by `t_allow` |
+| `floor` | `{floor_s, rows}` | One row per threshold pair that was run with more than one floor: `t_allow`, `t_block` and `by_floor`, keyed by the floor in seconds as text (`"0"`, `"1"`, `"2"`), each `{label, crash_rate, violations_per_episode, mean_return, escalation_rate, floored_rate, floor_all_rate}` |
+| `baseline` | object or null | The contents of `internal/eval/baseline.json` when `interlock baseline` has run: `checks`, `strata`, `jev` and `models`, each judge with `overall` and `by_group` reliability plus latency, tokens and cost for the chat models. See [Chat-LLM baseline](../../user-guide/evaluation.md#chat-llm-baseline) |
+| `calibration` | object | Pooled over the records of the shield-off runs and the shield-on runs at the default floor |
+| `plots` | `{before_after, tradeoff, calibration, baseline: path}` | Only the figures that could be drawn |
 
 ### `sweep[]` entry
 
@@ -124,7 +126,7 @@ The report `build_report` writes from the newest run per label.
 {
   "label": "on_ta0.20_tb0.80", "t_allow": 0.2, "t_block": 0.8,
   "violations_per_episode": 2.3, "escalation_rate": 0.4556, "all_blocked_rate": 0.0,
-  "conflict_rate": 0.044,
+  "conflict_rate": 0.044, "floored_rate": 0.0,
   "crash_rate": 0.05, "mean_return": 44.035, "cost_per_episode_usd": 0.007255,
   "human": {"approve": 219, "deny": 268, "override": 41}
 }

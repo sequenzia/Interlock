@@ -8,6 +8,7 @@ __pycache__/
 
 # Secrets: TYPESAFE_API_KEY lives in backend/.env and is never committed
 backend/.env
+backend/prices.json
 .env
 
 # Runtime artifacts

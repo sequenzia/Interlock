@@ -29,7 +29,7 @@ from backend.jev_client import DEFAULT_MODEL, make_client
 from backend.logger import JsonlLogger, default_log_path, make_run_id
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE
 from backend.policy import Policy
-from backend.shield import Thresholds
+from backend.shield import DEFAULT_FLOOR_S, Thresholds
 
 
 def format_step(result: StepResult) -> str:
@@ -82,6 +82,7 @@ async def main_async(args: argparse.Namespace) -> int:
         judge=judge,
         store=store,
         thresholds=Thresholds(args.t_allow, args.t_block),
+        floor_s=args.floor_s,
         shield_on=shield_on,
         operator=OPERATORS[args.operator],
         operator_name=args.operator,
@@ -91,7 +92,8 @@ async def main_async(args: argparse.Namespace) -> int:
     runner.run_id = run_id
     print(
         f"shield {args.shield} | seed {args.seed} | jev {jev_mode} | rules {[c.text for c in store.constraints]}"
-        f" | thresholds {args.t_allow}/{args.t_block} | operator {args.operator} | log {log_path}"
+        f" | thresholds {args.t_allow}/{args.t_block} | floor {args.floor_s:g} s | operator {args.operator}"
+        f" | log {log_path}"
     )
     on_step = None if args.quiet else lambda result: print(format_step(result), flush=True)
     try:
@@ -124,6 +126,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--t-allow", type=float, default=Thresholds().t_allow)
     parser.add_argument("--t-block", type=float, default=Thresholds().t_block)
+    parser.add_argument(
+        "--floor-s",
+        type=float,
+        default=DEFAULT_FLOOR_S,
+        help="time to collision floor in seconds; candidates under it never run; 0 disables",
+    )
     parser.add_argument("--operator", choices=sorted(OPERATORS), default="simulated")
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument(

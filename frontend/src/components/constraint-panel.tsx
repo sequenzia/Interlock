@@ -7,7 +7,7 @@ const NO_PRESETS: Preset[] = [];
 const GAP_POSITIVE =
   "A lane change requires at least 10 m of clear space to the nearest vehicle in the target lane";
 
-function ThresholdControls({ current, disabled }: { current: Thresholds; disabled: boolean }) {
+function ThresholdControls({ current, floorS, disabled }: { current: Thresholds; floorS: number; disabled: boolean }) {
   const [local, setLocal] = useState(current);
   useEffect(() => setLocal(current), [current]);
   const commit = (): void => {
@@ -43,6 +43,11 @@ function ThresholdControls({ current, disabled }: { current: Thresholds; disable
           <span className="w-8 text-right tabular-nums">{local[key].toFixed(2)}</span>
         </label>
       ))}
+      <div className="text-[10px] leading-snug text-zinc-500">
+        {floorS > 0
+          ? `Physics floor ${floorS.toFixed(1)} s: a candidate closing on the vehicle ahead in under that time never runs. Set at launch, not here.`
+          : "Physics floor off: every candidate is eligible. Set at launch, not here."}
+      </div>
     </div>
   );
 }
@@ -176,7 +181,7 @@ export function ConstraintPanel() {
             </button>
           </div>
         )}
-        {session && <ThresholdControls current={session.thresholds} disabled={disabled} />}
+        {session && <ThresholdControls current={session.thresholds} floorS={session?.floor_s ?? 0} disabled={disabled} />}
       </div>
     </section>
   );

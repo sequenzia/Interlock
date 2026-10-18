@@ -69,8 +69,10 @@ Each simulation step:
    in multiple hops, which its documentation lists as weaknesses.
 3. One Jev request per candidate asks, for every enabled rule, whether
    executing that action would violate it. Each answer is a probability.
-4. The shield takes the top-ranked action's worst probability across rules and
-   applies two thresholds, by default 0.2 and 0.8:
+4. Code drops any candidate that would close on the vehicle ahead in under
+   2 seconds. That physics floor is set at launch and no rule can type it
+   away. The shield then takes the top remaining action's worst probability
+   across rules and applies two thresholds, by default 0.3 and 0.7:
    - below the allow threshold: execute it;
    - above the block threshold, with a lower-ranked action that is confidently
      safe: execute that one;
@@ -99,19 +101,31 @@ minutes and costs under a dollar.
 | Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
 | --- | --- | --- | --- | --- |
 | Shield off | 105.45 | 50.7 | 40% | 0.0% |
-| Shield on, 0.2 / 0.8 | 2.30 | 44.1 | 5% | 46.8% |
-| Shield on, 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.1% |
+| Shield on, 0.2 / 0.8 | 3.45 | 45.7 | 0% | 48.2% |
+| Shield on, 0.3 / 0.7 (default) | 3.55 | 46.0 | 0% | 16.5% |
 
 By rule, shield off to on: speed limit 1030 violations to 0, lane change gap
-124 to 1, left lane for passing 8 to 0, headway 647 to 43, lane-change rate
-300 to 4. When no candidate satisfies every rule the shield asks the operator
-to choose rather than running a last resort, which is why the crash rate falls
-with the shield on. Calibration over 169,500 labeled checks gives an expected
+124 to 1, left lane for passing 8 to 0, headway 647 to 65, lane-change rate
+300 to 5. When no candidate satisfies every rule the shield asks the operator
+to choose rather than running a last resort, and a 2 second time-to-collision
+floor in code removes the closest calls before any rule is judged, which is
+why no shielded episode crashes. Calibration over 174,625 labeled checks gives an expected
 calibration error of 0.095 and 98.7% accuracy at a 0.5 cut, with the speed and
 lane-change rate rules at 100% and the passing rule the weakest. Jev answers a full step of five
 requests in about 158 ms at the median from a cold cache.
 
 ![Reliability diagram per rule](internal/plots/calibration.png)
+
+The same questions put to chat models on 2,000 checks balanced over rule and
+label: Claude Sonnet 5.5 is better calibrated than Jev on that sample, ECE
+0.060 against 0.139, yet at the default band it would have allowed 3
+violations and blocked 5 compliant actions where Jev allowed and blocked
+none, because Jev errs toward uncertainty and the band turns that into a
+question for the operator. Jev's price is operator load, 20.6% of checks
+escalated against 3.1%; the chat model's price is about a second per check
+against 158 ms per step, and roughly 860 times the cost per episode.
+
+![Jev against chat models on the same checks](internal/plots/baseline.png)
 
 The threshold sweep, the reading of these numbers and the design decisions
 behind them live in `internal/build-plan.md`. Measured Jev behavior from the

@@ -23,12 +23,16 @@ from backend.jev_client import JevClient
 from backend.logger import JsonlLogger, build_record, make_run_id
 from backend.policy import Policy
 from backend.shield import (
+    DEFAULT_FLOOR_S,
     Answer,
     Decision,
     EscalationReason,
+    Floor,
     Thresholds,
     decide,
+    floor_decision,
     resolve,
+    under_floor,
     violation_probability,
 )
 
@@ -112,6 +116,7 @@ class Totals:
     crashed: bool = False
     decisions: dict[str, int] = field(default_factory=dict)
     conflicts: int = 0  # escalations with no compliant action
+    floored: int = 0  # steps where the floor removed at least one candidate
     violations: dict[str, int] = field(
         default_factory=dict
     )  # constraint id -> executed-action violations
@@ -130,6 +135,7 @@ class EpisodeRunner:
         judge: JevClient,
         store: ConstraintStore,
         thresholds: Thresholds | None = None,
+        floor_s: float = DEFAULT_FLOOR_S,
         shield_on: bool = True,
         operator: Operator | None = None,
         operator_name: str = "simulated",
@@ -141,6 +147,7 @@ class EpisodeRunner:
         self.judge = judge
         self.store = store
         self.thresholds = thresholds or Thresholds()
+        self.floor_s = floor_s
         self.shield_on = shield_on
         self.operator = operator or simulated_operator
         self.operator_name = operator_name
@@ -180,7 +187,15 @@ class EpisodeRunner:
         check = await self.judge.check(candidates, enabled)
         labels = checkers.label_all(candidates, enabled)
         noop = fact_extractor.noop_actions(candidates)
-        decision = decide(names, check.p, self.thresholds, noop)
+        floor = Floor(
+            applied=self.shield_on and self.floor_s > 0,
+            removed=under_floor(candidates, self.floor_s),
+        )
+        executable = [a for a in names if a not in floor.removed] if floor.applied else names
+        if executable:
+            decision = decide(executable, check.p, self.thresholds, noop)
+        else:
+            decision = floor_decision(names, check.p)
 
         escalation: Escalation | None = None
         human: dict[str, Any] | None = None
@@ -241,6 +256,7 @@ class EpisodeRunner:
             escalated=escalated,
             human=human,
             fallback={"action": decision.fallback, "kind": decision.fallback_kind},
+            floor=floor.to_dict(),
             judge=check.judge_record(),
             reward=float(reward),
             crashed=bool(info["crashed"]),
@@ -313,6 +329,8 @@ class EpisodeRunner:
         t.decisions[record["decision"]] = t.decisions.get(record["decision"], 0) + 1
         if record["escalation_reason"] == "no_compliant_action":
             t.conflicts += 1
+        if record["floor"]["applied"] and record["floor"]["removed"]:
+            t.floored += 1
         for cid, violated in executed_labels.items():
             if violated:
                 t.violations[cid] = t.violations.get(cid, 0) + 1
@@ -338,6 +356,7 @@ class EpisodeRunner:
             "crashed": t.crashed,
             "decisions": dict(sorted(t.decisions.items())),
             "conflicts": t.conflicts,
+            "floored": t.floored,
             "violations": {
                 cid: t.violations.get(cid, 0) for cid in [c.id for c in self.store.constraints]
             },

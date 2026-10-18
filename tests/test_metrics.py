@@ -35,6 +35,7 @@ def record(
         "decision": decision,
         "executed": executed,
         "human": None,
+        "floor": {"applied": True, "removed": []},
         "judge": {
             "source": "live",
             "latency_ms": 150.0,
@@ -152,3 +153,32 @@ def test_hand_labels_fill_in_free_text_rules_for_calibration() -> None:
     }
     assert cal["by_checker"]["speed_limit"]["label_source"] == "checker"
     assert calibration([rec])["by_checker"].keys() == {"speed_limit"}
+
+
+def test_floor_counts_steps_with_a_removal_and_steps_that_removed_everything() -> None:
+    records = [
+        record(0, "allow", "FASTER", [("c1", 0.1, False)]),
+        record(
+            1, "allow", "IDLE", [("c1", 0.1, False)], floor={"applied": True, "removed": ["FASTER"]}
+        ),
+        record(
+            2,
+            "fallback",
+            "IDLE",
+            [("c1", 0.1, False)],
+            floor={"applied": True, "removed": ["FASTER", "IDLE"]},
+        ),
+        record(
+            3,
+            "allow",
+            "FASTER",
+            [("c1", 0.1, False)],
+            floor={"applied": False, "removed": ["FASTER"]},
+        ),
+    ]
+    m = episode_metrics(records)
+    assert (m["floored"], m["floor_all"]) == (2, 1)
+    agg = aggregate([m])
+    assert (agg["floored_rate"], agg["floor_all_rate"]) == (0.5, 0.25)
+    old = [{k: v for k, v in r.items() if k != "floor"} for r in records]  # logs before the floor
+    assert episode_metrics(old)["floored"] == 0

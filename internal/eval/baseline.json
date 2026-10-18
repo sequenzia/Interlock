@@ -1,0 +1,1480 @@
+{
+ "generated_at": "2026-10-18T06:45:19+00:00",
+ "checks": 2000,
+ "strata": {
+  "headway": {
+   "violation": 200,
+   "ok": 200
+  },
+  "lane_change_gap": {
+   "violation": 200,
+   "ok": 200
+  },
+  "lane_change_rate": {
+   "violation": 200,
+   "ok": 200
+  },
+  "left_lane_passing": {
+   "violation": 200,
+   "ok": 200
+  },
+  "speed_limit": {
+   "violation": 200,
+   "ok": 200
+  }
+ },
+ "jev": {
+  "overall": {
+   "n": 2000,
+   "positives": 1000,
+   "bins": [
+    {
+     "lo": 0.0,
+     "hi": 0.1,
+     "count": 636,
+     "mean_p": 0.0489,
+     "observed": 0.0
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.2,
+     "count": 266,
+     "mean_p": 0.1299,
+     "observed": 0.0
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "count": 37,
+     "mean_p": 0.2278,
+     "observed": 0.0
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.4,
+     "count": 27,
+     "mean_p": 0.3374,
+     "observed": 0.4444
+    },
+    {
+     "lo": 0.4,
+     "hi": 0.5,
+     "count": 50,
+     "mean_p": 0.4546,
+     "observed": 0.34
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "count": 135,
+     "mean_p": 0.5618,
+     "observed": 0.9111
+    },
+    {
+     "lo": 0.6,
+     "hi": 0.7,
+     "count": 193,
+     "mean_p": 0.6379,
+     "observed": 0.9948
+    },
+    {
+     "lo": 0.7,
+     "hi": 0.8,
+     "count": 101,
+     "mean_p": 0.7474,
+     "observed": 1.0
+    },
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "count": 206,
+     "mean_p": 0.8583,
+     "observed": 1.0
+    },
+    {
+     "lo": 0.9,
+     "hi": 1.0,
+     "count": 349,
+     "mean_p": 0.9291,
+     "observed": 1.0
+    }
+   ],
+   "ece": 0.1391,
+   "brier": 0.046,
+   "accuracy_at_0_5": 0.9785
+  },
+  "by_group": {
+   "headway": {
+    "n": 400,
+    "positives": 200,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 118,
+      "mean_p": 0.0558,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 53,
+      "mean_p": 0.1226,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 13,
+      "mean_p": 0.2315,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 6,
+      "mean_p": 0.325,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 7,
+      "mean_p": 0.4457,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 5,
+      "mean_p": 0.52,
+      "observed": 0.4
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 13,
+      "mean_p": 0.6569,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 27,
+      "mean_p": 0.7615,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 50,
+      "mean_p": 0.8442,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 108,
+      "mean_p": 0.9439,
+      "observed": 1.0
+     }
+    ],
+    "ece": 0.1163,
+    "brier": 0.0249,
+    "accuracy_at_0_5": 0.995
+   },
+   "lane_change_gap": {
+    "n": 400,
+    "positives": 200,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 159,
+      "mean_p": 0.0483,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 30,
+      "mean_p": 0.123,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 6,
+      "mean_p": 0.2333,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 14,
+      "mean_p": 0.3464,
+      "observed": 0.7857
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 12,
+      "mean_p": 0.4467,
+      "observed": 0.9167
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 23,
+      "mean_p": 0.5509,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 28,
+      "mean_p": 0.6475,
+      "observed": 0.9643
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 27,
+      "mean_p": 0.7533,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 35,
+      "mean_p": 0.8506,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 66,
+      "mean_p": 0.9136,
+      "observed": 1.0
+     }
+    ],
+    "ece": 0.1534,
+    "brier": 0.0531,
+    "accuracy_at_0_5": 0.935
+   },
+   "lane_change_rate": {
+    "n": 400,
+    "positives": 200,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 142,
+      "mean_p": 0.0449,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 57,
+      "mean_p": 0.1305,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 1,
+      "mean_p": 0.21,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 3,
+      "mean_p": 0.5833,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 59,
+      "mean_p": 0.6498,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 43,
+      "mean_p": 0.737,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 76,
+      "mean_p": 0.865,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 19,
+      "mean_p": 0.9042,
+      "observed": 1.0
+     }
+    ],
+    "ece": 0.1483,
+    "brier": 0.0344,
+    "accuracy_at_0_5": 1.0
+   },
+   "left_lane_passing": {
+    "n": 400,
+    "positives": 200,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 64,
+      "mean_p": 0.0691,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 79,
+      "mean_p": 0.1415,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 17,
+      "mean_p": 0.2241,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 7,
+      "mean_p": 0.33,
+      "observed": 0.1429
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 31,
+      "mean_p": 0.4597,
+      "observed": 0.1935
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 104,
+      "mean_p": 0.5656,
+      "observed": 0.9135
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 93,
+      "mean_p": 0.6247,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 4,
+      "mean_p": 0.725,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 1,
+      "mean_p": 0.81,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     }
+    ],
+    "ece": 0.2533,
+    "brier": 0.1112,
+    "accuracy_at_0_5": 0.9625
+   },
+   "speed_limit": {
+    "n": 400,
+    "positives": 200,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 153,
+      "mean_p": 0.0395,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 47,
+      "mean_p": 0.1221,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 44,
+      "mean_p": 0.8698,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 156,
+      "mean_p": 0.9283,
+      "observed": 1.0
+     }
+    ],
+    "ece": 0.0717,
+    "brier": 0.0064,
+    "accuracy_at_0_5": 1.0
+   }
+  }
+ },
+ "models": {
+  "claude-haiku-5-5": {
+   "overall": {
+    "n": 2000,
+    "positives": 1000,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 912,
+      "mean_p": 0.0326,
+      "observed": 0.0033
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 71,
+      "mean_p": 0.1192,
+      "observed": 0.0986
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 28,
+      "mean_p": 0.2304,
+      "observed": 0.5
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 35,
+      "mean_p": 0.32,
+      "observed": 0.8
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 10,
+      "mean_p": 0.415,
+      "observed": 0.8
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 4,
+      "mean_p": 0.55,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 32,
+      "mean_p": 0.6138,
+      "observed": 0.9375
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 51,
+      "mean_p": 0.7349,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 209,
+      "mean_p": 0.8256,
+      "observed": 1.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 648,
+      "mean_p": 0.9323,
+      "observed": 0.9969
+     }
+    ],
+    "ece": 0.0802,
+    "brier": 0.0285,
+    "accuracy_at_0_5": 0.968
+   },
+   "by_group": {
+    "headway": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 171,
+       "mean_p": 0.0402,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 13,
+       "mean_p": 0.1254,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 10,
+       "mean_p": 0.23,
+       "observed": 0.1
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 4,
+       "mean_p": 0.325,
+       "observed": 0.25
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 2,
+       "mean_p": 0.4,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 7,
+       "mean_p": 0.63,
+       "observed": 0.7143
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 10,
+       "mean_p": 0.744,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 77,
+       "mean_p": 0.8331,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 106,
+       "mean_p": 0.9288,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.0861,
+     "brier": 0.0192,
+     "accuracy_at_0_5": 0.99
+    },
+    "lane_change_gap": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 194,
+       "mean_p": 0.0276,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 5,
+       "mean_p": 0.12,
+       "observed": 0.4
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 5,
+       "mean_p": 0.24,
+       "observed": 0.8
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 3,
+       "mean_p": 0.3333,
+       "observed": 0.6667
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 1,
+       "mean_p": 0.55,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 6,
+       "mean_p": 0.6167,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 1,
+       "mean_p": 0.75,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 9,
+       "mean_p": 0.8389,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 176,
+       "mean_p": 0.9361,
+       "observed": 0.9943
+      }
+     ],
+     "ece": 0.0631,
+     "brier": 0.0199,
+     "accuracy_at_0_5": 0.9775
+    },
+    "lane_change_rate": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 179,
+       "mean_p": 0.0308,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 18,
+       "mean_p": 0.1189,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 3,
+       "mean_p": 0.2,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 12,
+       "mean_p": 0.8525,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 188,
+       "mean_p": 0.9345,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.0559,
+     "brier": 0.0046,
+     "accuracy_at_0_5": 1.0
+    },
+    "left_lane_passing": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 185,
+       "mean_p": 0.0344,
+       "observed": 0.0162
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 19,
+       "mean_p": 0.1195,
+       "observed": 0.2105
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 10,
+       "mean_p": 0.235,
+       "observed": 0.9
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 27,
+       "mean_p": 0.3185,
+       "observed": 0.9259
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 8,
+       "mean_p": 0.4188,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 3,
+       "mean_p": 0.55,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 19,
+       "mean_p": 0.6068,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 40,
+       "mean_p": 0.7322,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 89,
+       "mean_p": 0.8085,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      }
+     ],
+     "ece": 0.1734,
+     "brier": 0.0897,
+     "accuracy_at_0_5": 0.8775
+    },
+    "speed_limit": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 183,
+       "mean_p": 0.0308,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 16,
+       "mean_p": 0.1138,
+       "observed": 0.0625
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 1,
+       "mean_p": 0.3,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 22,
+       "mean_p": 0.8477,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 178,
+       "mean_p": 0.9285,
+       "observed": 0.9944
+      }
+     ],
+     "ece": 0.0546,
+     "brier": 0.0091,
+     "accuracy_at_0_5": 0.995
+    }
+   },
+   "answered": 2000,
+   "failed": 0,
+   "live": 2000,
+   "cached": 0,
+   "latency_ms_p50": 1122.0,
+   "latency_ms_p95": 2671.7,
+   "input_tokens": 1853571,
+   "output_tokens": 248454,
+   "cost_usd": 0.3096
+  },
+  "claude-sonnet-5-5": {
+   "overall": {
+    "n": 2000,
+    "positives": 1000,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 904,
+      "mean_p": 0.0243,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 75,
+      "mean_p": 0.1123,
+      "observed": 0.0133
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 6,
+      "mean_p": 0.2083,
+      "observed": 0.3333
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 15,
+      "mean_p": 0.3167,
+      "observed": 0.6
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 9,
+      "mean_p": 0.4167,
+      "observed": 0.6667
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 6,
+      "mean_p": 0.5333,
+      "observed": 0.5
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 30,
+      "mean_p": 0.613,
+      "observed": 0.9667
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 18,
+      "mean_p": 0.7194,
+      "observed": 0.7778
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 182,
+      "mean_p": 0.837,
+      "observed": 0.9945
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 755,
+      "mean_p": 0.9434,
+      "observed": 1.0
+     }
+    ],
+    "ece": 0.0599,
+    "brier": 0.0145,
+    "accuracy_at_0_5": 0.9875
+   },
+   "by_group": {
+    "headway": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 144,
+       "mean_p": 0.0348,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 36,
+       "mean_p": 0.1139,
+       "observed": 0.0278
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 5,
+       "mean_p": 0.21,
+       "observed": 0.2
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 8,
+       "mean_p": 0.3125,
+       "observed": 0.25
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 3,
+       "mean_p": 0.4167,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 4,
+       "mean_p": 0.525,
+       "observed": 0.25
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 12,
+       "mean_p": 0.6092,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 11,
+       "mean_p": 0.7209,
+       "observed": 0.6364
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 39,
+       "mean_p": 0.8415,
+       "observed": 0.9744
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 138,
+       "mean_p": 0.9421,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.0745,
+     "brier": 0.0304,
+     "accuracy_at_0_5": 0.975
+    },
+    "lane_change_gap": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 197,
+       "mean_p": 0.0199,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 3,
+       "mean_p": 0.1,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 2,
+       "mean_p": 0.81,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 198,
+       "mean_p": 0.9522,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.0352,
+     "brier": 0.0018,
+     "accuracy_at_0_5": 1.0
+    },
+    "lane_change_rate": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 200,
+       "mean_p": 0.021,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 2,
+       "mean_p": 0.85,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 198,
+       "mean_p": 0.9389,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.0414,
+     "brier": 0.0025,
+     "accuracy_at_0_5": 1.0
+    },
+    "left_lane_passing": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 191,
+       "mean_p": 0.0231,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 9,
+       "mean_p": 0.1078,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 1,
+       "mean_p": 0.2,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 7,
+       "mean_p": 0.3214,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 6,
+       "mean_p": 0.4167,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 2,
+       "mean_p": 0.55,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 17,
+       "mean_p": 0.6165,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 7,
+       "mean_p": 0.7171,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 134,
+       "mean_p": 0.8351,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 26,
+       "mean_p": 0.9046,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.121,
+     "brier": 0.0339,
+     "accuracy_at_0_5": 0.965
+    },
+    "speed_limit": {
+     "n": 400,
+     "positives": 200,
+     "bins": [
+      {
+       "lo": 0.0,
+       "hi": 0.1,
+       "count": 172,
+       "mean_p": 0.0256,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.1,
+       "hi": 0.2,
+       "count": 27,
+       "mean_p": 0.113,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.2,
+       "hi": 0.3,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.3,
+       "hi": 0.4,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.4,
+       "hi": 0.5,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.5,
+       "hi": 0.6,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.6,
+       "hi": 0.7,
+       "count": 1,
+       "mean_p": 0.6,
+       "observed": 0.0
+      },
+      {
+       "lo": 0.7,
+       "hi": 0.8,
+       "count": 0,
+       "mean_p": null,
+       "observed": null
+      },
+      {
+       "lo": 0.8,
+       "hi": 0.9,
+       "count": 5,
+       "mean_p": 0.858,
+       "observed": 1.0
+      },
+      {
+       "lo": 0.9,
+       "hi": 1.0,
+       "count": 195,
+       "mean_p": 0.9452,
+       "observed": 1.0
+      }
+     ],
+     "ece": 0.0486,
+     "brier": 0.0042,
+     "accuracy_at_0_5": 0.9975
+    }
+   },
+   "answered": 2000,
+   "failed": 0,
+   "live": 2000,
+   "cached": 0,
+   "latency_ms_p50": 1156.6,
+   "latency_ms_p95": 2540.5,
+   "input_tokens": 1853571,
+   "output_tokens": 47865,
+   "cost_usd": 4.1858
+  }
+ }
+}

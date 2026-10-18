@@ -24,7 +24,12 @@ def policy() -> Policy:
 
 
 def make_runner(
-    policy: Policy, tmp_path: Path, shield_on: bool, rules: bool = True, operator: str = "simulated"
+    policy: Policy,
+    tmp_path: Path,
+    shield_on: bool,
+    rules: bool = True,
+    operator: str = "simulated",
+    floor_s: float = 1.0,
 ) -> EpisodeRunner:
     store = ConstraintStore()
     if rules:
@@ -34,6 +39,7 @@ def make_runner(
         judge=JevClient(live=None, cache=JevCache(None)),
         store=store,
         thresholds=Thresholds(),
+        floor_s=floor_s,
         shield_on=shield_on,
         operator=OPERATORS[operator],
         operator_name=operator,
@@ -199,3 +205,49 @@ def test_passed_zone_retires_its_rule_during_the_episode(policy: Policy, tmp_pat
     records = read_log(tmp_path / "run.jsonl")
     assert records[0]["constraints"][0]["enabled"] is True
     assert records[-1]["constraints"][0]["enabled"] is False
+
+
+def _under(record: dict, floor_s: float) -> list[str]:
+    return [
+        c["action"]
+        for c in record["candidates"]
+        if (t := c["facts"]["lane_after_action"]["time_to_collision_ahead_s"]) is not None
+        and t < floor_s
+    ]
+
+
+def test_floor_removes_closing_candidates_from_everything_the_shield_can_run(
+    policy: Policy, tmp_path: Path
+) -> None:
+    floor_s = 30.0  # high enough that the mock episode floors something on seed 0
+    runner = make_runner(policy, tmp_path, shield_on=True, floor_s=floor_s)
+    summary = asyncio.run(runner.run(seed=0, max_steps=12))
+    runner.close()
+    records = read_log(tmp_path / "run.jsonl")
+    floored_steps = [r for r in records if r["floor"]["removed"]]
+    assert floored_steps, "seed 0 should bring the ego within 30 s of a vehicle ahead"
+    assert summary["floored"] == len(floored_steps)
+    for r in records:
+        assert r["floor"]["applied"] is True
+        assert r["floor"]["removed"] == _under(r, floor_s)
+        removed = set(r["floor"]["removed"])
+        if len(removed) == len(r["candidates"]):
+            assert r["executed"] == "SLOWER" and r["decision"] == "fallback"
+        else:
+            assert r["executed"] not in removed and r["fallback"]["action"] not in removed
+    # shield off: nothing filtered, but the record still says what would have gone
+    runner = make_runner(policy, tmp_path / "off", shield_on=False, floor_s=floor_s)
+    asyncio.run(runner.run(seed=0, max_steps=12))
+    runner.close()
+    off = read_log(tmp_path / "off" / "run.jsonl")
+    assert all(r["floor"]["applied"] is False for r in off)
+    assert all(r["floor"]["removed"] == _under(r, floor_s) for r in off)
+    assert all(r["executed"] == r["candidates"][0]["action"] for r in off)
+    # floor 0: off entirely
+    runner = make_runner(policy, tmp_path / "zero", shield_on=True, floor_s=0.0)
+    asyncio.run(runner.run(seed=0, max_steps=4))
+    runner.close()
+    assert all(
+        r["floor"] == {"applied": False, "removed": []}
+        for r in read_log(tmp_path / "zero" / "run.jsonl")
+    )

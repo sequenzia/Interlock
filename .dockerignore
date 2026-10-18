@@ -1,6 +1,6 @@
 # Build context for the backend image: the lock, the package, the promoted
-# checkpoint, the eval report and the warm Jev cache. Nothing else, and never
-# backend/.env.
+# checkpoint, the eval report, the warm Jev cache and the shield-off logs the
+# server replays as the unshielded twin. Nothing else, and never backend/.env.
 *
 !pyproject.toml
 !uv.lock
@@ -11,5 +11,7 @@ backend/.env
 backend/logs/*
 !backend/logs/.gitkeep
 !backend/logs/jev_cache.jsonl
+!backend/logs/runs/*_off.jsonl
+!backend/logs/eval/*_off/seed*.jsonl
 !models/dqn_highway.zip
 !internal/eval/latest.json

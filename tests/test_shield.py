@@ -5,7 +5,9 @@ from backend.shield import (
     Thresholds,
     decide,
     fallback_action,
+    floor_decision,
     resolve,
+    under_floor,
     violation_probability,
 )
 
@@ -119,3 +121,64 @@ def test_helpers() -> None:
     assert violation_probability({}) == (0.0, None)
     assert violation_probability({"a": 0.2, "b": 0.7}) == (0.7, "b")
     assert fallback_action(RANKED, grid(FASTER=0.9), TH) == Fallback("LANE_LEFT", "safe")
+
+
+def ttc(**by_action: float | None) -> dict[str, dict]:
+    """Facts stubs carrying only the time to collision the floor reads."""
+    return {
+        a: {"lane_after_action": {"time_to_collision_ahead_s": v}} for a, v in by_action.items()
+    }
+
+
+def test_under_floor_removes_closing_candidates_and_keeps_null_and_far_ones() -> None:
+    facts = ttc(FASTER=0.6, LANE_LEFT=None, IDLE=1.0, SLOWER=4.2, LANE_RIGHT=0.99)
+    assert under_floor(facts, 1.0) == ("FASTER", "LANE_RIGHT")  # strictly under, ranking order
+    assert under_floor(facts, 0.0) == ()
+    assert under_floor({"IDLE": {"lane_after_action": {}}}, 1.0) == ()
+
+
+def test_last_resort_respects_the_executable_set() -> None:
+    # SLOWER floored: the last resort falls through to IDLE
+    fb = fallback_action(
+        ["FASTER", "IDLE"], grid(FASTER=0.9, IDLE=0.9), TH, noop=frozenset({"IDLE"})
+    )
+    assert fb == Fallback("IDLE", "last_resort")
+    # both floored: the executable action with the lowest p, ties to rank
+    fb = fallback_action(["FASTER", "LANE_LEFT"], grid(FASTER=0.9, LANE_LEFT=0.9), TH)
+    assert fb == Fallback("FASTER", "last_resort")
+    fb = fallback_action(["FASTER", "LANE_LEFT"], grid(FASTER=0.9, LANE_LEFT=0.85), TH)
+    assert fb == Fallback("LANE_LEFT", "last_resort")
+    # nothing floored: unchanged behaviour, SLOWER unless it is itself a confident violation
+    everything = grid(FASTER=0.9, LANE_LEFT=0.9, IDLE=0.9, SLOWER=0.9, LANE_RIGHT=0.9)
+    assert fallback_action(RANKED, everything, TH) == Fallback("IDLE", "last_resort")
+    slower_ok = {**everything, "SLOWER": {"c1": 0.6}}  # a no-op SLOWER is not least bad
+    assert fallback_action(RANKED, slower_ok, TH, noop=frozenset({"SLOWER"})) == Fallback(
+        "SLOWER", "last_resort"
+    )
+
+
+def test_decide_on_the_executable_set_never_names_a_floored_action() -> None:
+    executable = ["LANE_LEFT", "IDLE"]  # FASTER, SLOWER and LANE_RIGHT are under the floor
+    d = decide(executable, grid(FASTER=0.0, LANE_LEFT=0.95, IDLE=0.05), TH)
+    assert (d.kind, d.proposed, d.executed, d.fallback) == ("fallback", "LANE_LEFT", "IDLE", "IDLE")
+    assert set(d.p_viol) == set(executable)
+    with pytest.raises(ValueError):
+        resolve(
+            decide(executable, grid(LANE_LEFT=0.5, IDLE=0.05), TH), Answer("override", "FASTER")
+        )
+
+
+def test_floor_decision_runs_slower_as_a_fallback() -> None:
+    d = floor_decision(RANKED, grid(FASTER=0.9, SLOWER=0.95))
+    assert (d.kind, d.proposed, d.executed, d.fired_constraint) == (
+        "fallback",
+        "FASTER",
+        "SLOWER",
+        "c1",
+    )
+    assert (d.fallback, d.fallback_kind, d.all_blocked, d.reason) == (
+        "SLOWER",
+        "last_resort",
+        False,
+        None,
+    )

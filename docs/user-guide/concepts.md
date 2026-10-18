@@ -48,6 +48,16 @@ For the policy's top-ranked action the shield takes the highest p across the ena
 
 All five actions are judged in the same step, so falling back costs no extra round trip. The thresholds are live controls in the console and the evaluation sweeps them to show the tradeoff between violations and how often a person is asked. See [Shield algorithm](../developer-guide/backend/shield.md) for the exact rules.
 
+## Three layers: physics in code, rules in the model, judgment to the human
+
+Not everything belongs to the judge. A candidate that would close on the
+vehicle ahead in under two seconds is removed in code before any rule is
+consulted. That is the physics floor: it is arithmetic on a fact the
+extractor already computes, it never asks a model anything, and an operator
+cannot type it away. Rules in plain English are the model's layer, and the
+calls the judge is unsure about are the human's. The floor applies only with
+the shield on, so the shield-off baseline stays the raw agent.
+
 ## Why calibration matters
 
 A threshold at 0.8 is only meaningful if 0.8 means "wrong about one time in five". If the model said 0.8 for things that were violations half the time, the allow and block bands would be mislabeled and the escalation band would be in the wrong place. Interlock therefore measures calibration: it compares Jev's probabilities against ground truth over tens of thousands of labeled checks and draws a reliability diagram. The numbers are in [Evaluation and results](evaluation.md).

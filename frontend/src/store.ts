@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { StateCreator } from "zustand";
-import type { Constraint, Escalation, Hello, LogRecord, Metrics, SessionState, Zone } from "./types";
+import type { Constraint, Escalation, Hello, LogRecord, Metrics, SessionState, Twin, Zone } from "./types";
 
 // One store, four slices (plan: steps, constraints, queue, metrics) plus the
 // connection slice that holds hello and the session state.
@@ -24,6 +24,8 @@ interface ConnectionSlice {
 interface StepsSlice {
   steps: LogRecord[];
   selectedStep: number | null;
+  twin: Twin | null; // the shield-off run of the current seed, scrubbed with the live steps
+  setTwin: (twin: Twin | null) => void;
   pushStep: (record: LogRecord) => void;
   replaceSteps: (records: LogRecord[]) => void;
   resetSteps: () => void;
@@ -79,6 +81,8 @@ const createConnectionSlice: StateCreator<Store, [], [], ConnectionSlice> = (set
 const createStepsSlice: StateCreator<Store, [], [], StepsSlice> = (set) => ({
   steps: [],
   selectedStep: null,
+  twin: null,
+  setTwin: (twin) => set({ twin }),
   pushStep: (record) =>
     set((s) => {
       const steps = s.steps.length >= MAX_STEPS ? s.steps.slice(-MAX_STEPS + 1) : s.steps.slice();

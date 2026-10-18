@@ -134,6 +134,10 @@ Pure decision functions. See [Shield algorithm](../developer-guide/backend/shiel
 | `OperatorDecision` | `Literal["approve", "deny", "override"]` |
 | `Thresholds` | frozen dataclass: `t_allow: float = 0.3`, `t_block: float = 0.7`; validates in `__post_init__` |
 | `Fallback` | frozen dataclass: `action: str`, `kind: FallbackKind` |
+| `DEFAULT_FLOOR_S` | `1.0`, the time-to-collision floor |
+| `Floor` | frozen dataclass: `applied: bool`, `removed: tuple[str, ...]`; `to_dict()` |
+| `under_floor(candidates, floor_s)` | the candidates whose `time_to_collision_ahead_s` is under the floor, in order |
+| `floor_decision(ranked, p)` | the SLOWER `fallback` when every candidate is under the floor |
 | `Answer` | frozen dataclass: `decision: OperatorDecision`, `action: str \| None = None` |
 | `Decision` | frozen dataclass: `kind`, `proposed: str`, `executed: str`, `fired_constraint: str \| None`, `p_proposed: float`, `p_viol: dict[str, float]`, `fallback: str`, `fallback_kind: FallbackKind`, `reason: EscalationReason \| None = None`, `all_blocked: bool = False` |
 | `violation_probability` | `(p_for_action: dict[str, float]) -> tuple[float, str \| None]` |
@@ -224,6 +228,18 @@ FastAPI WebSocket server. See [Server and session](../developer-guide/backend/se
 | `create_app` | `(session: Session \| None = None, *, console_origins: list[str] \| None = None) -> FastAPI` |
 | `app` | `create_app()` |
 
+### `backend/twin.py`
+
+The unshielded twin. See [WebSocket protocol](../developer-guide/contracts/websocket-protocol.md).
+
+| Name | Signature or value |
+| --- | --- |
+| `RUNS_DIR`, `EVAL_DIR` | `backend/logs/runs/`, `backend/logs/eval/` |
+| `find_twin_log` | `(seed: int, runs_dir: Path \| None = None, eval_dir: Path \| None = None) -> Path \| None`: the newest eval off run's `seedN.jsonl`, else the newest `*_seedN_off.jsonl` |
+| `twin_steps` | `(records) -> list[dict]`: `step`, `ego`, `vehicles`, `executed`, `violations`, `violations_so_far`, `crashed` per record |
+| `twin_message` | `(seed: int, path: Path \| None) -> dict`: the `twin` message; empty for no log, a shielded log or another seed |
+| `empty_twin` | `(seed: int) -> dict` |
+
 ### `backend/metrics.py`
 
 Pure functions over records. See [Evaluation internals](../developer-guide/backend/evaluation.md).
@@ -282,6 +298,27 @@ Hand labels for rules without a checker. See [Command line](../user-guide/cli.md
 | `render` | `(item: Item, index: int, total: int, show_p: bool) -> str` |
 | `label_session` | `(items, ask: Callable[[str], str], out_path: Path, *, show_p: bool = False, labeler: str = "human") -> int` |
 | `add_arguments`, `run_cli`, `main` | the module CLI |
+
+### `backend/baseline_llm.py`
+
+Chat-LLM baseline for the judge, offline for Jev. Behind `interlock baseline`. See [Chat-LLM baseline](../user-guide/evaluation.md#chat-llm-baseline).
+
+| Name | Signature or value |
+| --- | --- |
+| `DEFAULT_MODELS` | `("claude-haiku-5-5", "claude-sonnet-5-5")` |
+| `BASELINE_PATH`, `CACHE_PATH` | `internal/eval/baseline.json`, `backend/logs/baseline_cache.jsonl` |
+| `FORMAT`, `SYSTEM`, `MAX_TOKENS` | the structured output schema (one `probability` field), the system prompt, and the reply cap that the model's thinking also counts against |
+| `Item` | frozen dataclass: `key`, `group`, `rule_text`, `action`, `facts`, `label`, `jev_p` |
+| `Reply` | frozen dataclass: `p: float \| None`, `latency_ms`, `input_tokens`, `output_tokens`, `source` (`live`, `cache`, `failed`) |
+| `collect_items` | `(records, labels) -> list[Item]`: one per distinct state and rule, labeled by checker or by hand |
+| `stratified_sample` | `(items, n, rng) -> list[Item]`: even quota per (rule, label), topped up |
+| `build_messages` | `(item) -> (system, user)`: the judge's own question text plus the facts JSON |
+| `BaselineCache` | append-only JSONL keyed by model and item key |
+| `parse_probability` | `(stop_reason, texts) -> float \| None`: the clamped number from a reply that ended on its own, else `None` |
+| `AnthropicChat` | `ask(model, item) -> Reply` through `AsyncAnthropic` with `output_config.format`; a failed call, a cut-off reply or a refusal returns `p=None` |
+| `run_models` | `(items, models, ask, concurrency) -> dict[str, list[Reply]]` |
+| `judge_summary`, `summarize` | reliability overall and per rule, latency, tokens and cost per judge; Jev scored from the logged `p` |
+| `load_items`, `print_summary`, `add_arguments`, `run_cli`, `main` | CLI plumbing; `--dry-run` sends nothing |
 
 ### `backend/cli.py`
 
@@ -368,7 +405,8 @@ One Zustand store. See [Store and selectors](../developer-guide/frontend/store.m
 | `main.tsx` | Mounts `App` under `StrictMode` |
 | `app.tsx` | `App()`: layout, socket lifetime, keyboard shortcuts, error toast |
 | `components/status-strip.tsx` | `StatusStrip()` |
-| `components/road-view.tsx` | `RoadView()` |
+| `components/road-view.tsx` | `RoadView()`, plus `drawCar`, `drawArrow`, `arrowFor`, `lerp` and the scale constants |
+| `components/twin-strip.tsx` | `TwinStrip()` |
 | `components/constraint-panel.tsx` | `ConstraintPanel()` |
 | `components/approval-queue.tsx` | `ApprovalQueue()` |
 | `components/decision-strip.tsx` | `DecisionStrip()` |

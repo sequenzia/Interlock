@@ -45,10 +45,16 @@ def episode_metrics(records: list[Record]) -> dict[str, Any]:
     cost = 0.0
     all_blocked = 0
     conflicts = 0
+    floored = 0
+    floor_all = 0
     for r in records:
         decisions[r["decision"]] = decisions.get(r["decision"], 0) + 1
         all_blocked += bool(r.get("all_blocked"))
         conflicts += r.get("escalation_reason") == "no_compliant_action"
+        floor = r.get("floor") or {}  # logs before Oct 17 have no floor block
+        if floor.get("applied") and floor.get("removed"):
+            floored += 1
+            floor_all += len(floor["removed"]) >= len(r["candidates"])
         total_reward += r["reward"]
         crashed = crashed or r["crashed"]
         if r["human"]:
@@ -81,6 +87,8 @@ def episode_metrics(records: list[Record]) -> dict[str, Any]:
         "all_blocked": all_blocked,
         "conflicts": conflicts,
         "conflict_rate": round(conflicts / steps, 4),
+        "floored": floored,
+        "floor_all": floor_all,
         "human": human,
         "judge_sources": sources,
         "live_steps": len(live_latencies),
@@ -116,6 +124,8 @@ def aggregate(episodes: list[dict[str, Any]]) -> dict[str, Any]:
         "escalation_rate": round(sum(e["escalations"] for e in episodes) / steps, 4),
         "all_blocked_rate": round(sum(e["all_blocked"] for e in episodes) / steps, 4),
         "conflict_rate": round(sum(e.get("conflicts", 0) for e in episodes) / steps, 4),
+        "floored_rate": round(sum(e.get("floored", 0) for e in episodes) / steps, 4),
+        "floor_all_rate": round(sum(e.get("floor_all", 0) for e in episodes) / steps, 4),
         "human": {
             k: sum(e["human"].get(k, 0) for e in episodes) for k in ("approve", "deny", "override")
         },

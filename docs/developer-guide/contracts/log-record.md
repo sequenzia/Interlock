@@ -68,6 +68,7 @@ denied, and `IDLE` ran.
   "all_blocked": false,
   "escalation_reason": "uncertain",
   "fallback": {"action": "IDLE", "kind": "safe"},
+  "floor": {"applied": true, "removed": []},
   "judge": {
     "model": "jev-1.13.0",
     "source": "live",
@@ -169,6 +170,7 @@ candidate's `checks`.
 | `human` | `{decision, action, latency_ms, operator}` or null | The answer (`approve`, `deny` or `override`), the action named by an override (null otherwise), how long it took, and who answered: `ui`, `simulated`, `approve` or `deny`. A timeout in the console records `deny` with the full timeout as latency. |
 | `all_blocked` | bool | The executed action came from the `SLOWER` / `IDLE` last resort through a denied or timed-out escalation. |
 | `fallback` | `{action, kind}` | What deny would run, or did run, and how it was found: `safe`, `least_bad` or `last_resort`. Present on every step, including allowed and shadow-mode ones. |
+| `floor` | `{applied, removed}` | The physics floor (Oct 17). `removed` lists the candidates whose time to collision ahead after the action was under the floor, in rank order; `applied` says whether they were actually taken out of the executable set, which is true with the shield on and a floor above 0. Absent in logs written before Oct 17. |
 
 ### The judge
 
@@ -205,6 +207,9 @@ exchange.asked}}`, which is exactly what the inspector's raw tab rebuilds.
   `executed == fallback.action`, while `decision` stays `escalate`.
 - `human.decision == "override"` implies `human.action` is one of the
   candidates and equals `executed`.
+- `floor.applied` implies `executed` is not in `floor.removed`, unless
+  `floor.removed` lists every candidate, in which case `executed ==
+  "SLOWER"` and `decision == "fallback"`.
 - `judge.exchanges` is empty when every answer came from the cache.
 - `shield_on == false` implies `decision == "allow"` and `executed ==
   candidates[0].action`.
@@ -217,7 +222,7 @@ exchange.asked}}`, which is exactly what the inspector's raw tab rebuilds.
 | Decision strip and status strip | `decision`, `executed`, `escalated`, `human`, `judge.source`, `judge.latency_ms` |
 | Inspector | everything, including `judge.questions` and `judge.exchanges` |
 | `server.replay_metrics` | `decision`, `escalation_reason`, `reward`, `crashed`, `human`, the executed candidate's `checks`, `judge.cost_usd` |
-| `metrics.episode_metrics` | the above plus `all_blocked`, `judge.source`, `judge.latency_ms`, `judge.input_tokens`, `thresholds` |
+| `metrics.episode_metrics` | the above plus `all_blocked`, `floor`, `judge.source`, `judge.latency_ms`, `judge.input_tokens`, `thresholds` |
 | `metrics.collect_checks` | every candidate's `checks` with a non-null `ground_truth`, joined to `constraints[].checker` |
 
 ## Files

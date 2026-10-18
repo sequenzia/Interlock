@@ -70,6 +70,10 @@ Two sliders at the bottom set the allow and block thresholds, 0 to 1 in steps of
 
 Narrow the band (for example 0.4 and 0.6) and the shield asks less and decides more. Widen it (0.1 and 0.9) and nearly everything uncertain comes to you. The measured tradeoff is on [Evaluation and results](../evaluation.md).
 
+## The physics floor
+
+The line under the sliders states the physics floor, 2 seconds by default. A candidate that would close on the vehicle ahead in under that time is removed before the rules are judged, so it never runs and never appears in the approval queue; the inspector fades such rows and tags them `floor`. There is no control for it on purpose: it is set when the backend starts (`interlock console --floor-s 0` turns it off) and no rule you type can override it.
+
 ## What persists
 
 Rules, zones and thresholds belong to the session, not the episode. "reset" starts a new episode but keeps the rule list and any zone the ego had not yet passed. Zones are in absolute road coordinates, so a zone that was still ahead when you reset is ahead again on the new episode. A server restart clears everything.

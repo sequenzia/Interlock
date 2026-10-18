@@ -9,8 +9,11 @@ Read from the process environment, with `backend/.env` loaded first by the serve
 | Variable | Default | Read by | Effect |
 | --- | --- | --- | --- |
 | `TYPESAFE_API_KEY` | unset | `typesafe_sdk` inside `LiveJudge`; presence checked by `session_from_env`, `run_episode`, `evaluate`, `jev_spike` | Authenticates live Jev calls. Unset with `JEV_MODE=auto` selects mock mode. Never committed, never logged |
+| `ANTHROPIC_API_KEY` | unset | the `anthropic` SDK inside `baseline_llm.AnthropicChat` | Only `interlock baseline` needs it; `--dry-run` does not. Never committed, never logged |
+| `ANTHROPIC_WORKSPACE_ID` | unset | `baseline_llm.AnthropicChat`, as the `anthropic-workspace-id` header | Required when the key is not scoped to a workspace; the API rejects every request without it |
 | `JEV_MODE` | `auto` | `backend/server.py` `session_from_env`; `--jev` flags default to `auto` too | `live`, `mock`, or `auto` (live when the key is present) |
 | `ESCALATION_TIMEOUT_S` | `20` | `session_from_env` | Seconds before an unanswered escalation is denied. `0` means wait for the operator indefinitely |
+| `FLOOR_S` | `2.0` | `session_from_env` | Time-to-collision floor in seconds: a candidate closing on the vehicle ahead in under this never runs. `0` disables it. Not changeable from the console |
 | `SEED` | `0` | `session_from_env` | Seed of the server's first episode |
 | `MODEL_PATH` | `models/dqn_highway.zip` | `session_from_env` | DQN checkpoint the server loads |
 | `JEV_CACHE_PATH` | `backend/logs/jev_cache.jsonl` | `session_from_env` | Content cache the judge reads at start and appends to. An empty file makes every step escalate in mock mode |
@@ -94,6 +97,7 @@ One of `--mode`, `--sweep`, `--all` or `--report` is required.
 | `--jev auto|live|mock` | inherit | Sets `JEV_MODE` |
 | `--seed N` | inherit | Sets `SEED` |
 | `--escalation-timeout S` | inherit | Sets `ESCALATION_TIMEOUT_S` |
+| `--floor-s S` | inherit | Sets `FLOOR_S` |
 | `--model-path PATH` | inherit | Sets `MODEL_PATH` |
 | `--cache PATH` | inherit | Sets `JEV_CACHE_PATH` |
 
@@ -106,6 +110,7 @@ One of `--mode`, `--sweep`, `--all` or `--report` is required.
 | `Thresholds()` | `t_allow 0.3`, `t_block 0.7` | `backend/shield.py` | Defaults; validated `0 <= t_allow <= t_block <= 1` |
 | `DEFAULT_STEPS_PER_SEC` | `2.0` | `backend/server.py` | Play speed; `set_speed` clamps to 0.1 to 10 |
 | `DEFAULT_ESCALATION_TIMEOUT_S` | `20.0` | `backend/server.py` | |
+| `DEFAULT_FLOOR_S` | `2.0` | `backend/shield.py` | The physics floor; `run`, `eval` and `console` take `--floor-s` |
 | `DEFAULT_MODEL` | `jev-1.13.0` | `backend/jev_client.py` | Pinned Jev model |
 | `USD_PER_INPUT_TOKEN` | `0.042 / 1_000_000` | `backend/jev_client.py` | Cost accounting; output tokens are free |
 | `UNAVAILABLE_P` | `0.5` | `backend/jev_client.py` | Placeholder when the judge cannot answer |
@@ -130,7 +135,8 @@ One of `--mode`, `--sweep`, `--all` or `--report` is required.
 
 | Path | Role | Git |
 | --- | --- | --- |
-| `backend/.env` | `TYPESAFE_API_KEY` and optional `CONSOLE_ORIGINS`; copy from `backend/.env.example` | ignored |
+| `backend/.env` | `TYPESAFE_API_KEY`, optional `ANTHROPIC_API_KEY` and `CONSOLE_ORIGINS`; copy from `backend/.env.example` | ignored |
+| `backend/prices.json` | Per-model USD per million tokens for `interlock baseline`; copy from `backend/prices.example.json` | ignored |
 | `models/dqn_highway.zip` | The promoted checkpoint `Policy.load` opens by default | ignored |
 | `models/dqn_highway_<N>k.zip`, `*.eval.json` | Training outputs | ignored |
 | `backend/logs/runs/<run_id>.jsonl` | One file per headless or console episode; the replay picker lists these | ignored |

@@ -10,6 +10,7 @@ The console is a dark, dense operator view. It opens at <http://127.0.0.1:5173> 
 | --- | --- | --- |
 | Status strip | top | connection, mode, transport controls, shield toggle, replay picker, live stats |
 | Road view | left, largest | ego-centered Canvas drawing of the road, vehicles, zones and the executed action |
+| Unshielded twin | left, under the road view | the same seed with the shield off, faded, at the same step; hidden when no shield-off log exists for the seed |
 | Inspector | left, under the road view | appears when a tick in the decisions strip is selected; see [Timeline and inspector](timeline-and-inspector.md) |
 | Decisions | left, bottom | one tick per step, colored by outcome; click to inspect |
 | Approval queue | right, top | the open escalation, or counts of answered ones; see [Approval queue](approval-queue.md) |
@@ -49,6 +50,10 @@ Left to right:
 ## Road view
 
 The road runs left to right with lane 1, the leftmost lane, at the top. The view is 240 m wide and the ego vehicle (cyan, with a glow) sits 70 m from the left edge, so about 170 m of road ahead is visible. Other vehicles are grey. Positions are interpolated between steps so playback is smooth at any speed. A closed zone is hatched in amber with its name and lane. Above the road a status line repeats the step, lane, position and decision. See [Running an episode](running-an-episode.md) for the arrows.
+
+## Unshielded twin
+
+A short, faded second road under the main one shows what the policy does on the same seed with the shield off: its own ego, traffic and executed action at the step the main view is showing. Playback and scrubbing share the index, so stepping the live run steps the twin. The title line keeps a running count of the twin's rule violations and names the step at which it crashed, if it did; once the live run is past that step the twin stays on its last frame marked `CRASHED`. The strip appears only when the server has a shield-off log for the seed: the evaluation's off run covers seeds 0 to 19, and `interlock run --shield off --seed N` warms another.
 
 ## Decisions strip
 

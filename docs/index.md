@@ -83,9 +83,9 @@ flowchart LR
 ```
 
 Each step, the policy ranks its five actions, code turns the simulator state
-into structured facts per candidate, Jev answers one question per (action,
-rule) pair, and two thresholds split the result into allow, fallback or
-escalate. One JSONL record per step holds everything that happened, and the
+into structured facts per candidate and drops any candidate under the
+time-to-collision floor, Jev answers one question per (action, rule) pair,
+and two thresholds split the result into allow, fallback or escalate. One JSONL record per step holds everything that happened, and the
 console, the replay and the evaluation all read that one record format. The
 [architecture page](developer-guide/architecture.md) walks through it in detail.
 
@@ -98,11 +98,17 @@ Oct 17.
 | Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
 | --- | --- | --- | --- | --- |
 | Shield off | 105.45 | 50.7 | 40% | 0% |
-| Shield on, thresholds 0.2 / 0.8 | 2.30 | 44.1 | 5% | 46.8% |
-| Shield on, thresholds 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.1% |
+| Shield on, thresholds 0.2 / 0.8 | 3.45 | 45.7 | 0% | 48.2% |
+| Shield on, thresholds 0.3 / 0.7 (default) | 3.55 | 46.0 | 0% | 16.5% |
+
+Put the same questions to chat models and Claude Sonnet 5.5 is better
+calibrated than Jev on a balanced sample, yet at the default band it would
+have allowed 3 violations and blocked 5 compliant actions where Jev allowed
+and blocked none, at about a second per check against 158 ms per step.
 
 The [evaluation page](user-guide/evaluation.md) has the full sweep, the per-rule
-breakdown, the calibration numbers and the reading of them.
+breakdown, the calibration numbers, the chat-model baseline and the reading of
+them.
 
 ## Where things live
 

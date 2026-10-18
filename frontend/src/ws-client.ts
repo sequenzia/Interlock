@@ -33,6 +33,9 @@ function apply(msg: ServerMessage): void {
     case "metrics":
       s.setMetrics(msg);
       break;
+    case "twin":
+      s.setTwin(msg);
+      break;
     case "error":
       s.pushError(msg.message);
       break;

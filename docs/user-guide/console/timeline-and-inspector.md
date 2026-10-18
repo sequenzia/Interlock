@@ -41,7 +41,7 @@ Five rows, one per action, in the policy's ranking:
 | Column | Meaning |
 | --- | --- |
 | # | rank by Q-value, 1 is the policy's choice |
-| candidate | action name; `RAN` marks the executed action, `BLOCKED` marks a rank 1 action that did not run |
+| candidate | action name; `RAN` marks the executed action, `BLOCKED` marks a rank 1 action that did not run, `FLOOR` with a faded row marks a candidate the physics floor removed before the rules were judged |
 | Q | the Q-value with a bar scaled between the step's minimum and maximum |
 | one column per enabled rule | p(violation) for that action against that rule |
 

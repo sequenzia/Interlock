@@ -152,8 +152,11 @@ shielded/
 3. `jev_client.check(candidates, constraints)` returns `p[action][constraint]`
    plus latency, token usage, model version and a `source` of `live`, `cache`
    or `unavailable`.
-4. `shield.decide(ranked, p, thresholds)` returns one of `allow`, `fallback`,
-   `escalate`, `all_blocked` with the chosen action and the firing constraint.
+4. The physics floor (Oct 17, section 16.4) drops every candidate whose time
+   to collision ahead after the action is under `FLOOR_S` from the executable
+   set; `shield.decide(executable, p, thresholds)` returns one of `allow`,
+   `fallback`, `escalate` with the chosen action and the firing constraint.
+   If the floor leaves nothing, SLOWER runs.
 5. On `escalate`, the loop pauses until the operator resolves or the timeout
    fires (default deny; 20 s live, 0 s in eval with the simulated operator).
 6. `env.step(executed)`; `checkers.label(state_before, candidates)` labels
@@ -190,6 +193,17 @@ last resort. The decision kind `all_blocked` is no longer produced; the
 `all_blocked` flag still marks an executed last resort after a deny or a
 timeout. The fallback's kind is recorded so the log says whether deny would
 have run a safe action, the least-bad one or the last resort.
+
+Physics floor (Oct 17, section 16.4): before the rules above, every
+candidate whose `lane_after_action.time_to_collision_ahead_s` is under
+`FLOOR_S` (default 2.0 s; 0 disables) leaves the executable set, so it is
+never the proposal, a fallback, the last resort or an override target. The
+last resort falls through SLOWER, then IDLE, then the executable action with
+the lowest p. If the floor removes every candidate, SLOWER runs with decision
+kind `fallback` and the record's `floor.removed` naming all five. The floor
+applies only with the shield on; in shadow mode the record still lists what
+it would have removed, with `applied: false`. Operators cannot type it away:
+it is set at launch, not from the console.
 
 Shield off still runs facts, Jev and checkers in shadow and executes `top`
 unconditionally. Shadow mode means the before/after comparison and the
@@ -403,6 +417,7 @@ One line per step. This is the contract between backend, UI and eval.
   "decision": "fallback", "executed": "IDLE", "fired_constraint": "c1",
   "escalated": false, "human": null, "all_blocked": false,
   "escalation_reason": null, "fallback": {"action": "IDLE", "kind": "safe"},
+  "floor": {"applied": true, "removed": ["FASTER"]},
   "judge": {"model": "jev-1.13.0", "source": "live", "latency_ms": 140,
             "input_tokens": 1210, "cost_usd": 0.0000508,
             "questions": {"c1": {"type": "noul", "instructions": "...", "criteria": {"true": "...", "false": "..."}}},
@@ -666,6 +681,108 @@ Reading:
 - Latency and cost in this run are not cold-cache figures. Quote the first
   run's 158 ms and $0.0051 for a cold step and say so.
 
+### Results, Oct 17, third run (physics floor)
+
+Same 20 seeds, 60 steps and seven rules, with the physics floor (section
+16.4) at 2.0 s, the default after the sensitivity below. Run directories are
+stamped 2026-10-18T03 to T04 UTC. Nearly every state had been judged in the
+earlier sweeps, so the five pairs cost two cents together; the report pools
+the calibration over the off run and the five default-floor runs only.
+
+| Configuration | Violations per episode | Return | Crash rate | Escalated | Conflicts | Overrides | Floored |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.1 / 0.9 | 3.55 | 46.0 | 0% | 89.3% | 63.7% | 627 | 12.9% |
+| 0.2 / 0.8 | 3.45 | 45.7 | 0% | 48.2% | 6.2% | 46 | 10.8% |
+| 0.3 / 0.7 (default) | 3.55 | 46.0 | 0% | 16.5% | 6.2% | 44 | 11.6% |
+| 0.4 / 0.6 | 3.55 | 45.8 | 0% | 11.6% | 6.0% | 42 | 11.7% |
+| 0.5 / 0.5 | 3.55 | 43.6 | 5% | 6.5% | 5.9% | 40 | 11.0% |
+| Shield off | 105.45 | 50.7 | 40% | 0.0% | 0.0% | 0 | 0% |
+
+By rule at the default, off to on: speed limit 1030 to 0, gap 124 to 1,
+passing 8 to 0, headway 647 to 65 (43 before the floor), lane-change rate
+300 to 5. Calibration over 174,625 checks: ECE 0.095, Brier 0.024, accuracy
+at 0.5 98.7%; per rule speed 0.056, gap 0.064, rate 0.084, headway 0.110,
+passing 0.174. Latency and cost: quote the first run's cold figures.
+
+Floor sensitivity, crash rate by pair and floor (off / 1 s / 2 s / 3 s):
+0.1 / 0.9: 5 / 5 / 0; 0.2 / 0.8: 5 / 5 / 0; 0.3 / 0.7: 5 / 5 / 0 / 0;
+0.4 / 0.6: 5 / 5 / 0; 0.5 / 0.5: 10 / 10 / 5 / 10. Violations per episode
+at the default pair: 2.40 / 2.40 / 3.55 / 2.75; steps floored 0 / 6.0% /
+11.6% / 15.0%. The full table is on the evaluation page and in
+`latest.json` under `floor.rows`.
+
+Reading:
+
+- A 1 s floor is a no-op by construction. A step is one second, so it
+  fires on the last step, when only SLOWER is left and it cannot shed
+  enough speed. It removed a candidate on 6% of steps and never one that
+  would have run: every number matched the no-floor run and every answer
+  came from the cache.
+- The one shielded crash (seed 2) was a rear-end the rules approved into:
+  gap ahead 14, 10, 6, 1 m over four steps, IDLE run twice at 2.3 s and
+  1.3 s to collision as the fewest-violation override in a conflict. At
+  2 s the floor removes IDLE one step earlier and the crash is gone at
+  every pair. Default moved to 2.0 s.
+- The crash left at 0.5 / 0.5 (seed 15) is a lane change into a vehicle
+  alongside: 0 m behind in the target lane, 22 s to collision ahead. A
+  floor that reads time to collision ahead cannot see it; the gap rule
+  can, and at 0.5 / 0.5 Jev's probability for it landed under the single
+  cut. 3 s floors 15% of steps, helps nothing further, and at 0.5 / 0.5
+  seed 2 crashes again by a different path.
+- Cost of the floor: headway violations 43 to 65 at the default, since the
+  car follows slow traffic instead of changing lanes into closing gaps;
+  escalation 14.1% to 16.5%. Return rises 44.4 to 46.0 because no episode
+  ends early. Talk framing holds: physics in code, rules in the model,
+  judgment to the human, and the floor is the one layer the operator
+  cannot type away.
+
+### Chat-LLM baseline, Oct 18
+
+`interlock baseline` on 2,000 of the 97,905 distinct labeled checks, 200
+violations and 200 compliant per scored rule, sampled with seed 0 from the
+Oct 17 runs. Each chat model got the judge's own question text and facts
+JSON, one check per call, as a structured JSON number, thinking at the
+model's default. Jev's answers come from the logs. No call failed. Block in
+`latest.json` under `baseline`, plot `baseline.png`, panel on the metrics tab.
+
+| Judge | ECE | Brier | Acc at 0.5 | Allowed violations | Blocked compliant | Escalated at 0.3 / 0.7 | Latency | Cost |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Jev, from the logs | 0.139 | 0.046 | 97.9% | 0 | 0 | 412 (20.6%) | 158 ms per step of 35 checks | $0.0051 per episode |
+| Haiku 5.5 | 0.080 | 0.029 | 96.8% | 24 | 2 | 86 (4.3%) | 1,122 / 2,672 ms per check | $0.31 per 2,000 checks |
+| Sonnet 5.5 | 0.060 | 0.015 | 98.8% | 3 | 5 | 63 (3.1%) | 1,157 / 2,541 ms per check | $4.19 per 2,000 checks |
+
+Per rule ECE, Jev / Haiku / Sonnet: speed 0.072 / 0.055 / 0.049, gap
+0.153 / 0.063 / 0.035, rate 0.148 / 0.056 / 0.041, headway 0.116 / 0.086 /
+0.074, passing 0.253 / 0.173 / 0.121. Allowed violations by rule, Haiku:
+passing 16, gap 6, headway 1, speed 1; Sonnet: headway 2, passing 1. In the
+band by rule, Jev: passing 236, gap 78, rate 66, headway 32, speed 0.
+Tokens per check: 927 in; Haiku 124 out, mostly thinking; Sonnet 24 out.
+
+Reading:
+
+- Both chat models are better calibrated than Jev on this sample and
+  Sonnet is more accurate. The sample is half violations, and violations
+  are where Jev is underconfident: p 0.56 to 0.64 is a violation 91% to
+  99% of the time. The pooled calibration, mostly compliant checks, gives
+  Jev 0.095.
+- For a shield the band is the mechanism, and it turns Jev's error into a
+  question: zero violations allowed and zero compliant actions blocked,
+  with 20.6% of checks escalated. The chat models' errors land outside the
+  band: Haiku would have allowed 24 violations, Sonnet 3, and both would
+  have blocked a few compliant actions, while asking on 3% to 4% of
+  checks. Calibration alone is the wrong headline for the talk; show the
+  band table next to the reliability diagram.
+- Latency and cost are where the decision model earns its place: 1.1 s at
+  the median per check, 2.5 s at p95, against 158 ms for a full step of 35
+  checks, and a 60-step episode at one call per check would cost about
+  $0.33 with Haiku and $4.40 with Sonnet against $0.0051.
+- Caveats. One sample of 2,000 at one seed. The chat models answered one
+  check per call where Jev answers seven per request, so a chat shield
+  built Jev's way would share the facts across rules and cost less per
+  check than measured here. Thinking was left at the model default, so
+  Haiku thought and Sonnet mostly did not. The fuzzy rules are absent
+  until hand labels exist.
+
 ## 11. Day 1 Jev spike checklist
 
 Script: `backend/spike/jev_spike.py`. Results to
@@ -880,6 +997,21 @@ old all-blocked column; both were corrected on Oct 17.
 - Jev's answers for the same checks come from the logs, so Jev costs nothing.
 - Dependency: the `anthropic` SDK, approved Oct 17. Key as `ANTHROPIC_API_KEY`
   in `backend/.env`, gitignored, never logged.
+- Done Oct 17, code and docs: `backend/baseline_llm.py` behind `interlock
+  baseline`, one structured JSON number through `output_config.format`, the
+  judge's own question text and facts JSON, a reply cache, and prices from
+  the gitignored `backend/prices.json` (example file committed) so nothing
+  is hardcoded, `baseline.json` folded into `latest.json`
+  with `baseline.png` and a Metrics tab panel. The dry run samples 2,000 of
+  93,855 distinct labeled checks at 200 per rule and label. The live run
+  waits on `ANTHROPIC_API_KEY` in `backend/.env`; results go to section 10.
+- Oct 18: the first live run answered all 2,000 Haiku checks through a forced
+  `report_probability` tool call, then stopped on Sonnet's first request:
+  Claude Sonnet 5.5 rejects forced `tool_choice` with a 400. The number now
+  comes back as a structured JSON object, which every model accepts, and both
+  models were re-run under the same request shape so the comparison is like
+  for like. Thinking stays at each model's default, so latency and cost are
+  what a chat model costs as shipped.
 
 ### 16.4 Item C: physics floor in code
 
@@ -895,6 +1027,16 @@ old all-blocked column; both were corrected on Oct 17.
   calls to the human.
 - Eval: crash rate before and after, expected to fall at the aggressive
   threshold settings.
+- Done Oct 17, default moved from 1.0 s to 2.0 s the same night: at 1 s the
+  floor fired only on the last step and changed nothing, at 2 s it removed
+  the one shielded crash on 20 seeds; 3 s floors 15% of steps for no further
+  gain. Section 10 has the table. `shield.under_floor` reads the fact, `floor_decision` covers
+  the all-removed case, and the last resort respects the executable set.
+  `--floor-s` on run, eval and console (`FLOOR_S` for the server); the
+  state message carries `floor_s`. Eval labels gain `_nofloor` when the
+  floor is off and `newest_runs` treats runs without a `floor_s` field as
+  no-floor, so the Oct 18 sweep serves as the before; the report's `floor`
+  block pairs each threshold pair with and without. Results in section 10.
 
 ### 16.5 Item D: the unshielded twin
 
@@ -908,6 +1050,12 @@ old all-blocked column; both were corrected on Oct 17.
   twin record at the current step index and drawn faded, with a running count
   of twin violations and crashes. Playback and scrubbing share the index.
 - No Jev cost and no new server state beyond the loaded records.
+- Done Oct 17. `backend/twin.py` finds the newest shield-off log (eval off
+  run first, then `runs/`) and builds a compact per-step strip; the server
+  sends `twin` on connect, reset and replay load. `twin-strip.tsx` draws it
+  faded under the road view at the view step's index, clamped to the
+  twin's last step, with violations so far and the crash step in the
+  title. The image allowlists the off logs. Smoke test passes with it.
 
 ### 16.6 Phases and freeze
 
@@ -920,8 +1068,8 @@ and the first plan went from brief to deployed in one night.
 | 1 | A1 metrics fix, A2 conflict policy and queue protocol | Report regenerated from the existing logs; a no-compliant-action escalation resolves from the console with a chosen action. Done Oct 17. |
 | 2 | A3 facts, spike re-run | New fields on every candidate; preset rules within 0.1 of the Oct 16 spike. Done Oct 17. |
 | 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot. Rules, command and eval done Oct 17; labels are the operator's work and pending. |
-| 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor |
-| 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed |
+| 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor. Floor done Oct 17 with the table in section 10 and the default at 2 s. Baseline code, plot and panel done Oct 17; live run done Oct 18 after the structured-output fix, numbers and reading in section 10. |
+| 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed. Done Oct 17. |
 | 6 | Freeze: docs sweep, section 10 and README corrected, backup video, rehearsal | `mkdocs build --strict` passes; video recorded; no code changes after this point |
 
 Human-paced work: collecting labels in phase 3 and the video and rehearsal in

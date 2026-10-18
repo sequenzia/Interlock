@@ -4,13 +4,13 @@ import { selectViewPrevStep, selectViewStep, useStore } from "../store";
 import type { ActionName, LogRecord, Zone } from "../types";
 
 // Ego-centered view. The road runs left to right; lane 1 (leftmost) is at the top.
-const VIEW_M = 240;
-const EGO_OFFSET_M = 70;
+export const VIEW_M = 240;
+export const EGO_OFFSET_M = 70;
 const MIN_LANE_H = 44;
 const MAX_LANE_H = 84;
-const LANE_WIDTH_M = 4;
-const CAR_L_M = 5;
-const CAR_W_M = 2.2;
+export const LANE_WIDTH_M = 4;
+export const CAR_L_M = 5;
+export const CAR_W_M = 2.2;
 
 interface Frame {
   prev: LogRecord | null;
@@ -19,7 +19,7 @@ interface Frame {
   intervalMs: number;
 }
 
-function arrowFor(action: ActionName, laneH: number): [number, number] {
+export function arrowFor(action: ActionName, laneH: number): [number, number] {
   switch (action) {
     case "LANE_LEFT":
       return [0, -laneH * 0.85];
@@ -58,9 +58,9 @@ function hatchPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   return hatch;
 }
 
-const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-function drawArrow(
+export function drawArrow(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -95,7 +95,7 @@ function drawArrow(
   ctx.restore();
 }
 
-function drawCar(
+export function drawCar(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,

@@ -15,6 +15,7 @@ EpisodeRunner(
     judge: JevClient,               # live, cached or mock
     store: ConstraintStore,         # rules and zones, shared with the caller
     thresholds: Thresholds | None,  # defaults to 0.3 / 0.7
+    floor_s: float = 2.0,           # time to collision floor; 0 disables
     shield_on: bool = True,
     operator: Operator | None,      # async callback for escalations, default simulated
     operator_name: str = "simulated",  # recorded in human.operator
@@ -61,9 +62,13 @@ async def step(self) -> StepResult:
    reach the decision; they go into the record and into the simulated
    operator's answer.
 6. **Decide.** `facts.noop_actions(candidates)` names the actions that would
-   change nothing, then `decide(names, check.p, thresholds, noop)` returns a
-   `Decision` of kind `allow`, `fallback` or `escalate`, with a reason on
-   escalations. See [Shield algorithm](shield.md).
+   change nothing and `shield.under_floor(candidates, floor_s)` the ones under
+   the time-to-collision floor. With the shield on, `decide(executable,
+   check.p, thresholds, noop)` runs on the ranking minus the floored actions
+   and returns a `Decision` of kind `allow`, `fallback` or `escalate`, with a
+   reason on escalations; if nothing is executable, `floor_decision` runs
+   SLOWER. With the shield off the floor is not applied and `decide` sees
+   every action. See [Shield algorithm](shield.md).
 7. **Apply the shield mode.**
     - Shield off: the decision is overwritten to `allow` with the proposed
       action executed, `all_blocked` cleared and the reason dropped.
@@ -169,6 +174,7 @@ message during a live episode:
 | `steps`, `return`, `crashed` | Length, summed reward, whether a crash ended it |
 | `decisions` | Count per decision kind |
 | `conflicts` | Escalations with reason `no_compliant_action` |
+| `floored` | Steps where the floor was applied and removed at least one candidate |
 | `violations`, `violations_total` | Executed-action violations per rule id (every rule in the store, zero when none) and their sum |
 | `human` | Count per operator answer |
 | `judge_sources` | Steps per step-level source: `live`, `cache`, `unavailable` |

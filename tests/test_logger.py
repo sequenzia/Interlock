@@ -7,7 +7,7 @@ from backend.shield import Thresholds, decide
 PLAN_KEYS = {
     "run_id", "episode", "step", "seed", "source", "shield_on", "thresholds", "ego", "vehicles",
     "zones", "constraints", "candidates", "decision", "executed", "fired_constraint", "escalated",
-    "human", "all_blocked", "escalation_reason", "fallback", "judge", "reward", "crashed",
+    "human", "all_blocked", "escalation_reason", "fallback", "floor", "judge", "reward", "crashed",
 }  # fmt: skip
 
 
@@ -41,6 +41,7 @@ def test_record_has_exactly_the_plan_keys_and_roundtrips(tmp_path: Path) -> None
         escalated=False,
         human=None,
         fallback={"action": decision.fallback, "kind": decision.fallback_kind},
+        floor={"applied": True, "removed": []},
         judge={
             "model": "jev-latest",
             "source": "live",

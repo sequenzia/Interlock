@@ -10,7 +10,7 @@ The eval harness writes three kinds of JSON. All of them are plain outputs of `b
 
 ## Per-configuration `metrics.json`
 
-One per run directory. The label encodes the configuration: `on_ta0.20_tb0.80`, `off_ta0.20_tb0.80`, or `on_ta0.20_tb0.80_zone10` with a zone drop.
+One per run directory. The label encodes the configuration: `on_ta0.30_tb0.70`, `off`, or `on_ta0.30_tb0.70_zone10` with a zone drop. A shield-off label carries no thresholds because they change nothing with the shield off; runs written before Oct 17 stored `off_ta0.20_tb0.80`, which the report reads as `off`.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -92,12 +92,12 @@ Example (seed 0, shield on, default thresholds):
 
 ```json
 {
-  "overall": {"n": 93285, "positives": 13838, "bins": [...], "ece": 0.0932, "brier": 0.032, "accuracy_at_0_5": 0.9747},
+  "overall": {"n": 169500, "positives": 28040, "bins": [...], "ece": 0.0839, "brier": 0.0281, "accuracy_at_0_5": 0.9735},
   "by_checker": {"lane_change_gap": {...}, "left_lane_passing": {...}, "speed_limit": {...}}
 }
 ```
 
-Each reliability object has `n`, `positives`, ten `bins`, `ece`, `brier` and `accuracy_at_0_5`. A bin is `{lo, hi, count, mean_p, observed}`; an empty bin has `count: 0` and `null` for the two means. Two real bins from the pooled report:
+Each reliability object has `n`, `positives`, ten `bins`, `ece`, `brier` and `accuracy_at_0_5`, and each `by_checker` entry also has `label_source`, `"checker"` for a rule scored in code or `"human"` for a rule scored by hand labels. The keys of `by_checker` are checker ids for crisp rules and preset ids (or a slug of the rule text) for rules without a checker; a rule with neither checker nor labels does not appear. A bin is `{lo, hi, count, mean_p, observed}`; an empty bin has `count: 0` and `null` for the two means. Two real bins from the pooled report:
 
 ```json
 {"lo": 0.0, "hi": 0.1, "count": 9061, "mean_p": 0.0502, "observed": 0.0}
@@ -111,9 +111,9 @@ The report `build_report` writes from the newest run per label.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `generated_at` | ISO 8601 UTC | |
-| `thresholds_default` | `{t_allow, t_block}` | The pair that selects `before_after` |
+| `thresholds_default` | `{t_allow, t_block}` | The pair that selects `before_after.on` |
 | `runs` | `{label: directory}` | Which run directory fed each label |
-| `before_after.off`, `before_after.on` | full `metrics.json` or null | The shield-off and shield-on runs at the default thresholds |
+| `before_after.off`, `before_after.on` | full `metrics.json` or null | `on` is the shield-on run without a zone at the default thresholds; `off` is the newest shield-off run without a zone |
 | `sweep` | object[] | One point per shield-on run without a zone, sorted by `t_allow` |
 | `calibration` | object | Pooled over every record of every newest run |
 | `plots` | `{before_after, tradeoff, calibration: path}` | Only the figures that could be drawn |
@@ -123,10 +123,10 @@ The report `build_report` writes from the newest run per label.
 ```json
 {
   "label": "on_ta0.20_tb0.80", "t_allow": 0.2, "t_block": 0.8,
-  "violations_per_episode": 2.65, "escalation_rate": 0.2386, "all_blocked_rate": 0.0522,
-  "conflict_rate": 0.0,
-  "crash_rate": 0.25, "mean_return": 41.442, "cost_per_episode_usd": 0.006734,
-  "human": {"approve": 121, "deny": 126, "override": 0}
+  "violations_per_episode": 2.3, "escalation_rate": 0.4556, "all_blocked_rate": 0.0,
+  "conflict_rate": 0.044,
+  "crash_rate": 0.05, "mean_return": 44.035, "cost_per_episode_usd": 0.007255,
+  "human": {"approve": 219, "deny": 268, "override": 41}
 }
 ```
 

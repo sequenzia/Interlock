@@ -41,10 +41,10 @@ uv run interlock run --rules speed_limit --operator approve --max-steps 20
 | `--jev auto|live|mock` | `auto` | judge mode |
 | `--model ID` | `jev-1.13.0` | Jev model id |
 | `--model-path PATH` | `models/dqn_highway.zip` | DQN checkpoint |
-| `--rules LIST` | `all` | comma list of checker ids (`speed_limit`, `lane_change_gap`, `left_lane_passing`, `lane_closed`), `all` for the three standing rules, or `none` |
+| `--rules LIST` | `all` | comma list of preset ids (`speed_limit`, `lane_change_gap`, `left_lane_passing`, `lane_closed`, `headway`, `lane_change_rate`, `cut_in`, `dense_traffic`), `all` for the standing rules (every preset but `lane_closed`), or `none` |
 | `--zone-at-step N` | unset | drop the default work zone at step N, which adds the lane-closed rule |
-| `--t-allow P` | `0.2` | allow threshold |
-| `--t-block P` | `0.8` | block threshold |
+| `--t-allow P` | `0.3` | allow threshold |
+| `--t-block P` | `0.7` | block threshold |
 | `--operator approve|deny|simulated` | `simulated` | who answers escalations; simulated answers from the ground-truth checkers |
 | `--max-steps N` | unset | stop early |
 | `--log PATH` | `backend/logs/runs/<run_id>.jsonl` | where the records go |
@@ -68,7 +68,7 @@ uv run interlock eval --report
 | --- | --- | --- |
 | `--seeds RANGE` | `0-19` | `0-19` or `3,7,11` |
 | `--mode off|on|shadow` | unset | one configuration; `shadow` is an alias of `off` |
-| `--t-allow P`, `--t-block P` | `0.2`, `0.8` | thresholds for `--mode on` |
+| `--t-allow P`, `--t-block P` | `0.3`, `0.7` | thresholds for `--mode on` |
 | `--sweep` | off | shield on over the five pairs 0.1/0.9, 0.2/0.8, 0.3/0.7, 0.4/0.6, 0.5/0.5 |
 | `--all` | off | off, then the sweep, then the report |
 | `--report` | off | aggregate the newest run per configuration into the report and plots |
@@ -101,6 +101,28 @@ uv run interlock train --eval-only models/dqn_highway_20k.zip
 | `--promote` | off | also copy the checkpoint to `models/dqn_highway.zip` |
 
 Writes the checkpoint and a `.eval.json` next to it with return, crash rate, mean speed and steps per seed. See [Training and policy](../developer-guide/backend/training.md).
+
+## interlock label
+
+Hand-label candidate actions against a rule that no checker scores, so the fuzzy presets enter the calibration plot. It reads a logged run, picks pairs the checkers left unlabeled, spreads them across the range of Jev's probability, and asks you one at a time. Jev's answer is hidden unless you ask for it, so the label is your judgment.
+
+```bash
+uv run interlock label --run backend/logs/eval/<stamp>_on_ta0.30_tb0.70 --rule dense_traffic
+uv run interlock label --run backend/logs/runs/<run_id>.jsonl --rule "plenty of room" --sample 100
+uv run interlock eval --report                      # fold the labels into the calibration
+```
+
+Each prompt shows the seed, step and candidate, the rule, and the facts as sentences; answer `y` for a violation, `n` for none, `s` to skip, `q` to stop. Labels append to `backend/logs/labels/<preset id or slug>.jsonl`, keyed by a hash of the facts and the rule text, so they apply to any run that shows the same state. A later line for the same key wins.
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--run PATH` | required | a JSONL log or an eval run directory |
+| `--rule TEXT` | required | a constraint id, a preset id, or a substring of the rule text |
+| `--sample N` | `50` | how many pairs to label in this session |
+| `--seed N` | `0` | sampling seed |
+| `--labels PATH` | per rule | output file |
+| `--show-p` | off | show Jev's probability on each card |
+| `--include-scored` | off | also offer pairs a checker already labeled |
 
 ## interlock spike
 

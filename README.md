@@ -89,23 +89,27 @@ unavailable.
 
 ## Results
 
-20 seeded episodes of 60 steps with three standing rules (speed limit, lane
-change gap, left lane for passing), live Jev, and a simulated operator that
-answers from the ground-truth checkers. The full run takes about eight minutes
-and costs under a dollar.
+20 seeded episodes of 60 steps with seven standing rules (speed limit, lane
+change gap, left lane for passing, 2 second headway, one lane change per 10
+seconds, and two fuzzy rules about moving in ahead of a faster vehicle and
+driving conservatively in dense traffic), live Jev, and a simulated operator
+that answers from the ground-truth checkers. The full run takes about seven
+minutes and costs under a dollar.
 
 | Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
 | --- | --- | --- | --- | --- |
-| Shield off | 58.1 | 50.7 | 40% | 0% |
-| Shield on, thresholds 0.2 / 0.8 | 2.65 | 41.4 | 25% | 23.9% |
-| Shield on, thresholds 0.4 / 0.6 | 1.25 | 42.0 | 40% | 6.6% |
+| Shield off | 105.45 | 50.7 | 40% | 0.0% |
+| Shield on, 0.2 / 0.8 | 2.30 | 44.1 | 5% | 46.8% |
+| Shield on, 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.1% |
 
 By rule, shield off to on: speed limit 1030 violations to 0, lane change gap
-124 to 1, left lane for passing 8 to 52. The crisp rules are solved; the fuzzy
-one is where the shield leaks. Calibration over 93,285 labeled checks gives an
-expected calibration error of 0.093 and 97.5% accuracy at a 0.5 cut, with the
-speed rule near perfect and the passing rule the weakest. Jev answers a full
-step of five requests in about 160 ms at the median.
+124 to 1, left lane for passing 8 to 0, headway 647 to 43, lane-change rate
+300 to 4. When no candidate satisfies every rule the shield asks the operator
+to choose rather than running a last resort, which is why the crash rate falls
+with the shield on. Calibration over 169,500 labeled checks gives an expected
+calibration error of 0.095 and 98.7% accuracy at a 0.5 cut, with the speed and
+lane-change rate rules at 100% and the passing rule the weakest. Jev answers a full step of five
+requests in about 158 ms at the median from a cold cache.
 
 ![Reliability diagram per rule](internal/plots/calibration.png)
 
@@ -120,7 +124,7 @@ A dark, dense console in React with a Canvas 2D road view.
 - **Road view**: ego-centered, four lanes, vehicles interpolated between steps,
   closed zones hatched, the executed action as a solid arrow and a blocked
   action as a ghost arrow.
-- **Operator rules**: type any rule, or add one of the four presets. Toggle,
+- **Operator rules**: type any rule, or add one of the eight presets. Toggle,
   remove, drop a work zone ahead with one click. The zone arms its rule and
   retires it once the zone is passed.
 - **Approval queue**: the proposed action, its facts in plain sentences, the
@@ -296,6 +300,7 @@ backend/
   server.py        FastAPI WebSocket server, live and replay
   metrics.py       episode metrics, aggregates, calibration
   evaluate.py      batch evaluation and report
+  label.py         hand-label fuzzy rules for calibration, behind interlock label
   plots.py         slide plots
   spike/           the Day 1 Jev spike
 frontend/          Vite, React, TypeScript, Tailwind, Zustand, Recharts, Playwright

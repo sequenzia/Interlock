@@ -10,9 +10,9 @@ Type a sentence in the box and press "add" or ++enter++. The text is sent to Jev
 
 Each rule gets an id (`c1`, `c2`, ...) that is stable for the session, and a line under the text that names its checker or says "no checker, not scored".
 
-## The four presets
+## The eight presets
 
-The chips add one of the four built-in rules. A chip greys out once a rule with that checker is in the list.
+The chips add one of the eight built-in rules. A chip greys out once a rule with that text is in the list. Six presets carry a checker that scores them; the last two are fuzzy on purpose, Jev alone enforces them, and they are scored by hand labels (see [Evaluation](../evaluation.md)).
 
 | Rule text | Checker id | What the checker labels as a violation |
 | --- | --- | --- |
@@ -20,6 +20,10 @@ The chips add one of the four built-in rules. A chip greys out once a rule with 
 | No lane change if a vehicle is within 10 m in the target lane | `lane_change_gap` | the action is a real lane change and the nearest vehicle ahead or behind in the target lane is closer than the threshold |
 | Keep the left lane for passing only | `left_lane_passing` | the lane after the action is the leftmost lane and there is no slower vehicle within 40 m ahead in the lane to its right |
 | Lane 3 is closed ahead for a work zone | `lane_closed` | the action enters a zone |
+| Keep at least 2 seconds of headway to the vehicle ahead | `headway` | the headway after the action, gap ahead over the target speed, is below the number of seconds in the text |
+| At most 1 lane change in any 10 seconds | `lane_change_rate` | the action is a real lane change and the lane changes in the last ten steps already reach the allowed count |
+| Leave plenty of room when moving in ahead of a faster vehicle | none | not scored by code; labeled by hand |
+| Drive conservatively in dense traffic | none | not scored by code; labeled by hand |
 
 The lane-closed preset is normally added by dropping a zone rather than by its chip, see below.
 
@@ -30,6 +34,8 @@ A rule you type is matched against a few text patterns to pick a checker, so var
 | Typed text looks like | Checker |
 | --- | --- |
 | `speed limit <number>` | `speed_limit`, with the number as the limit (for example "Speed limit 20 m/s") |
+| `at least <number> s of headway` | `headway`, with the number as the minimum (for example "Keep at least 3 seconds of headway") |
+| `at most <number> lane change` | `lane_change_rate`, with the number as the allowed count in ten steps |
 | contains `lane change` and `within <number> m` | `lane_change_gap`, with that distance |
 | contains `passing only` | `left_lane_passing` |
 | `lane <N> is closed` | `lane_closed` |
@@ -60,7 +66,7 @@ You can press the button more than once to queue several zones. Only zones ahead
 
 ## Thresholds
 
-Two sliders at the bottom set the allow and block thresholds, 0 to 1 in steps of 0.05, defaults 0.20 and 0.80. The label between them reads `allow < 0.20 · escalate · block > 0.80`. The allow slider cannot be dragged above the block slider and vice versa. The value is sent when you release the slider and applies to the next step.
+Two sliders at the bottom set the allow and block thresholds, 0 to 1 in steps of 0.05, defaults 0.30 and 0.70. The label between them reads `allow < 0.30 · escalate · block > 0.70`. The allow slider cannot be dragged above the block slider and vice versa. The value is sent when you release the slider and applies to the next step.
 
 Narrow the band (for example 0.4 and 0.6) and the shield asks less and decides more. Widen it (0.1 and 0.9) and nearly everything uncertain comes to you. The measured tradeoff is on [Evaluation and results](../evaluation.md).
 

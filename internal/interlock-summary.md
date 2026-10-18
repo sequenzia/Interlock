@@ -86,23 +86,24 @@ unavailable" rather than inventing a number.
 
 ## What the numbers say
 
-Twenty seeded episodes of 60 steps, three standing rules, live `jev-1.13.0`,
-and a simulated operator answering from the checkers.
+Twenty seeded episodes of 60 steps, seven standing rules, live `jev-1.13.0`,
+and a simulated operator answering from the checkers, measured Oct 17.
 
 | Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
 | --- | --- | --- | --- | --- |
-| Shield off | 58.1 | 50.7 | 40% | 0% |
-| Shield on, 0.2 / 0.8 (default) | 2.65 | 41.4 | 25% | 23.9% |
-| Shield on, 0.4 / 0.6 | 1.25 | 42.0 | 40% | 6.6% |
+| Shield off | 105.45 | 50.7 | 40% | 0.0% |
+| Shield on, 0.2 / 0.8 | 2.30 | 44.1 | 5% | 46.8% |
+| Shield on, 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.1% |
 
 By rule, off to on at the default: speed limit 1030 to 0, lane-change gap 124
-to 1, left lane for passing 8 to 52. The crisp rules are solved. The fuzzy one
-leaks, and the logs show why: on every leaked step no action satisfied every
-rule, the operator denied the escalation, and the SLOWER last resort kept the
-car in lane 1. Calibration over 93,285 labeled checks gives
-an expected calibration error of 0.093 and 97.5% accuracy at a 0.5 cut. A
-full step answers in about 160 ms at the median, and an episode costs under a
-cent.
+to 1, left lane for passing 8 to 0, headway 647 to 43, lane-change rate 300
+to 4. The passing leak from the first run is gone: states where no action
+satisfied every rule now reach the operator instead of looping on a no-op
+last resort. The crash rate fell because the headway rule is a following
+distance rule. Calibration over 169,500 labeled checks gives an expected
+calibration error of 0.095 and 98.7% accuracy at a 0.5 cut. A full
+step answers in about 158 ms at the median from a cold cache, and an
+episode costs under a cent.
 
 ## Why it is interesting
 
@@ -115,9 +116,9 @@ cent.
   number and Jev only judges. A rule typed with negation gets a suggested
   rephrase, never an edit.
 - **A calibrated probability is a control signal.** Two thresholds turn one
-  number into three outcomes, and the sweep shows the dial: 0.2 / 0.8 asks a
-  person on a quarter of steps; 0.4 / 0.6 asks on 7% with fewer violations but
-  the crash rate of an unshielded car. Calibration is measured, not assumed.
+  number into three outcomes, and the sweep shows the dial: 0.1 / 0.9 asks a
+  person on 89% of steps, 0.3 / 0.7 on 14%, for the same violations and crash
+  rate. The band sets operator load. Calibration is measured, not assumed.
 - **Human on the loop, not in the loop.** The system asks only when it is
   unsure. The passing rule sits near 0.5 for Jev regardless of phrasing; that
   is treated as the human moment, not a bug to prompt away. Every approve or

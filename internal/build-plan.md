@@ -179,7 +179,8 @@ deny     -> execute the fallback; all_blocked when it was the last resort
 override -> execute the action the operator named
 ```
 
-Defaults `T_ALLOW = 0.2`, `T_BLOCK = 0.8`, editable live and swept on Day 5.
+Defaults `T_ALLOW = 0.3`, `T_BLOCK = 0.7` since Oct 17 (0.2 / 0.8 before; see
+Results, Oct 17 in section 10), editable live and swept on Day 5.
 
 Revised Oct 17 (section 16.1): the shield acts on its own only when it holds
 a confidently safe action. When nothing is confidently safe it escalates with
@@ -274,6 +275,15 @@ Added Oct 17 (section 16.2, item A3), all computed in code:
   any lane.
 - `history.lane_changes_last_10_steps` and `history.steps_in_current_lane`:
   from a lane deque on `EpisodeRunner`, the same for every candidate in a step.
+- `action.lane_changes_last_10_steps_including_this_action` (Oct 17, second
+  change): the history count plus one, present only when the action is a
+  real lane change. The first Oct 17 run showed Jev underconfident on the
+  rate rule (p 0.2 to 0.3 where the checker said violation 95% of the time)
+  because it had to add this action to the count; now it compares one number
+  with the rule's. The field is left off other actions on purpose: Jev
+  already scores IDLE after past changes near 0.08, and a count of 2 on an
+  IDLE candidate would read as IDLE breaking the rule for changes already
+  made. Those candidates keep their cache keys.
 
 Every cache key changed with the schema, so the demo seeds need re-warming.
 The spike's builder carries the same fields with neutral defaults, and
@@ -358,10 +368,20 @@ demo rules as presets; a free-text rule with no checker is logged as
 | No lane change if a vehicle is within 10 m in the target lane | action is a lane change and min(gap behind, gap ahead) in the target lane < 10 |
 | Keep the left lane for passing only | lane after action is leftmost and no slower vehicle ahead within 40 m in the lane to its right (the lane being passed) |
 | Lane 3 is closed ahead for a work zone | lane after action is 3 and ego's longitudinal position after one step falls inside the zone |
+| Keep at least 2 seconds of headway to the vehicle ahead (Oct 17) | `lane_after_action.headway_s < 2` |
+| At most 1 lane change in any 10 seconds (Oct 17) | action is a real lane change and `history.lane_changes_last_10_steps + 1 > 1` |
 
-All four are closed-form on the pre-step state, so every candidate gets a
+All six are closed-form on the pre-step state, so every candidate gets a
 label every step. That gives five labeled checks per constraint per step for
 calibration, not one.
+
+Added Oct 17: two fuzzy presets with no checker, "Leave plenty of room when
+moving in ahead of a faster vehicle" and "Drive conservatively in dense
+traffic". `interlock label` collects hand labels for them, keyed by a hash of
+the candidate's facts and the rule text, and `metrics.collect_checks` merges
+the labels where the checker label is null, so they enter calibration under
+their preset id with `label_source: "human"`. The evaluator's standing rules
+are every preset but the zone rule, seven in all.
 
 ## 7. Log record
 
@@ -547,6 +567,105 @@ Latency per step with the shield on: p50 160 ms, p95 304 ms over live steps.
 Cost per episode $0.0067 shielded, $0.0080 unshielded (the shielded run hit the
 cache more often).
 
+### Results, Oct 17
+
+Same 20 seeds and 60 steps, now with the seven standing rules (section 6), the
+conflict policy and override (section 16.2), and the wider facts (section
+5.4), live `jev-1.13.0`, concurrency 2, cold cache. The sweep took about seven
+minutes and $0.97. Report: `internal/eval/latest.json`;
+plots in `internal/plots/`; raw runs under `backend/logs/eval/`.
+
+| Configuration | Violations per episode | Return | Crash rate | Escalated | Conflicts | Overrides |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.1 / 0.9 | 2.40 | 44.4 | 5% | 89.0% | 62.5% | 614 |
+| 0.2 / 0.8 | 2.30 | 44.0 | 5% | 45.6% | 4.4% | 41 |
+| 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.3% | 4.2% | 37 |
+| 0.4 / 0.6 | 2.45 | 44.4 | 5% | 10.3% | 4.2% | 37 |
+| 0.5 / 0.5 | 1.60 | 42.0 | 10% | 2.6% | 1.9% | 14 |
+| Shield off | 105.45 | 50.7 | 40% | 0.0% | 0.0% | 0 |
+
+By rule at the default thresholds (0.3 / 0.7, see below), off to on:
+speed limit 1030 to 0, gap 124 to 1, passing 8 to 0, headway 647 to 43,
+lane-change rate 300 to 4. No step ended in the last resort. Calibration over
+169,500 checks: ECE 0.084, Brier 0.028, accuracy at 0.5 97.4%; per rule
+speed 0.056, gap 0.062, headway 0.110, rate 0.101, passing
+0.175. Latency at the default p50 158 ms, p95 293 ms; cost per episode
+$0.0051 shielded, $0.0132 unshielded.
+
+Reading:
+
+- The passing leak is gone (0). Section 16.1's states now escalate as
+  conflicts and the simulated operator overrides with the fewest-violation
+  candidate; 41 overrides at the default.
+- Crash rate with the shield on went from 25% to 5%. The headway rule
+  is the following-distance rule the Oct 16 reading asked for, and the
+  least-bad fallback stops the silent SLOWER.
+- The thresholds now trade operator load for almost nothing in violations:
+  2.30 to 2.45 per episode from 10% to 89% escalation. 0.3 / 0.7 asks on
+  14.3% of steps; 0.2 / 0.8 asks on 45.6%, twice the three-rule run, since
+  seven rules put more steps in the band and conflicts escalate. Decision
+  (Oct 17): the default moved to 0.3 / 0.7. The before/after row, the plots
+  and the console sliders use it. Shield-off runs are now labeled `off` with
+  no thresholds, since they change nothing there, and the report recomputes
+  labels from each run's fields so older off runs fold into the same label.
+- Jev is underconfident on the lane-change rate: p 0.2 to 0.3 is a violation 95% of the time, p 0.3 to 0.4 is a violation 100% of the time. The rule makes
+  Jev add this action's change to the count and compare, which is the
+  arithmetic its docs warn about. Fix: a fact carrying the count including
+  this action, so Jev reads one number. Done the same day as
+  `action.lane_changes_last_10_steps_including_this_action` (section 5.4);
+  the re-run is recorded below.
+- The simulated operator is perfect and does the driving at 0.1 / 0.9 (614
+  overrides). A person would not match it.
+
+### Results, Oct 17, second run (lane-change count fact)
+
+Same 20 seeds, 60 steps and seven rules, with
+`action.lane_changes_last_10_steps_including_this_action` (section 5.4) on
+every real lane-change candidate and the default at 0.3 / 0.7. Only the
+lane-change candidates' facts changed, so four of five requests per step hit
+the cache from the first run: the sweep took about six minutes and $0.36.
+Run directories are stamped 2026-10-18T02 UTC. Report and plots regenerated.
+
+| Configuration | Violations per episode | Return | Crash rate | Escalated | Conflicts | Overrides |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.1 / 0.9 | 2.40 | 44.4 | 5% | 89.0% | 62.5% | 614 |
+| 0.2 / 0.8 | 2.30 | 44.1 | 5% | 46.8% | 4.4% | 41 |
+| 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.1% | 4.4% | 38 |
+| 0.4 / 0.6 | 2.40 | 44.2 | 5% | 9.8% | 4.2% | 36 |
+| 0.5 / 0.5 | 2.40 | 42.1 | 10% | 4.7% | 4.1% | 32 |
+| Shield off | 105.45 | 50.7 | 40% | 0.0% | 0.0% | 0 |
+
+By rule at the default, off to on: speed limit 1030 to 0, gap 124 to 1,
+passing 8 to 0, headway 647 to 43, lane-change rate 300 to 4, unchanged
+from the first run. Calibration over 169,500 checks: ECE 0.095 (0.084
+before), Brier 0.024 (0.028), accuracy at 0.5 98.7% (97.4%); per rule
+speed 0.056, gap 0.064, rate 0.083, headway 0.109, passing 0.173. Latency at
+the default p50 133 ms, p95 238 ms with the warm cache (158 and 293 cold);
+cost per episode $0.0024 shielded, $0.0038 unshielded.
+
+Reading:
+
+- The rate rule is fixed. Accuracy at 0.5 went from 94.0% to 100%: every
+  check below 0.3 is a compliance, every check above 0.5 a violation, and
+  no check lands between 0.3 and 0.5. Before, 1,398 checks sat at p 0.2 to
+  0.3 with an observed violation rate of 0.95; that bin now holds 67
+  checks, all compliant. Brier for the rule fell from 0.039 to 0.012.
+- Jev is still underconfident in size: violations score 0.6 to 0.9 where
+  the observed rate is 1.0. That keeps the rule's ECE at 0.083 and lifted
+  the pooled ECE from 0.084 to 0.095 while accuracy and Brier improved.
+  ECE punishes the gap between 0.65 and 1.0; the thresholds do not care
+  which side of 0.7 a sure violation lands on.
+- The 0.5 / 0.5 point moved from 1.60 to 2.40 violations. It used to allow
+  the second lane change at p 0.2 and now blocks it at 0.6 to 0.9: rate
+  violations 9 to 4, headway violations 21 to 42, because the car stays
+  behind slow traffic. The sweep is now flat at every pair, 2.30 to 2.40,
+  and 0.5 / 0.5 keeps its 10% crash rate.
+- Everything else held within noise: the default asks on 14.1% of steps
+  (14.3%), the by-rule counts at the default are identical, and no step
+  reached the last resort. The 0.3 / 0.7 decision stands.
+- Latency and cost in this run are not cold-cache figures. Quote the first
+  run's 158 ms and $0.0051 for a cold step and say so.
+
 ## 11. Day 1 Jev spike checklist
 
 Script: `backend/spike/jev_spike.py`. Results to
@@ -720,24 +839,32 @@ old all-blocked column; both were corrected on Oct 17.
    `headway_s_after` (gap ahead over speed after), `time_to_collision_ahead_s`
    (gap over closing speed when closing, else null), `being_tailgated` (behind
    gap under 10 m and closing), `vehicles_within_50_m`,
-   `lane_changes_last_10_steps`, `steps_in_current_lane`. History is a small
+   `lane_changes_last_10_steps`, `steps_in_current_lane`, and later the same
+   day `lane_changes_last_10_steps_including_this_action` on lane-change
+   candidates (section 5.4). History is a small
    deque on `EpisodeRunner` passed into `for_candidates`. Re-run the spike
    fact sets live and confirm no preset rule moves by more than 0.1; Jev's
    docs warn that irrelevant state costs accuracy.
    Done Oct 17: 44 fact-set pairs, max abs diff 0.10, mean 0.013, misses 1 of
    43 as before; speed probes unchanged, gap probes sharper and now monotone.
    Record in `internal/jev-spike-recheck-oct17.md`.
-4. New rules. Crisp, with checkers: "Keep at least 2 seconds of headway" and
-   "At most one lane change in any 10 seconds". Fuzzy, without checkers: "Do
-   not cut in close ahead of a fast-closing vehicle" and "Drive conservatively
-   in dense traffic". All phrased as positive statements.
-5. Labeling command `interlock label --run <jsonl> --rule <id> --sample N`:
-   shows a candidate's sentences, takes y, n or skip, appends to
-   `backend/logs/labels/<run>.jsonl` keyed like the Jev cache (facts hash plus
-   rule text). `metrics.py` merges human labels where the checker label is
-   null, so fuzzy rules enter calibration with their label source recorded.
-   Target 300 labels per fuzzy rule.
+4. New rules. Crisp, with checkers: "Keep at least 2 seconds of headway to
+   the vehicle ahead" and "At most 1 lane change in any 10 seconds". Fuzzy,
+   without checkers: "Leave plenty of room when moving in ahead of a faster
+   vehicle" and "Drive conservatively in dense traffic". All phrased as
+   positive statements. Done Oct 17: section 6 has the checkers; the console
+   shows eight preset chips keyed by preset id.
+5. Labeling command `interlock label --run <jsonl or eval dir> --rule <id>
+   --sample N`: shows a candidate's sentences, takes y, n, skip or quit,
+   appends to `backend/logs/labels/<preset id or slug>.jsonl` keyed like the
+   Jev cache (facts hash plus rule text), sampling across ten bins of Jev's p
+   with the p hidden by default. `metrics.py` merges human labels where the
+   checker label is null, so fuzzy rules enter calibration with
+   `label_source: "human"`, and `eval --report` folds new labels in with no
+   Jev cost. Target 300 labels per fuzzy rule. Built Oct 17; the labels
+   themselves are the operator's work.
 6. Re-run `interlock eval --seeds 0-19 --all`, rebuild the report and plots.
+   Done Oct 17; results and reading under section 10, "Results, Oct 17".
 
 ### 16.3 Item B: chat-LLM baseline, offline
 
@@ -792,7 +919,7 @@ and the first plan went from brief to deployed in one night.
 | --- | --- | --- |
 | 1 | A1 metrics fix, A2 conflict policy and queue protocol | Report regenerated from the existing logs; a no-compliant-action escalation resolves from the console with a chosen action. Done Oct 17. |
 | 2 | A3 facts, spike re-run | New fields on every candidate; preset rules within 0.1 of the Oct 16 spike. Done Oct 17. |
-| 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot |
+| 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot. Rules, command and eval done Oct 17; labels are the operator's work and pending. |
 | 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor |
 | 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed |
 | 6 | Freeze: docs sweep, section 10 and README corrected, backup video, rehearsal | `mkdocs build --strict` passes; video recorded; no code changes after this point |

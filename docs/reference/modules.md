@@ -74,8 +74,11 @@ Operator rules and zones. See [Constraints and checkers](../developer-guide/back
 
 | Name | Signature or value |
 | --- | --- |
-| `CHECKER_SPEED_LIMIT`, `CHECKER_LANE_CHANGE_GAP`, `CHECKER_LEFT_LANE_PASSING`, `CHECKER_LANE_CLOSED` | `"speed_limit"`, `"lane_change_gap"`, `"left_lane_passing"`, `"lane_closed"` |
-| `PRESETS` | `dict[str, str]`, checker id to rule text, in chip order |
+| `CHECKER_SPEED_LIMIT`, `CHECKER_LANE_CHANGE_GAP`, `CHECKER_LEFT_LANE_PASSING`, `CHECKER_LANE_CLOSED`, `CHECKER_HEADWAY`, `CHECKER_LANE_CHANGE_RATE` | `"speed_limit"`, `"lane_change_gap"`, `"left_lane_passing"`, `"lane_closed"`, `"headway"`, `"lane_change_rate"` |
+| `PRESET_CUT_IN`, `PRESET_DENSE_TRAFFIC` | `"cut_in"`, `"dense_traffic"`, the fuzzy presets |
+| `PRESETS` | `dict[str, str]`, preset id to rule text, in chip order; eight entries |
+| `FUZZY_PRESETS` | `frozenset` of the two preset ids without a checker |
+| `preset_checker` | `(preset_id: str) -> str \| None` |
 | `DEFAULT_ZONE_LANE`, `DEFAULT_ZONE_AHEAD_M`, `DEFAULT_ZONE_LENGTH_M`, `DEFAULT_ZONE_NAME` | `3`, `120.0`, `200.0`, `"work zone"` |
 | `Constraint` | dataclass: `id: str`, `text: str`, `enabled: bool = True`, `checker: str \| None = None`; `to_dict() -> dict[str, Any]` |
 | `Zone` | dataclass: `name: str`, `lane: int`, `start_m: float`, `end_m: float`; `to_dict() -> dict[str, Any]` |
@@ -84,7 +87,7 @@ Operator rules and zones. See [Constraints and checkers](../developer-guide/back
 | `ConstraintStore.zones` | property `-> list[Zone]` (copy) |
 | `ConstraintStore.enabled` | `() -> list[Constraint]` |
 | `ConstraintStore.add` | `(text: str, checker: str \| None = None) -> Constraint` |
-| `ConstraintStore.add_presets` | `(checker_ids: Iterable[str] \| None = None) -> list[Constraint]` |
+| `ConstraintStore.add_presets` | `(preset_ids: Iterable[str] \| None = None) -> list[Constraint]` |
 | `ConstraintStore.get` | `(constraint_id: str) -> Constraint`, raises `KeyError` |
 | `ConstraintStore.toggle` | `(constraint_id: str, enabled: bool) -> Constraint` |
 | `ConstraintStore.remove` | `(constraint_id: str) -> None` |
@@ -129,7 +132,7 @@ Pure decision functions. See [Shield algorithm](../developer-guide/backend/shiel
 | `FallbackKind` | `Literal["safe", "least_bad", "last_resort"]` |
 | `EscalationReason` | `Literal["uncertain", "no_compliant_action"]` |
 | `OperatorDecision` | `Literal["approve", "deny", "override"]` |
-| `Thresholds` | frozen dataclass: `t_allow: float = 0.2`, `t_block: float = 0.8`; validates in `__post_init__` |
+| `Thresholds` | frozen dataclass: `t_allow: float = 0.3`, `t_block: float = 0.7`; validates in `__post_init__` |
 | `Fallback` | frozen dataclass: `action: str`, `kind: FallbackKind` |
 | `Answer` | frozen dataclass: `decision: OperatorDecision`, `action: str \| None = None` |
 | `Decision` | frozen dataclass: `kind`, `proposed: str`, `executed: str`, `fired_constraint: str \| None`, `p_proposed: float`, `p_viol: dict[str, float]`, `fallback: str`, `fallback_kind: FallbackKind`, `reason: EscalationReason \| None = None`, `all_blocked: bool = False` |
@@ -146,7 +149,7 @@ Ground-truth labels for scoring only. See [Constraints and checkers](../develope
 | --- | --- |
 | `LANE_CHANGE_ACTIONS` | `frozenset({"LANE_LEFT", "LANE_RIGHT"})` |
 | `Checker` | `Callable[[Facts, Constraint], bool]` |
-| `check_speed_limit`, `check_lane_change_gap`, `check_left_lane_passing`, `check_lane_closed` | each `(facts: Facts, constraint: Constraint) -> bool` |
+| `check_speed_limit`, `check_lane_change_gap`, `check_left_lane_passing`, `check_lane_closed`, `check_headway`, `check_lane_change_rate` | each `(facts: Facts, constraint: Constraint) -> bool` |
 | `CHECKERS` | `dict[str, Checker]`, checker id to function |
 | `label` | `(facts: Facts, constraint: Constraint) -> bool \| None` |
 | `label_all` | `(candidates: dict[str, Facts], constraints: list[Constraint]) -> dict[str, dict[str, bool \| None]]` |
@@ -230,9 +233,10 @@ Pure functions over records. See [Evaluation internals](../developer-guide/backe
 | `executed_candidate` | `(record: Record) -> Record \| None` |
 | `episode_metrics` | `(records: list[Record]) -> dict[str, Any]` |
 | `aggregate` | `(episodes: list[dict[str, Any]]) -> dict[str, Any]` |
-| `collect_checks` | `(records: Iterable[Record]) -> list[tuple[float, bool, str]]` |
-| `reliability` | `(checks: list[tuple[float, bool, str]], bins: int = 10) -> dict[str, Any]` |
-| `calibration` | `(records: Iterable[Record], bins: int = 10) -> dict[str, Any]` |
+| `Check` | `tuple[float, bool, str]`: p, label, calibration group |
+| `collect_checks` | `(records: Iterable[Record], labels: dict[str, bool] \| None = None) -> list[Check]` |
+| `reliability` | `(checks: list[Check], bins: int = 10) -> dict[str, Any]` |
+| `calibration` | `(records: Iterable[Record], bins: int = 10, labels: dict[str, bool] \| None = None) -> dict[str, Any]`; each `by_checker` entry carries `label_source` |
 
 ### `backend/evaluate.py`
 
@@ -244,6 +248,7 @@ Batch evaluation and report. Writes `backend/logs/eval/<stamp>_<label>/`, `inter
 | `config_label` | `(shield_on: bool, thresholds: Thresholds, zone_at_step: int \| None) -> str` |
 | `run_config` | `async (policy: Policy, judge: JevClient, seeds: list[int], *, shield_on: bool, thresholds: Thresholds, out_dir: Path, zone_at_step: int \| None = None, rules: list[str] \| None = None, concurrency: int = 3, max_steps: int \| None = None, quiet: bool = False) -> dict[str, Any]` |
 | `new_run_dir` | `(root: Path, label: str) -> Path` |
+| `load_run` | `(path: Path, labels: dict[str, bool] \| None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]`, recomputes and rewrites `metrics.json` from the seed logs |
 | `newest_runs` | `(root: Path) -> dict[str, Path]` |
 | `build_report` | `(root: Path = EVAL_DIR, report_path: Path = REPORT_PATH, plots_dir: Path = PLOTS_DIR, thresholds: Thresholds = DEFAULT_THRESHOLDS) -> dict[str, Any]` |
 | `print_summary` | `(report: dict[str, Any]) -> None` |
@@ -258,6 +263,25 @@ Matplotlib figures, `Agg` backend. Each returns the path it wrote.
 | `plot_before_after` | `(before: dict[str, Any], after: dict[str, Any], path: Path) -> Path` |
 | `plot_tradeoff` | `(sweep: list[dict[str, Any]], path: Path) -> Path` |
 | `plot_calibration` | `(cal: dict[str, Any], path: Path) -> Path` |
+
+### `backend/label.py`
+
+Hand labels for rules without a checker. See [Command line](../user-guide/cli.md#interlock-label).
+
+| Name | Signature or value |
+| --- | --- |
+| `LABELS_DIR`, `BINS`, `ANSWERS` | `backend/logs/labels/`, `10`, `("y", "n", "s", "q")` |
+| `label_key` | `(facts: dict[str, Any], rule_text: str) -> str`, sha256 of the canonical JSON of both |
+| `slug`, `rule_group` | `(text: str) -> str`; the group is the preset id for a preset text, else the slug |
+| `load_labels` | `(directory: Path = LABELS_DIR) -> dict[str, bool]`, later lines win |
+| `Item` | frozen dataclass: `run_id`, `seed`, `step`, `action`, `rank`, `rule_id`, `rule_text`, `facts`, `sentences`, `p`, `key` |
+| `read_records` | `(run: Path) -> list[dict[str, Any]]`, a log file or an eval directory |
+| `find_rule` | `(record, rule: str) -> dict \| None`, by id, preset id or text substring |
+| `collect_items` | `(records, rule: str, unlabeled_only: bool = True) -> list[Item]` |
+| `sample_items` | `(items: list[Item], n: int, rng: random.Random, done: set[str]) -> list[Item]`, round-robin over ten bins of p |
+| `render` | `(item: Item, index: int, total: int, show_p: bool) -> str` |
+| `label_session` | `(items, ask: Callable[[str], str], out_path: Path, *, show_p: bool = False, labeler: str = "human") -> int` |
+| `add_arguments`, `run_cli`, `main` | the module CLI |
 
 ### `backend/cli.py`
 

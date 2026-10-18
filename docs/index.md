@@ -91,14 +91,15 @@ console, the replay and the evaluation all read that one record format. The
 
 ## Results at a glance
 
-Twenty seeded episodes of 60 steps with three standing rules, live Jev, and a
-simulated operator that answers from the ground-truth checkers.
+Twenty seeded episodes of 60 steps with seven standing rules, live Jev, and a
+simulated operator that answers from the ground-truth checkers, measured on
+Oct 17.
 
 | Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
 | --- | --- | --- | --- | --- |
-| Shield off | 58.1 | 50.7 | 40% | 0% |
-| Shield on, thresholds 0.2 / 0.8 | 2.65 | 41.4 | 25% | 23.9% |
-| Shield on, thresholds 0.4 / 0.6 | 1.25 | 42.0 | 40% | 6.6% |
+| Shield off | 105.45 | 50.7 | 40% | 0% |
+| Shield on, thresholds 0.2 / 0.8 | 2.30 | 44.1 | 5% | 46.8% |
+| Shield on, thresholds 0.3 / 0.7 (default) | 2.40 | 44.4 | 5% | 14.1% |
 
 The [evaluation page](user-guide/evaluation.md) has the full sweep, the per-rule
 breakdown, the calibration numbers and the reading of them.

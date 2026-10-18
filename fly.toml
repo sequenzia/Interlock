@@ -14,7 +14,7 @@ primary_region = "iad"
 
 [env]
   ESCALATION_TIMEOUT_S = "0"   # live demo: wait for the operator, never default-deny
-  CONSOLE_ORIGINS = "https://interlock-console-pied.vercel.app,https://interlock-console-sequenzia.vercel.app"   # the console's production aliases on Vercel
+  CONSOLE_ORIGINS = "https://interlock-sequenzia.vercel.app,https://interlock-console-pied.vercel.app,https://interlock-console-sequenzia.vercel.app"   # every production alias of the console on Vercel; interlock-console-pied redirects to interlock-sequenzia
 
 [http_service]
   internal_port = 8000

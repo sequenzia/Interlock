@@ -83,7 +83,7 @@ macOS keeps the PyPI wheel. Without this the image would grow by the CUDA librar
 | `primary_region` | `iad` | One region, one machine |
 | `[build] dockerfile` | `Dockerfile` | `fly deploy` builds remotely from this directory with `.dockerignore` applied, so the gitignored checkpoint and cache ship without a commit |
 | `[env] ESCALATION_TIMEOUT_S` | `"0"` | Wait for the operator, never default-deny in a live session |
-| `[env] CONSOLE_ORIGINS` | the two Vercel production aliases | CORS for the console's fetches |
+| `[env] CONSOLE_ORIGINS` | every Vercel production alias of the console, including the one the others redirect to | CORS for the console's fetches |
 | `[http_service] internal_port` | 8000 | Matches `PORT` |
 | `force_https` | true | The console connects over `wss` |
 | `auto_stop_machines` | `"off"` | The session lives in memory; never scale to zero |

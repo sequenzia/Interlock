@@ -854,7 +854,7 @@ mid-episode zone drop.
 - [ ] Install ffmpeg via Homebrew if QuickTime screen recording is not enough for the backup video.
 - [ ] After the talk: `fly apps destroy interlock-backend`. The machine is always-on by design and bills around ten dollars a month while it exists.
 - [x] Backend host: Fly.io, `fly.toml` at the repo root, app `interlock-backend` in `iad` (Oct 16).
-- [x] Console deployed Oct 16: Vercel project `interlock-console`, https://interlock-console-pied.vercel.app, `VITE_BACKEND_URL=https://interlock-backend.fly.dev`. `CONSOLE_ORIGINS` carries both production aliases in `fly.toml`.
+- [x] Console deployed Oct 16: Vercel project `interlock-console`, https://interlock-console-pied.vercel.app, `VITE_BACKEND_URL=https://interlock-backend.fly.dev`. `CONSOLE_ORIGINS` in `fly.toml` carries every production alias; on Oct 18 the pied alias was found to redirect to `interlock-sequenzia.vercel.app`, which was missing from the list, so the metrics fetch was CORS-blocked until that origin was added.
 
 ## 15. Deployment (added Oct 16)
 

@@ -52,8 +52,8 @@ approval queue, a decision inspector and the evaluation numbers.
 ## What Interlock demonstrates
 
 - **A reward-only policy made safe at runtime, with no retraining.** The DQN
-  only ever sees environment reward: speed, no collisions and a small
-  right-lane bonus. Rules such as "Speed limit 25 m/s" or "Lane 3 is closed
+  only ever sees [environment reward](developer-guide/backend/training.md#the-reward-function):
+  speed, no collisions and a small right-lane bonus. Rules such as "Speed limit 25 m/s" or "Lane 3 is closed
   ahead for a work zone" are added while it drives.
 - **A system that knows when to ask a person.** Jev's probability drives three
   outcomes. Confident safe runs, confident violation falls back, and the

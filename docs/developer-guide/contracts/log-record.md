@@ -192,7 +192,7 @@ exchange.asked}}`, which is exactly what the inspector's raw tab rebuilds.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `reward` | float | The environment reward for the executed action, rounded to 4 places. |
+| `reward` | float | The environment reward for the executed action, rounded to 4 places. highway-env normalizes it onto 0 to 1, so a step without a crash reads 0.667 to 1.0; see [the reward function](../backend/training.md#the-reward-function). |
 | `crashed` | bool | `info["crashed"]` after the step. A crash ends the episode. |
 
 ## Invariants

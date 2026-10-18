@@ -32,7 +32,7 @@ flowchart LR
 
 | Component | Module | Responsibility |
 | --- | --- | --- |
-| Environment | `backend/env.py` | `highway-fast-v0` with four lanes, 60 steps, 30 vehicles, one decision per second. The reward is the highway-env default and never mentions a rule. |
+| Environment | `backend/env.py` | `highway-fast-v0` with four lanes, 60 steps, 30 vehicles, one decision per second. The reward is the [highway-env default](backend/training.md#the-reward-function) and never mentions a rule. |
 | Policy | `backend/policy.py`, `backend/train.py` | A Stable-Baselines3 DQN trained on task reward alone. Exposes a Q-value per action so the whole ranking is available every step. |
 | Fact extractor | `backend/facts.py` | Turns the simulator state plus one candidate action into JSON facts with units in the field names, and the same facts as plain sentences for people. All geometry happens here. |
 | Constraint store | `backend/constraints.py` | Operator rules as plain-English strings, optional checker ids, work zones, and the lifecycle that ties the lane-closed rule to its zone. |

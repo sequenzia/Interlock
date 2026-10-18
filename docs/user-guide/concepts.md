@@ -4,7 +4,7 @@ This page explains the ideas behind Interlock before you run anything. It is wri
 
 ## The policy proposes, the shield disposes
 
-A reinforcement learning policy is trained to maximize a reward. In Interlock the policy is a Stable-Baselines3 DQN driving in highway-env. Its reward pays for speed, penalizes collisions and adds a small bonus for keeping right. Nothing in that reward mentions a speed limit, a following distance or a closed lane. The policy has never seen a rule and it never will: it is trained once and never retrained.
+A reinforcement learning policy is trained to maximize a reward. In Interlock the policy is a Stable-Baselines3 DQN driving in highway-env. Its reward pays up to 0.4 for speed between 20 and 30 m/s, 0.1 for keeping right and -1 for a collision, normalized so an ordinary step scores between 0.667 and 1.0; [the reward function](../developer-guide/backend/training.md#the-reward-function) spells it out. Nothing in that reward mentions a speed limit, a following distance or a closed lane. The policy has never seen a rule and it never will: it is trained once and never retrained.
 
 A **shield** is a runtime monitor that sits between the policy and the simulator. Every step the policy proposes an action, the shield judges it, and only an approved action executes. If the proposal is unsafe the shield substitutes a safer one. This is the "shielding" idea from safe reinforcement learning. Interlock adds a third outcome: when the shield is unsure, it stops and asks a person.
 

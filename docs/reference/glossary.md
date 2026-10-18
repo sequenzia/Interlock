@@ -107,6 +107,9 @@ Terms as Interlock uses them, with the page that covers each one.
 **Replay**
 : Streaming a logged JSONL run through the console instead of the live simulator. See [Replay](../user-guide/console/replay.md).
 
+**Reward, task reward**
+: The per-step highway-env reward the policy was trained on: up to 0.4 for speed between 20 and 30 m/s, up to 0.1 for keeping right, -1 for a collision, normalized onto 0 to 1 so a step without a crash scores between 0.667 and 1.0. It never mentions a rule. See [the reward function](../developer-guide/backend/training.md#the-reward-function).
+
 **Run id**
 : `<UTC stamp>_seed<N>_on|off`, the name of a run's JSONL file and the key the replay picker shows.
 
@@ -129,7 +132,7 @@ Terms as Interlock uses them, with the page that covers each one.
 : One policy decision and one simulator advance, one second of simulated time, one record in the log.
 
 **Task return**
-: The sum of highway-env reward over an episode. The shield lowers it; that is the cost of safety.
+: The sum of [reward](../developer-guide/backend/training.md#the-reward-function) over an episode, at most 60 for a 60 step episode. The shield lowers it; that is the cost of safety.
 
 **Thresholds**
 : `t_allow` and `t_block`, defaults 0.3 and 0.7. Below `t_allow` allows, above `t_block` blocks, between them escalates. See [Rules and zones](../user-guide/console/rules-and-zones.md).

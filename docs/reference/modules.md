@@ -8,7 +8,7 @@ Shared type aliases: `Facts = dict[str, Any]` in `backend/facts.py`, `backend/ch
 
 ### `backend/env.py`
 
-highway-fast-v0 with the demo configuration. See [Training and policy](../developer-guide/backend/training.md).
+highway-fast-v0 with the demo configuration. See [Training and policy](../developer-guide/backend/training.md) and [the reward function](../developer-guide/backend/training.md#the-reward-function) it leaves at the highway-env default.
 
 | Name | Signature or value |
 | --- | --- |

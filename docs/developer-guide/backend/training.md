@@ -2,6 +2,42 @@
 
 Three small modules give the shield something to judge: `backend/env.py` builds the simulator, `backend/train.py` trains and scores a Stable-Baselines3 DQN, and `backend/policy.py` wraps a checkpoint so every step yields all five actions ranked by Q-value. The policy is trained on task reward alone and never sees an operator rule. That separation is the premise of the whole project.
 
+## The reward function
+
+The reward is the highway-env default for `highway-fast-v0`, untouched by Interlock: `DEFAULT_CONFIG` overrides the road and the traffic, never a reward term. Every step the environment computes four per-step values, weights three of them, normalizes the sum and multiplies by the fourth.
+
+| Term | Weight | Per-step value | Contribution |
+| --- | --- | --- | --- |
+| Collision | `collision_reward` = -1 | 1 if the ego crashed on this step, else 0 | -1 or 0 |
+| High speed | `high_speed_reward` = 0.4 | Forward speed mapped linearly from `reward_speed_range` 20 to 30 m/s onto 0 to 1 and clipped, so 20 m/s or slower earns 0 and 30 m/s or faster earns the full weight. Forward speed is speed times the cosine of the heading, so a car mid lane change earns slightly less | 0 to 0.4 |
+| Right lane | `right_lane_reward` = 0.1 | Lane index from the left divided by the lane count minus one. In the four-lane demo and Interlock's numbering, lane 1 earns 0, lane 2 a third, lane 3 two thirds, lane 4 the full weight. During a lane change the target lane counts | 0 to 0.1 |
+| Lane change | `lane_change_reward` = 0 | Each lane change action | 0, so no term |
+| On road | multiplier | 1 while the ego is on the road, which it always is on this highway | times 1 |
+
+`normalize_reward` is true, so the weighted sum, which lies between -1 and 0.5, is mapped linearly onto 0 to 1:
+
+```
+reward = (collision + speed + lane + 1) / 1.5
+```
+
+That mapping is why the `reward` in a log record and the `r=` figure in the console's step header read 0.8 to 1.0 on an ordinary step. A step without a crash scores between 0.667 and 1.0; a crash scores between 0 and 0.333.
+
+| Situation | Weighted sum | Reward |
+| --- | --- | --- |
+| Lane 1 at 20 m/s or slower, no crash | 0.0 | 0.667 |
+| Lane 4 at 20 m/s, no crash | 0.1 | 0.733 |
+| Lane 4 at 25 m/s, no crash | 0.3 | 0.867 |
+| Lane 1 at 30 m/s, no crash | 0.4 | 0.933 |
+| Lane 4 at 30 m/s or faster, no crash | 0.5 | 1.000 |
+| Lane 4 at 30 m/s, crash | -0.5 | 0.333 |
+| Lane 1 at 20 m/s, crash | -1.0 | 0.000 |
+
+An episode terminates on a crash and truncates after `duration` steps, 60 here, so the maximum task return is 60. The one-step collision penalty is the smaller part of the cost of crashing: the larger part is every remaining step's reward of at least 0.667 that the agent no longer collects. With `gamma` 0.8 the Q-values weigh about five steps ahead, which is why the trained policy avoids the collisions it can see coming and still runs at the top of the speed band.
+
+Nothing in these terms mentions a speed limit, a following gap, a passing lane, a closed lane or a lane-change count. The speed term pays most at 30 m/s, so a rule such as "Speed limit 25 m/s" sits inside the band the policy was trained to climb, and that rule is the one it breaks most with the shield off; the [evaluation page](../../user-guide/evaluation.md) has the counts. The per-step `reward` lands in the [log record](../contracts/log-record.md) rounded to four places, and the evaluation sums it per episode as task return.
+
+The source is `HighwayEnv._reward` and `HighwayEnv._rewards` in highway-env 1.12; the fast variant changes the traffic and the simulation frequency, not the reward. The [highway-env rewards page](https://highway-env.farama.org/rewards/) describes the same terms.
+
 ## `backend/env.py`
 
 ```python
@@ -22,9 +58,7 @@ DEFAULT_CONFIG = {"lanes_count": 4, "duration": 60, "vehicles_count": 30, "polic
 | `vehicles_count` | 30 | Enough traffic that gaps and passing matter |
 | `policy_frequency` | 1 | One decision per simulated second, so a Jev round trip fits comfortably |
 
-### The reward the policy sees
-
-Reward is left at the highway-env default: a collision penalty of -1, a high-speed reward of up to 0.4 over the 20 to 30 m/s range, and a right-lane bonus of 0.1. There is no term for a speed limit, a following gap, a passing lane or a closed lane. A speed-hungry policy therefore breaks rules written later, which is what the shield is for.
+The reward is not in `DEFAULT_CONFIG` because it is not overridden; [the reward function](#the-reward-function) above spells out the default the policy trains on.
 
 ## `backend/train.py`
 

@@ -162,6 +162,10 @@ def test_lane_history_in_the_facts_matches_the_logged_lanes(policy: Policy, tmp_
             in_lane += 1
         assert history["steps_in_current_lane"] == in_lane
         assert all(c["facts"]["history"] == history for c in r["candidates"])
+        for c in r["candidates"]:
+            real = c["facts"]["action"]["lane_after"] != lanes[k]
+            count = c["facts"]["action"].get("lane_changes_last_10_steps_including_this_action")
+            assert count == (history["lane_changes_last_10_steps"] + 1 if real else None)
 
 
 def test_no_rules_means_allow(policy: Policy, tmp_path: Path) -> None:

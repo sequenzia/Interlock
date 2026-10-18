@@ -1,4 +1,5 @@
-from backend.constraints import Zone
+from backend.checkers import label
+from backend.constraints import CHECKER_LANE_CHANGE_RATE, PRESETS, Constraint, Zone
 from backend.env import ACTION_NAMES, make_env
 from backend.facts import (
     action_meaning,
@@ -45,6 +46,23 @@ def test_facts_follow_the_plan_schema_from_live_state() -> None:
         history={"lane_changes_last_10_steps": 2, "steps_in_current_lane": 3},
     )
     assert with_history["history"] == {"lane_changes_last_10_steps": 2, "steps_in_current_lane": 3}
+    env.close()
+
+
+def test_only_a_real_lane_change_carries_the_count_including_itself() -> None:
+    field = "lane_changes_last_10_steps_including_this_action"
+    env = make_env()
+    env.reset(seed=0)  # ego starts in lane 4, the rightmost
+    history = {"lane_changes_last_10_steps": 1, "steps_in_current_lane": 0}
+    left = facts_for_action(env, "LANE_LEFT", zones=[], history=history)
+    assert left["action"][field] == 2
+    assert "Lane changes in the last 10 steps including this one: 2." in sentences(left)[1]
+    assert facts_for_action(env, "LANE_LEFT", zones=[])["action"][field] == 1  # no history
+    for action in ("LANE_RIGHT", "IDLE", "FASTER", "SLOWER"):  # LANE_RIGHT is a no-op here
+        f = facts_for_action(env, action, zones=[], history=history)
+        assert field not in f["action"] and "including this one" not in sentences(f)[1]
+    rate = Constraint("c1", PRESETS[CHECKER_LANE_CHANGE_RATE], checker=CHECKER_LANE_CHANGE_RATE)
+    assert label(left, rate) is True  # the checker and the fact agree on the count
     env.close()
 
 

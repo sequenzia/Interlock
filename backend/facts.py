@@ -168,6 +168,26 @@ def _zone_facts(ego: Any, zones: list[Zone], new_lane: int) -> list[Facts]:
     return out
 
 
+def _action_block(
+    action: str, lane: int, lane_count: int, new_lane: int, speed_after: float, past: History
+) -> Facts:
+    block: Facts = {
+        "name": action,
+        "meaning": action_meaning(action, lane, lane_count),
+        "lane_after": new_lane,
+        "target_speed_after_mps": speed_after,
+    }
+    if new_lane != lane:
+        # The number the rate rule is judged on, so the judge never adds this
+        # action to the history itself. Only a real lane change carries it: on
+        # any other action it would repeat the history count and read as that
+        # action breaking the rule for changes already made. Plan section 5.4.
+        block["lane_changes_last_10_steps_including_this_action"] = (
+            past["lane_changes_last_10_steps"] + 1
+        )
+    return block
+
+
 def facts_for_action(
     env: Any, action: str, zones: list[Zone], history: History | None = None
 ) -> Facts:
@@ -182,6 +202,7 @@ def facts_for_action(
     lane = lane_number(ego.lane_index)
     new_lane = lane_after(action, lane, lane_count)
     speed_after = target_speed_after(ego, action)
+    past = dict(NO_HISTORY if history is None else history)
     facts: Facts = {
         "ego": {
             "lane": lane,
@@ -189,16 +210,11 @@ def facts_for_action(
             "speed_mps": _r(ego.speed),
             "target_speed_mps": _r(ego.target_speed),
         },
-        "action": {
-            "name": action,
-            "meaning": action_meaning(action, lane, lane_count),
-            "lane_after": new_lane,
-            "target_speed_after_mps": speed_after,
-        },
+        "action": _action_block(action, lane, lane_count, new_lane, speed_after, past),
         "lane_after_action": _lane_block(road, ego, new_lane, lane_count, speed_after),
         "current_lane": _ahead_block(road, ego, lane),
         "traffic": _traffic(road, ego),
-        "history": dict(NO_HISTORY if history is None else history),
+        "history": past,
         "zones": _zone_facts(ego, zones, new_lane),
     }
     if new_lane == 1 and lane_count > 1:
@@ -293,7 +309,13 @@ def sentences(f: Facts) -> list[str]:
         f"Ego speed {ego['speed_mps']:g} m/s, target {ego['target_speed_mps']:g} m/s, "
         f"lane {ego['lane']} of {ego['lane_count']} (numbered from the left).",
         f"{act['name']}: {act['meaning']}. Lane after: {act['lane_after']}. "
-        f"Target speed after: {act['target_speed_after_mps']:g} m/s.",
+        f"Target speed after: {act['target_speed_after_mps']:g} m/s."
+        + (
+            " Lane changes in the last 10 steps including this one: "
+            f"{act['lane_changes_last_10_steps_including_this_action']}."
+            if "lane_changes_last_10_steps_including_this_action" in act
+            else ""
+        ),
         f"Lane {act['lane_after']} after the action: "
         f"{_gap_phrase(la['vehicle_behind_gap_m'], None, 'behind')}"
         + (

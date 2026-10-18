@@ -46,6 +46,9 @@ def test_build_matches_plan_schema() -> None:
     assert f["history"] == {"lane_changes_last_10_steps": 0, "steps_in_current_lane": 5}
     assert f["ego"] == {"lane": 2, "lane_count": 4, "speed_mps": 29.6, "target_speed_mps": 30.0}
     assert f["action"]["lane_after"] == 1
+    assert f["action"]["lane_changes_last_10_steps_including_this_action"] == 1
+    idle = build("IDLE", lane=2, speed=25.0, after=OPEN, current=CLEAR, lane_changes=3)
+    assert "lane_changes_last_10_steps_including_this_action" not in idle["action"]
     assert f["lane_after_action"]["is_leftmost"] is True
     assert f["lane_after_action"]["slower_vehicle_ahead_within_40_m"] is False
     assert f["zones"] == []

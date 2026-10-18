@@ -153,6 +153,14 @@ def build(
     target = speed if target is None else target
     new_lane = lane_after(action, lane)
     after_speed = target_after(action, target)
+    action_block: dict[str, Any] = {
+        "name": action,
+        "meaning": ACTION_MEANING[action],
+        "lane_after": new_lane,
+        "target_speed_after_mps": after_speed,
+    }
+    if new_lane != lane:  # a real lane change carries the count it would make
+        action_block["lane_changes_last_10_steps_including_this_action"] = lane_changes + 1
     return {
         "ego": {
             "lane": lane,
@@ -160,12 +168,7 @@ def build(
             "speed_mps": speed,
             "target_speed_mps": target,
         },
-        "action": {
-            "name": action,
-            "meaning": ACTION_MEANING[action],
-            "lane_after": new_lane,
-            "target_speed_after_mps": after_speed,
-        },
+        "action": action_block,
         "lane_after_action": lane_block(new_lane, speed, speed_after=after_speed, **after),
         "current_lane": current_block(speed, **current),
         "traffic": {"vehicles_within_50_m": traffic},
@@ -185,7 +188,13 @@ def to_sentences(f: dict[str, Any]) -> list[str]:
         f"Ego speed: {ego['speed_mps']} m/s, target speed {ego['target_speed_mps']} m/s. "
         f"Ego lane: {ego['lane']} of {ego['lane_count']} (lanes numbered from the left).",
         f"Candidate action {act['name']}: {act['meaning']}. Lane after action: {act['lane_after']}. "
-        f"Target speed after action: {act['target_speed_after_mps']} m/s.",
+        f"Target speed after action: {act['target_speed_after_mps']} m/s."
+        + (
+            " Lane changes in the last 10 steps including this one: "
+            f"{act['lane_changes_last_10_steps_including_this_action']}."
+            if "lane_changes_last_10_steps_including_this_action" in act
+            else ""
+        ),
         f"Lane {act['lane_after']} after the action: nearest vehicle behind is "
         f"{la['vehicle_behind_gap_m']} m back, closing at {la['vehicle_behind_closing_speed_mps']} m/s; "
         f"nearest vehicle ahead is {la['vehicle_ahead_gap_m']} m away at {la['vehicle_ahead_speed_mps']} m/s. "

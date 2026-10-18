@@ -29,7 +29,8 @@ on Oct 17 (`headway_s`, `time_to_collision_ahead_s`, `being_tailgated`,
     "name": "LANE_LEFT",
     "meaning": "move one lane to the left",
     "lane_after": 3,
-    "target_speed_after_mps": 25.0
+    "target_speed_after_mps": 25.0,
+    "lane_changes_last_10_steps_including_this_action": 2
   },
   "lane_after_action": {
     "is_leftmost": false,
@@ -54,9 +55,11 @@ on Oct 17 (`headway_s`, `time_to_collision_ahead_s`, `being_tailgated`,
 }
 ```
 
-Two blocks are conditional. `lane_right_of_lane_after` appears only when the
-lane after the action is lane 1; `zones` holds one entry per zone not yet
-passed and is an empty list otherwise.
+Two blocks and one field are conditional. `lane_right_of_lane_after` appears
+only when the lane after the action is lane 1; `zones` holds one entry per
+zone not yet passed and is an empty list otherwise; and
+`action.lane_changes_last_10_steps_including_this_action` is present only
+when the action is a real lane change.
 
 ### `ego`
 
@@ -75,6 +78,7 @@ passed and is an empty list otherwise.
 | `meaning` | Plain words. A lane change at the road edge says it changes nothing: "keep lane 1, already the leftmost lane, so this action changes nothing". Without that, the judge scored a no-op lane change as a gap violation. |
 | `lane_after` | Lane after the action, clamped to the road. |
 | `target_speed_after_mps` | The controller's target after the action, from the vehicle's discrete speed grid: `FASTER` and `SLOWER` move `speed_index` one notch and clamp to the ends of `target_speeds`. |
+| `lane_changes_last_10_steps_including_this_action` | Only on a real lane change: `history.lane_changes_last_10_steps` plus one. The number the rate rule is judged on, computed here so the judge compares one number with the rule's instead of adding this action to the history. Left off other actions on purpose: Jev already scores IDLE after past changes near 0.08, and repeating the history count on it would read as IDLE breaking the rule for changes already made. Added Oct 17 after the first evaluation showed the judge underconfident on the rate rule. |
 
 ### `lane_after_action`
 
@@ -145,6 +149,7 @@ retires them at the top of each step anyway (see
 | Tailgating is close and closing | `TAILGATE_RANGE_M = 10` | A vehicle behind within 10 m whose speed exceeds the ego's. |
 | Density is a count | `_traffic`, `TRAFFIC_RANGE_M = 50` | Vehicles within 50 m along the road, any lane, ego excluded. |
 | History is ten transitions | `lane_history`, `HISTORY_STEPS = 10` | The runner keeps twenty past lanes so `steps_in_current_lane` can exceed ten. |
+| A lane change counts itself | `_action_block` | A real lane change carries the history count plus one; the checker computes the same sum. |
 | Margins use the speed after the action | `_headway_and_ttc` | Headway and time to collision divide by the target speed the action commits to. |
 | One step is one second | `STEP_SECONDS = 1.0` | Matches `policy_frequency: 1`; used for zone entry. |
 | Neighbours come from the road | `road.neighbour_vehicles(ego, lane_tuple)` | highway-env's own lookup on the target lane, so the facts and the simulator agree. |
@@ -169,7 +174,7 @@ is exactly what the judge saw. For the example above:
 
 ```text
 Ego speed 24.4 m/s, target 25 m/s, lane 4 of 4 (numbered from the left).
-LANE_LEFT: move one lane to the left. Lane after: 3. Target speed after: 25 m/s.
+LANE_LEFT: move one lane to the left. Lane after: 3. Target speed after: 25 m/s. Lane changes in the last 10 steps including this one: 2.
 Lane 3 after the action: nearest vehicle behind is 1.5 m away, closing at -3.9 m/s; nearest vehicle ahead is 56.3 m away at 20.4 m/s. Slower vehicle ahead within 40 m: no. Headway: 2.3 s. Time to collision ahead: 12.2 s. Tailgated within 10 m: no.
 Current lane 4: nearest vehicle ahead is 7.2 m away at 21.1 m/s. Slower vehicle ahead within 40 m: yes.
 Traffic: 5 vehicles within 50 m. Lane changes in the last 10 steps: 1. Steps in the current lane: 4.
@@ -194,7 +199,9 @@ or a new block therefore invalidates every cached answer. That is the right
 behaviour, since a different state is a different question, but it means a
 warm cache for the demo seeds has to be rebuilt after editing this module.
 The Oct 17 additions did exactly that: every key changed, so the demo seeds
-need `interlock run` again before a mock-mode demo. See
+need `interlock run` again before a mock-mode demo. The lane-change count
+added later that day changed only the keys of real lane-change candidates,
+since the other candidates' facts are byte for byte the same. See
 [Jev integration](jev-integration.md).
 
 ## Tests
@@ -205,6 +212,8 @@ wording for edge lane changes, the lane-to-the-right block, the slower flag
 needing both gap and speed, headway, time to collision, tailgating and density
 against the simulator, `lane_history` over short and long sequences, the
 no-op action set, zone facts relative to the ego with the entry flag, the
-speed grid for `target_speed_after`, and that the sentences cover every block.
+speed grid for `target_speed_after`, that only a real lane change carries
+the count including itself and that the checker agrees with it, and that the
+sentences cover every block.
 `tests/test_episode.py` checks that the history in every logged candidate
 matches the lanes of the preceding records.

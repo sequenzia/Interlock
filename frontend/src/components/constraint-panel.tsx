@@ -102,15 +102,15 @@ export function ConstraintPanel() {
         )}
         <div className="flex flex-wrap gap-1">
           {presets.map((p) => {
-            const present = constraints.some((c) => c.checker === p.checker);
+            const present = constraints.some((c) => c.text === p.text);
             return (
               <button
-                key={p.checker}
+                key={p.id}
                 className="chip"
                 type="button"
                 disabled={disabled || present}
                 title={present ? "already in the list" : "add this preset rule"}
-                onClick={() => send({ type: "add_constraint", text: p.text, checker: p.checker })}
+                onClick={() => send({ type: "add_constraint", text: p.text, checker: p.checker ?? undefined })}
               >
                 + {p.text}
               </button>

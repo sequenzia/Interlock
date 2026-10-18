@@ -3,7 +3,7 @@ from itertools import pairwise
 from pathlib import Path
 
 import pytest
-from backend.constraints import ConstraintStore
+from backend.constraints import PRESETS, ConstraintStore
 from backend.env import make_env
 from backend.episode import OPERATORS, EpisodeRunner, Escalation, simulated_operator
 from backend.jev_client import JevCache, JevClient
@@ -59,7 +59,7 @@ def test_mock_shield_on_escalates_every_step_and_logs(policy: Policy, tmp_path: 
     assert summary["judge_sources"] == {"unavailable": 4}
     for r in records:
         assert [c["rank"] for c in r["candidates"]] == [0, 1, 2, 3, 4]
-        assert len(r["candidates"][0]["checks"]) == 4
+        assert len(r["candidates"][0]["checks"]) == len(PRESETS)
         assert r["ego"]["lane"] in (1, 2, 3, 4) and len(r["vehicles"]) == 30
 
 
@@ -142,7 +142,7 @@ def test_shield_off_runs_in_shadow(policy: Policy, tmp_path: Path) -> None:
     for r in records:
         assert r["executed"] == r["candidates"][0]["action"] and r["human"] is None
         assert r["escalation_reason"] is None and r["fallback"]["kind"] == "least_bad"
-        assert len(r["candidates"][0]["checks"]) == 4  # judge and checkers still ran
+        assert len(r["candidates"][0]["checks"]) == len(PRESETS)  # judge and checkers still ran
 
 
 def test_lane_history_in_the_facts_matches_the_logged_lanes(policy: Policy, tmp_path: Path) -> None:

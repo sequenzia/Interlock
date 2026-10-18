@@ -2,7 +2,9 @@ from typing import Any
 
 from backend.checkers import label, label_all
 from backend.constraints import (
+    CHECKER_HEADWAY,
     CHECKER_LANE_CHANGE_GAP,
+    CHECKER_LANE_CHANGE_RATE,
     CHECKER_LANE_CLOSED,
     CHECKER_LEFT_LANE_PASSING,
     CHECKER_SPEED_LIMIT,
@@ -15,6 +17,8 @@ GAP = Constraint("c2", PRESETS[CHECKER_LANE_CHANGE_GAP], checker=CHECKER_LANE_CH
 PASSING = Constraint("c3", PRESETS[CHECKER_LEFT_LANE_PASSING], checker=CHECKER_LEFT_LANE_PASSING)
 CLOSED = Constraint("c4", PRESETS[CHECKER_LANE_CLOSED], checker=CHECKER_LANE_CLOSED)
 FREE_TEXT = Constraint("c5", "Be courteous to trucks")
+HEADWAY = Constraint("c6", PRESETS[CHECKER_HEADWAY], checker=CHECKER_HEADWAY)
+RATE = Constraint("c7", PRESETS[CHECKER_LANE_CHANGE_RATE], checker=CHECKER_LANE_CHANGE_RATE)
 
 
 def facts(
@@ -77,6 +81,40 @@ def test_lane_closed_reads_the_zone_entry_fact() -> None:
     assert label(facts("IDLE", lane=3, enters_zone=True), CLOSED) is True
     assert label(facts("LANE_LEFT", lane=3, lane_after=2, enters_zone=False), CLOSED) is False
     assert label(facts("IDLE", lane=3), CLOSED) is False
+
+
+def test_headway_rule_reads_the_headway_after_the_action() -> None:
+    f = facts("IDLE")
+    f["lane_after_action"]["headway_s"] = 1.9
+    assert label(f, HEADWAY) is True
+    f["lane_after_action"]["headway_s"] = 2.0
+    assert label(f, HEADWAY) is False
+    f["lane_after_action"]["headway_s"] = None  # nobody ahead
+    assert label(f, HEADWAY) is False
+    three = Constraint("c9", "Keep at least 3 seconds of headway", checker=CHECKER_HEADWAY)
+    f["lane_after_action"]["headway_s"] = 2.5
+    assert label(f, three) is True
+
+
+def test_lane_change_rate_counts_recent_changes_plus_this_one() -> None:
+    f = facts("LANE_LEFT", lane=3, lane_after=2)
+    f["history"] = {"lane_changes_last_10_steps": 1, "steps_in_current_lane": 2}
+    assert label(f, RATE) is True
+    f["history"]["lane_changes_last_10_steps"] = 0
+    assert label(f, RATE) is False
+    idle = facts("IDLE")
+    idle["history"] = {"lane_changes_last_10_steps": 5, "steps_in_current_lane": 0}
+    assert label(idle, RATE) is False
+    edge = facts("LANE_LEFT", lane=1, lane_after=1)
+    edge["history"] = {"lane_changes_last_10_steps": 3, "steps_in_current_lane": 0}
+    assert label(edge, RATE) is False  # a no-op at the road edge
+    two = Constraint(
+        "c9", "At most 2 lane changes in any 10 seconds", checker=CHECKER_LANE_CHANGE_RATE
+    )
+    f["history"]["lane_changes_last_10_steps"] = 1
+    assert label(f, two) is False
+    f["history"]["lane_changes_last_10_steps"] = 2
+    assert label(f, two) is True
 
 
 def test_free_text_rule_has_no_label() -> None:

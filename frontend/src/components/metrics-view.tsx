@@ -24,12 +24,24 @@ import type { EvalReport, Reliability } from "../types";
 const ON = "#3987e5";
 const OFF = "#d95926";
 const AQUA = "#199e70";
-const CHECKER_COLOR: Record<string, string> = { speed_limit: ON, lane_change_gap: OFF, left_lane_passing: AQUA };
+const CHECKER_COLOR: Record<string, string> = {
+  speed_limit: ON,
+  lane_change_gap: OFF,
+  left_lane_passing: AQUA,
+  headway: "#a78bfa",
+  lane_change_rate: "#f59e0b",
+  cut_in: "#f472b6",
+  dense_traffic: "#22d3ee",
+};
 const CHECKER_LABEL: Record<string, string> = {
   speed_limit: "speed limit",
   lane_change_gap: "lane change gap",
   left_lane_passing: "left lane passing",
   lane_closed: "lane closed",
+  headway: "headway 2 s",
+  lane_change_rate: "one lane change per 10 s",
+  cut_in: "room when moving in",
+  dense_traffic: "conservative in dense traffic",
 };
 const GRID = "#383835";
 const INK = "#c3c2b7";
@@ -181,7 +193,7 @@ export function MetricsView() {
                   const rel = cal.by_checker[name];
                   if (!rel) return null;
                   return (
-                    <Line key={name} data={reliabilitySeries(rel)} dataKey="observed" name={`${CHECKER_LABEL[name] ?? name}, ECE ${rel.ece.toFixed(3)}`} stroke={CHECKER_COLOR[name]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
+                    <Line key={name} data={reliabilitySeries(rel)} dataKey="observed" name={`${CHECKER_LABEL[name] ?? name}${rel.label_source === "human" ? " (hand labels)" : ""}, ECE ${rel.ece.toFixed(3)}`} stroke={CHECKER_COLOR[name]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
                   );
                 })}
               </LineChart>

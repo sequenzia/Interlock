@@ -46,11 +46,12 @@ in that module's `add_arguments`, so `python -m backend.<module>` and
 | `server.py` | `Session`, `create_app`, `session_from_env`, replay helpers. The WebSocket server. |
 | `metrics.py` | `episode_metrics`, `aggregate`, `collect_checks`, `reliability`, `calibration`. Records in, numbers out. |
 | `evaluate.py` | `run_config`, `build_report`, the sweep. Behind `interlock eval`. |
+| `label.py` | Hand labels for rules without a checker, keyed by facts and rule text. Behind `interlock label`. |
 | `plots.py` | Three matplotlib figures from the report JSON. |
 | `cli.py` | The `interlock` entry point and the `console` subcommand that supervises uvicorn and Vite. |
 | `spike/jev_spike.py` | The offline-checkable Jev probe behind `interlock spike`; writes raw requests under `backend/logs/spike/`. |
 | `.env.example` | Template for `backend/.env`, which holds `TYPESAFE_API_KEY` and is gitignored. |
-| `logs/` | Runtime output, gitignored: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `jev_cache.jsonl`. |
+| `logs/` | Runtime output, gitignored: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `labels/` (hand labels per rule), `jev_cache.jsonl`. |
 
 ## frontend/
 

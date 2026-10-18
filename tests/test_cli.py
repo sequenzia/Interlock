@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from backend import cli, evaluate, run_episode, train
+from backend import cli, evaluate, label, run_episode, train
 from backend.spike import jev_spike
 
 
@@ -18,6 +18,7 @@ def test_subcommands_dispatch_to_their_modules():
     assert parse("eval", "--mode", "on").func is evaluate.run_cli
     assert parse("train", "--timesteps", "5").func is train.run_cli
     assert parse("spike", "--dry-run").func is jev_spike.run_cli
+    assert parse("label", "--run", "x", "--rule", "y").func is label.run_cli
     assert parse("console").func is cli.run_console
 
 
@@ -28,7 +29,7 @@ def test_run_flags_are_the_module_flags():
 
 
 @pytest.mark.parametrize(
-    "main", [cli.main, run_episode.main, evaluate.main, train.main, jev_spike.main]
+    "main", [cli.main, run_episode.main, evaluate.main, train.main, jev_spike.main, label.main]
 )
 def test_help_exits_zero(main):
     with pytest.raises(SystemExit) as exc:

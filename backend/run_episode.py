@@ -63,7 +63,7 @@ async def main_async(args: argparse.Namespace) -> int:
         jev_mode = "live" if os.environ.get("TYPESAFE_API_KEY") else "mock"
 
     store = ConstraintStore()
-    # "all" is the three standing rules; the lane-closed rule arrives with a zone drop.
+    # "all" is the standing rules, every preset but lane-closed, which arrives with a zone drop.
     standing = [r for r in PRESETS if r != CHECKER_LANE_CLOSED]
     rule_ids = standing if args.rules == "all" else [r for r in args.rules.split(",") if r]
     if args.rules != "none":
@@ -117,7 +117,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--rules",
         default="all",
-        help='comma list of preset ids, "all" (three standing rules) or "none"; the zone rule comes with --zone-at-step',
+        help='comma list of preset ids, "all" (every preset but the zone rule) or "none"; the zone rule comes with --zone-at-step',
     )
     parser.add_argument(
         "--zone-at-step", type=int, default=None, help="drop the default work zone at this step"

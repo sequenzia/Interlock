@@ -69,7 +69,7 @@ The fact schema is on the [Facts](../developer-guide/backend/facts.md) page.
 
 ## Ground-truth checkers score, never decide
 
-Each of the four preset rules has a small checker in code that labels a candidate action as a violation or not, for example "target speed after the action exceeds the limit". Those labels are what the evaluation counts and what the calibration compares against. They are never consulted by the shield: the decision comes from Jev's probabilities alone. If the checkers fed the decision the demo would be a rules engine, not a shield over a decision model. A rule typed in free text has no checker; it is enforced by the shield but not scored.
+Six of the eight preset rules have a small checker in code that labels a candidate action as a violation or not, for example "target speed after the action exceeds the limit". Those labels are what the evaluation counts and what the calibration compares against. They are never consulted by the shield: the decision comes from Jev's probabilities alone. If the checkers fed the decision the demo would be a rules engine, not a shield over a decision model. The other two presets, and any rule typed in free text, have no checker; the shield enforces them, nothing in code scores them, and only hand labels collected with `interlock label` bring them into the calibration.
 
 ## Mock mode and the cache
 

@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 from backend.constraints import CHECKER_LANE_CLOSED, PRESETS, ConstraintStore
 from backend.episode import EpisodeRunner, simulated_operator
 from backend.jev_client import DEFAULT_MODEL, JevClient, make_client
+from backend.label import load_labels
 from backend.logger import JsonlLogger, read_log
 from backend.metrics import aggregate, calibration, episode_metrics
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
@@ -118,7 +119,7 @@ async def run_config(
         "wall_seconds": round(time.perf_counter() - started, 1),
         "episodes": episodes,
         "aggregate": aggregate(episodes),
-        "calibration": calibration(all_records),
+        "calibration": calibration(all_records, labels=load_labels()),
     }
     (out_dir / "metrics.json").write_text(json.dumps(report, indent=1))
     return report
@@ -129,7 +130,9 @@ def new_run_dir(root: Path, label: str) -> Path:
     return root / f"{stamp}_{label}"
 
 
-def load_run(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def load_run(
+    path: Path, labels: dict[str, bool] | None = None
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Read a run directory and recompute its metrics from the seed logs.
 
     The record is the source of truth and metrics.json is a cache of it, so a
@@ -145,7 +148,9 @@ def load_run(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     all_records = [r for records in per_seed for r in records]
     episodes = [episode_metrics(records) for records in per_seed]
     stored.update(
-        episodes=episodes, aggregate=aggregate(episodes), calibration=calibration(all_records)
+        episodes=episodes,
+        aggregate=aggregate(episodes),
+        calibration=calibration(all_records, labels=labels),
     )
     (path / "metrics.json").write_text(json.dumps(stored, indent=1))
     return stored, all_records
@@ -172,10 +177,11 @@ def build_report(
     runs = newest_runs(root)
     if not runs:
         raise SystemExit(f"no eval runs under {root}")
+    labels = load_labels()
     loaded: dict[str, dict[str, Any]] = {}
     all_records: list[dict[str, Any]] = []
     for label, path in runs.items():
-        loaded[label], records = load_run(path)
+        loaded[label], records = load_run(path, labels)
         all_records.extend(records)
     off_label = config_label(False, thresholds, None)
     on_label = config_label(True, thresholds, None)
@@ -199,7 +205,7 @@ def build_report(
                 }
             )
     sweep_points.sort(key=lambda p: p["t_allow"])
-    cal = calibration(all_records)
+    cal = calibration(all_records, labels=labels)
     report: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "thresholds_default": {"t_allow": thresholds.t_allow, "t_block": thresholds.t_block},

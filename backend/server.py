@@ -36,6 +36,7 @@ from backend.constraints import (
     DEFAULT_ZONE_NAME,
     PRESETS,
     ConstraintStore,
+    preset_checker,
 )
 from backend.env import ACTION_NAMES, DEFAULT_CONFIG
 from backend.episode import EpisodeRunner, Escalation
@@ -143,7 +144,10 @@ class Session:
                 "steps_per_sec": self.speed,
                 "escalation_timeout_s": self.timeout_s,
             },
-            "presets": [{"checker": checker, "text": text} for checker, text in PRESETS.items()],
+            "presets": [
+                {"id": pid, "checker": preset_checker(pid), "text": text}
+                for pid, text in PRESETS.items()
+            ],
             "zone_defaults": {
                 "lane": DEFAULT_ZONE_LANE,
                 "ahead_m": DEFAULT_ZONE_AHEAD_M,

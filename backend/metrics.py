@@ -10,7 +10,10 @@ import statistics
 from collections.abc import Iterable
 from typing import Any
 
+from backend.label import label_key, rule_group
+
 Record = dict[str, Any]
+Check = tuple[float, bool, str]  # p, label, calibration group
 
 
 def _percentile(values: list[float], q: float) -> float:
@@ -129,26 +132,44 @@ def aggregate(episodes: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def collect_checks(records: Iterable[Record]) -> list[tuple[float, bool, str]]:
-    """Every (p, label, checker) with a ground-truth label, across all candidates."""
-    out: list[tuple[float, bool, str]] = []
+def _collect(
+    records: Iterable[Record], labels: dict[str, bool] | None
+) -> tuple[list[Check], dict[str, str]]:
+    """Labeled checks across all candidates, and each group's label source.
+
+    A rule with a checker is grouped by checker id and labeled by it. A rule
+    without one is grouped by its preset id or a slug of its text and labeled
+    by hand when ``labels`` holds its facts-plus-rule key; otherwise skipped.
+    """
+    out: list[Check] = []
+    sources: dict[str, str] = {}
     for r in records:
-        checker_of = {c["id"]: c.get("checker") or "free_text" for c in r["constraints"]}
+        by_id = {c["id"]: c for c in r["constraints"]}
         for cand in r["candidates"]:
             for check in cand["checks"]:
-                if check["ground_truth"] is None:
+                c = by_id.get(check["constraint_id"])
+                if c is None:
                     continue
-                out.append(
-                    (
-                        float(check["p_violation"]),
-                        bool(check["ground_truth"]),
-                        checker_of.get(check["constraint_id"], "unknown"),
-                    )
-                )
-    return out
+                truth = check["ground_truth"]
+                if c.get("checker"):
+                    group, source = c["checker"], "checker"
+                else:
+                    group, source = rule_group(c["text"]), "human"
+                    if truth is None and labels:
+                        truth = labels.get(label_key(cand["facts"], c["text"]))
+                if truth is None:
+                    continue
+                out.append((float(check["p_violation"]), bool(truth), group))
+                sources[group] = source
+    return out, sources
 
 
-def reliability(checks: list[tuple[float, bool, str]], bins: int = 10) -> dict[str, Any]:
+def collect_checks(records: Iterable[Record], labels: dict[str, bool] | None = None) -> list[Check]:
+    """Every (p, label, group) with a label, from the checkers or from hand labels."""
+    return _collect(records, labels)[0]
+
+
+def reliability(checks: list[Check], bins: int = 10) -> dict[str, Any]:
     """Equal-width bins of p; observed violation rate per bin; ECE and Brier."""
     n = len(checks)
     rows = []
@@ -184,14 +205,18 @@ def reliability(checks: list[tuple[float, bool, str]], bins: int = 10) -> dict[s
     }
 
 
-def calibration(records: Iterable[Record], bins: int = 10) -> dict[str, Any]:
-    checks = collect_checks(records)
-    by_checker: dict[str, list[tuple[float, bool, str]]] = {}
+def calibration(
+    records: Iterable[Record], bins: int = 10, labels: dict[str, bool] | None = None
+) -> dict[str, Any]:
+    """Reliability overall and per group; each group records whether a checker or a person labeled it."""
+    checks, sources = _collect(records, labels)
+    by_group: dict[str, list[Check]] = {}
     for item in checks:
-        by_checker.setdefault(item[2], []).append(item)
+        by_group.setdefault(item[2], []).append(item)
     return {
         "overall": reliability(checks, bins),
         "by_checker": {
-            name: reliability(items, bins) for name, items in sorted(by_checker.items())
+            name: {**reliability(items, bins), "label_source": sources[name]}
+            for name, items in sorted(by_group.items())
         },
     }

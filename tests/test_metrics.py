@@ -132,3 +132,23 @@ def test_calibration_bins_and_ece() -> None:
     assert 0 < rel["ece"] < 0.2 and 0 < rel["brier"] < 0.2 and rel["accuracy_at_0_5"] == 0.875
     cal = calibration(records)
     assert set(cal["by_checker"]) == {"speed_limit"} and cal["overall"]["n"] == 8
+
+
+def test_hand_labels_fill_in_free_text_rules_for_calibration() -> None:
+    from backend.label import label_key
+
+    rec = record(0, "allow", "FASTER", [("c1", 0.95, True), ("c5", 0.8, None)])
+    rec["candidates"][0]["facts"] = {"x": 1}
+    rec["candidates"][1]["facts"] = {"x": 2}
+    key = label_key({"x": 1}, "free")
+    assert {g for _, _, g in collect_checks([rec])} == {"speed_limit"}
+    checks = collect_checks([rec], labels={key: True})
+    assert (0.8, True, "free") in checks and len(checks) == 3
+    cal = calibration([rec], labels={key: True})
+    assert cal["by_checker"]["free"] == {
+        **cal["by_checker"]["free"],
+        "n": 1,
+        "label_source": "human",
+    }
+    assert cal["by_checker"]["speed_limit"]["label_source"] == "checker"
+    assert calibration([rec])["by_checker"].keys() == {"speed_limit"}

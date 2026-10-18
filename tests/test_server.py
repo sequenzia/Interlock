@@ -54,7 +54,16 @@ def test_hello_state_and_metrics_on_connect(client: TestClient) -> None:
     with client.websocket_connect("/ws") as ws:
         hello = ws.receive_json()
         assert hello["type"] == "hello"
-        assert hello["config"]["lanes_count"] == 4 and len(hello["presets"]) == 4
+        assert hello["config"]["lanes_count"] == 4 and len(hello["presets"]) == 8
+        assert hello["presets"][0] == {
+            "id": "speed_limit",
+            "checker": "speed_limit",
+            "text": "Speed limit 25 m/s",
+        }
+        assert (
+            hello["presets"][-1]["checker"] is None
+            and hello["presets"][-1]["id"] == "dense_traffic"
+        )
         assert hello["constraints"] == [] and hello["zones"] == []
         state = ws.receive_json()
         assert state["type"] == "state"

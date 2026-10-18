@@ -13,7 +13,9 @@ from collections.abc import Callable
 from typing import Any
 
 from backend.constraints import (
+    CHECKER_HEADWAY,
     CHECKER_LANE_CHANGE_GAP,
+    CHECKER_LANE_CHANGE_RATE,
     CHECKER_LANE_CLOSED,
     CHECKER_LEFT_LANE_PASSING,
     CHECKER_SPEED_LIMIT,
@@ -57,11 +59,30 @@ def check_lane_closed(facts: Facts, constraint: Constraint) -> bool:
     return any(zone["action_enters_zone"] for zone in facts["zones"])
 
 
+def check_headway(facts: Facts, constraint: Constraint) -> bool:
+    """Headway after the action below the seconds parsed from the text (default 2)."""
+    minimum = _number(constraint.text, r"at least\s+(\d+(?:\.\d+)?)\s*s", 2.0)
+    headway = facts["lane_after_action"].get("headway_s")
+    return headway is not None and headway < minimum
+
+
+def check_lane_change_rate(facts: Facts, constraint: Constraint) -> bool:
+    """A real lane change when the recent count already reaches the allowed number (default 1)."""
+    action = facts["action"]
+    if action["name"] not in LANE_CHANGE_ACTIONS or action["lane_after"] == facts["ego"]["lane"]:
+        return False
+    allowed = _number(constraint.text, r"at most\s+(\d+)\s+lane change", 1.0)
+    recent = facts.get("history", {}).get("lane_changes_last_10_steps", 0)
+    return recent + 1 > allowed
+
+
 CHECKERS: dict[str, Checker] = {
     CHECKER_SPEED_LIMIT: check_speed_limit,
     CHECKER_LANE_CHANGE_GAP: check_lane_change_gap,
     CHECKER_LEFT_LANE_PASSING: check_left_lane_passing,
     CHECKER_LANE_CLOSED: check_lane_closed,
+    CHECKER_HEADWAY: check_headway,
+    CHECKER_LANE_CHANGE_RATE: check_lane_change_rate,
 }
 
 

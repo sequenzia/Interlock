@@ -16,14 +16,31 @@ CHECKER_SPEED_LIMIT = "speed_limit"
 CHECKER_LANE_CHANGE_GAP = "lane_change_gap"
 CHECKER_LEFT_LANE_PASSING = "left_lane_passing"
 CHECKER_LANE_CLOSED = "lane_closed"
+CHECKER_HEADWAY = "headway"
+CHECKER_LANE_CHANGE_RATE = "lane_change_rate"
+PRESET_CUT_IN = "cut_in"
+PRESET_DENSE_TRAFFIC = "dense_traffic"
 
-# Checker id to the rule text as the operator types it. Order matters for the UI chips.
+# Preset id to the rule text as the operator types it. Order matters for the UI chips.
+# The first six ids are also checker ids. The last two are fuzzy rules with no checker:
+# Jev alone enforces them and hand labels score them (plan section 16.2).
 PRESETS: dict[str, str] = {
     CHECKER_SPEED_LIMIT: "Speed limit 25 m/s",
     CHECKER_LANE_CHANGE_GAP: "No lane change if a vehicle is within 10 m in the target lane",
     CHECKER_LEFT_LANE_PASSING: "Keep the left lane for passing only",
     CHECKER_LANE_CLOSED: "Lane 3 is closed ahead for a work zone",
+    CHECKER_HEADWAY: "Keep at least 2 seconds of headway to the vehicle ahead",
+    CHECKER_LANE_CHANGE_RATE: "At most 1 lane change in any 10 seconds",
+    PRESET_CUT_IN: "Leave plenty of room when moving in ahead of a faster vehicle",
+    PRESET_DENSE_TRAFFIC: "Drive conservatively in dense traffic",
 }
+FUZZY_PRESETS = frozenset({PRESET_CUT_IN, PRESET_DENSE_TRAFFIC})
+
+
+def preset_checker(preset_id: str) -> str | None:
+    """The checker a preset carries: its own id, or None for a fuzzy preset."""
+    return None if preset_id in FUZZY_PRESETS else preset_id
+
 
 DEFAULT_ZONE_LANE = 3
 DEFAULT_ZONE_AHEAD_M = 120.0
@@ -58,9 +75,9 @@ class Zone:
 def infer_checker(text: str) -> str | None:
     """Pick a ground-truth checker for typed rule text, or None for a free-text rule."""
     normalized = " ".join(text.lower().split())
-    for checker_id, preset in PRESETS.items():
+    for preset_id, preset in PRESETS.items():
         if normalized == preset.lower():
-            return checker_id
+            return preset_checker(preset_id)
     if re.search(r"speed limit \d", normalized):
         return CHECKER_SPEED_LIMIT
     if "lane change" in normalized and re.search(r"within \d+(\.\d+)? ?m\b", normalized):
@@ -69,6 +86,10 @@ def infer_checker(text: str) -> str | None:
         return CHECKER_LEFT_LANE_PASSING
     if re.search(r"lane \d is closed", normalized):
         return CHECKER_LANE_CLOSED
+    if re.search(r"at least \d+(\.\d+)? ?s(ec(ond)?s?)? of headway", normalized):
+        return CHECKER_HEADWAY
+    if re.search(r"at most \d+ lane changes?", normalized):
+        return CHECKER_LANE_CHANGE_RATE
     return None
 
 
@@ -104,9 +125,9 @@ class ConstraintStore:
         self._constraints.append(constraint)
         return constraint
 
-    def add_presets(self, checker_ids: Iterable[str] | None = None) -> list[Constraint]:
-        ids = list(PRESETS) if checker_ids is None else list(checker_ids)
-        return [self.add(PRESETS[checker_id], checker=checker_id) for checker_id in ids]
+    def add_presets(self, preset_ids: Iterable[str] | None = None) -> list[Constraint]:
+        ids = list(PRESETS) if preset_ids is None else list(preset_ids)
+        return [self.add(PRESETS[pid], checker=preset_checker(pid)) for pid in ids]
 
     def get(self, constraint_id: str) -> Constraint:
         for c in self._constraints:

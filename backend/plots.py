@@ -23,12 +23,20 @@ CHECKER_SERIES = {
     "speed_limit": "#2a78d6",
     "lane_change_gap": "#eb6834",
     "left_lane_passing": "#1baf7a",
+    "headway": "#7c3aed",
+    "lane_change_rate": "#b45309",
+    "cut_in": "#db2777",
+    "dense_traffic": "#0e7490",
 }
 CHECKER_LABEL = {
     "speed_limit": "Speed limit 25 m/s",
     "lane_change_gap": "Lane change gap 10 m",
     "left_lane_passing": "Left lane for passing",
     "lane_closed": "Lane closed",
+    "headway": "Headway 2 s",
+    "lane_change_rate": "One lane change per 10 s",
+    "cut_in": "Room when moving in",
+    "dense_traffic": "Conservative in dense traffic",
 }
 
 
@@ -172,7 +180,8 @@ def plot_calibration(cal: dict[str, Any], path: Path) -> Path:
             marker="o",
             markersize=5,
             markeredgecolor=SURFACE,
-            label=f"{CHECKER_LABEL.get(name, name)}, ECE {rel['ece']:.3f}",
+            label=f"{CHECKER_LABEL.get(name, name)}"
+            f"{' (hand labels)' if rel.get('label_source') == 'human' else ''}, ECE {rel['ece']:.3f}",
             zorder=3,
         )
     _style(

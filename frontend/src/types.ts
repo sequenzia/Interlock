@@ -178,7 +178,8 @@ export interface Metrics {
 }
 
 export interface Preset {
-  checker: string;
+  id: string;
+  checker: string | null;
   text: string;
 }
 
@@ -300,6 +301,7 @@ export interface Reliability {
   ece: number;
   brier: number;
   accuracy_at_0_5: number;
+  label_source?: "checker" | "human";
 }
 
 export interface EvalReport {

@@ -22,6 +22,8 @@ around Oct 23, 2026.
   keys, a consistent standard per rule, and where the labels land.
 - `internal/decision-models-research.md`: public facts about Jev and the
   decision-model category as of Oct 16. Vendor claims, not measured behavior.
+- `internal/experiment-tracker.md`: the Oct 19 assessment of adding Weights &
+  Biases, deferred to after the talk, with the phased plan to add it.
 - `internal/eval/latest.json` and `internal/plots/`: the Day 5 evaluation.
   Plan section 10 holds the results table and the reading of it.
 - `docs/` and `mkdocs.yml`: the public documentation site (MkDocs Material),

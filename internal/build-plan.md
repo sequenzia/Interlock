@@ -83,8 +83,6 @@ at most 0.05.
 | 3 | Sun Oct 18 | `server.py` WebSocket with live and replay sources; React console: road view, constraint panel, status strip, play/pause/step/reset | Live sim in the browser; add and toggle rules; drop a work zone |
 | 4 | Mon Oct 19 | Approval queue and escalation round trip; decision timeline with inspector drawer | Approve and deny from the UI; click any tick to see questions, answers, Q-values |
 | 5 | Tue Oct 20 | `evaluate.py`: before/after, threshold sweep, calibration; metrics panel; Playwright smoke test; CLAUDE.md run commands | Numbers and plots exist; test passes |
-| 6 | Wed Oct 21 | Backup video, mock-mode dry run with network off, slides | Demo runs offline end to end |
-| 7 | Thu Oct 22 | Rehearsal, buffer | Talk fits the slot |
 
 Cut lines if a day slips: metrics panel in the UI (plots go to slides from
 matplotlib), Playwright test, click-to-place zones, inspector raw
@@ -851,10 +849,12 @@ mid-episode zone drop.
 - [x] `TYPESAFE_API_KEY` in `backend/.env`; Day 1 spike run on Oct 16.
 - [x] Jev model pinned to `jev-1.13.0`.
 - [x] N for the passing-lane rule is 40 m (`facts.SLOWER_AHEAD_RANGE_M`).
-- [ ] Install ffmpeg via Homebrew if QuickTime screen recording is not enough for the backup video.
 - [ ] After the talk: `fly apps destroy interlock-backend`. The machine is always-on by design and bills around ten dollars a month while it exists.
 - [x] Backend host: Fly.io, `fly.toml` at the repo root, app `interlock-backend` in `iad` (Oct 16).
 - [x] Console deployed Oct 16: Vercel project `interlock-console`, https://interlock-console-pied.vercel.app, `VITE_BACKEND_URL=https://interlock-backend.fly.dev`. `CONSOLE_ORIGINS` in `fly.toml` carries every production alias; on Oct 18 the pied alias was found to redirect to `interlock-sequenzia.vercel.app`, which was missing from the list, so the metrics fetch was CORS-blocked until that origin was added.
+- [ ] After the talk: experiment tracker. Assessed Oct 19 and deferred past the
+  freeze; the reasoning and the phased plan are in `experiment-tracker.md`.
+  Start with `interlock eval --list`, then Weights & Biases behind `--track`.
 
 ## 15. Deployment (added Oct 16)
 
@@ -1070,10 +1070,10 @@ and the first plan went from brief to deployed in one night.
 | 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot. Rules, command and eval done Oct 17; labels are the operator's work and pending. |
 | 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor. Floor done Oct 17 with the table in section 10 and the default at 2 s. Baseline code, plot and panel done Oct 17; live run done Oct 18 after the structured-output fix, numbers and reading in section 10. |
 | 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed. Done Oct 17. |
-| 6 | Freeze: docs sweep, section 10 and README corrected, backup video, rehearsal | `mkdocs build --strict` passes; video recorded; no code changes after this point |
+| 6 | Freeze: docs sweep, section 10 and README corrected | `mkdocs build --strict` passes; no code changes after this point |
 
-Human-paced work: collecting labels in phase 3 and the video and rehearsal in
-phase 6 need the operator's time. Everything else is agent time.
+Human-paced work: collecting labels in phase 3 needs the operator's time.
+Everything else is agent time.
 
 Risks: widening the facts shifts preset answers, caught by the spike re-run;
 the conflict policy changes every on-mode number, so all tables regenerate

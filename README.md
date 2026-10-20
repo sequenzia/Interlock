@@ -2,6 +2,8 @@
 
 **The policy was trained once. The rules changed live, in plain English.**
 
+**Live demo:** [interlock-demo.vercel.app](https://interlock-demo.vercel.app) · **Documentation:** [sequenzia.github.io/interlock](https://sequenzia.github.io/interlock/)
+
 Interlock is a runtime safety shield for a reinforcement learning agent, with a
 human on the loop. A Stable-Baselines3 DQN drives in [highway-env](https://highway-env.farama.org/)
 on task reward alone and knows nothing about rules. At every step,
@@ -15,9 +17,12 @@ the evaluation numbers.
 Built as a demo of runtime safety for learned policies and human-on-the-loop
 design.
 
-Full documentation, with a user guide for the console and the command line and
-a developer guide for every module and contract, is at
-[sequenzia.github.io/interlock](https://sequenzia.github.io/interlock/). It builds
+The live demo at [interlock-demo.vercel.app](https://interlock-demo.vercel.app)
+is one shared session: every browser sees the same episode and any of them can
+press play, add a rule or answer an escalation. The documentation at
+[sequenzia.github.io/interlock](https://sequenzia.github.io/interlock/) has a
+user guide for the console and the command line, a developer guide for every
+module and contract, and a reference for every flag and variable. It builds
 from `docs/` with `uv run mkdocs serve -a 127.0.0.1:8080`.
 
 Interlock is an independent personal project and is not affiliated with any
@@ -94,9 +99,9 @@ unavailable.
 20 seeded episodes of 60 steps with seven standing rules (speed limit, lane
 change gap, left lane for passing, 2 second headway, one lane change per 10
 seconds, and two fuzzy rules about moving in ahead of a faster vehicle and
-driving conservatively in dense traffic), live Jev, and a simulated operator
-that answers from the ground-truth checkers. The full run takes about seven
-minutes and costs under a dollar.
+driving conservatively in dense traffic), the 2 second physics floor, live
+Jev, and a simulated operator that answers from the ground-truth checkers.
+The full run takes about seven minutes and costs under a dollar.
 
 | Configuration | Violations per episode | Task return | Crash rate | Steps escalated |
 | --- | --- | --- | --- | --- |
@@ -109,15 +114,25 @@ By rule, shield off to on: speed limit 1030 violations to 0, lane change gap
 300 to 5. When no candidate satisfies every rule the shield asks the operator
 to choose rather than running a last resort, and a 2 second time-to-collision
 floor in code removes the closest calls before any rule is judged, which is
-why no shielded episode crashes. Calibration over 174,625 labeled checks gives an expected
-calibration error of 0.095 and 98.7% accuracy at a 0.5 cut, with the speed and
-lane-change rate rules at 100% and the passing rule the weakest. Jev answers a full step of five
-requests in about 158 ms at the median from a cold cache.
+why no shielded episode crashes. Jev answers a full step of five requests in
+about 158 ms at the median from a cold cache.
+
+Calibration over 244,393 labeled checks across all seven rules gives an
+expected calibration error of 0.101 and 94.6% accuracy at a 0.5 cut. The five
+crisp rules alone score 0.095 and 98.7%, with the speed limit and lane-change
+rate rules at 100%. The two fuzzy rules, labeled by a fixed standard that
+`interlock autolabel` applies to every state in the pool, are the honest
+counterweight: Jev enforces "drive conservatively in dense traffic" about as
+well as the headway rule once "dense" is pinned down (ECE 0.110, 79.1%
+accuracy), and does not score "leave plenty of room when moving in ahead of a
+faster vehicle" on this road at all (ECE 0.221; its probability barely moves
+with the two facts that decide the rule). The band catches underconfidence,
+not an uninformative number.
 
 ![Reliability diagram per rule](internal/plots/calibration.png)
 
-The same questions put to chat models on 2,000 checks balanced over rule and
-label: Claude Sonnet 5.5 is better calibrated than Jev on that sample, ECE
+The same questions put to chat models on 2,000 checks balanced over the five
+crisp rules and label: Claude Sonnet 5.5 is better calibrated than Jev on that sample, ECE
 0.060 against 0.139, yet at the default band it would have allowed 3
 violations and blocked 5 compliant actions where Jev allowed and blocked
 none, because Jev errs toward uncertainty and the band turns that into a
@@ -127,9 +142,11 @@ against 158 ms per step, and roughly 860 times the cost per episode.
 
 ![Jev against chat models on the same checks](internal/plots/baseline.png)
 
-The threshold sweep, the reading of these numbers and the design decisions
-behind them live in `internal/build-plan.md`. Measured Jev behavior from the
-Day 1 spike is in `internal/jev-spike-results.md`.
+The full sweep, the floor sensitivity, the per-rule breakdown and the reading
+of these numbers are on the
+[evaluation page](https://sequenzia.github.io/interlock/user-guide/evaluation/)
+of the docs. The design decisions behind them live in `internal/build-plan.md`,
+and measured Jev behavior from the Day 1 spike in `internal/jev-spike-results.md`.
 
 ## The operator console
 
@@ -138,27 +155,33 @@ A dark, dense console in React with a Canvas 2D road view.
 - **Road view**: ego-centered, four lanes, vehicles interpolated between steps,
   closed zones hatched, the executed action as a solid arrow and a blocked
   action as a ghost arrow.
+- **Unshielded twin**: under the road view, a faded second road replays the
+  same seed with the shield off, in step with the live run, with a running
+  count of its violations and the step where it crashed. It appears whenever
+  a shield-off log exists for the seed; the evaluation covers seeds 0 to 19.
 - **Operator rules**: type any rule, or add one of the eight presets. Toggle,
   remove, drop a work zone ahead with one click. The zone arms its rule and
   retires it once the zone is passed.
 - **Approval queue**: the proposed action, its facts in plain sentences, the
   rule that fired, the probability, what deny would execute, and approve or
-  deny by button or keyboard.
+  deny by button or keyboard. When no candidate is confidently safe the queue
+  lists all five, ranked, for the operator to pick from.
 - **Decision timeline and inspector**: one tick per step colored by outcome.
   Click a tick to scrub the road view to that step and open the inspector: the
   five candidates by Q-value, the probability grid against every rule with the
   checker's label, the facts, and the exact Jev request and response.
 - **Shield toggle on the same seed**, speed control, replay of any logged run,
-  and a metrics tab with the before/after bars, the tradeoff curve and the
-  reliability diagram.
+  and a metrics tab with the before/after bars, the tradeoff curve, the
+  reliability diagram, the physics floor table and the chat-model comparison.
 
 Keyboard: space plays and pauses, `n` steps, `a` and `d` answer an escalation,
-arrow keys scrub, Esc returns to live.
+`1` to `5` override it with the candidate of that rank, arrow keys scrub, Esc
+returns to live.
 
 ## Getting started
 
-Requirements: Python 3.12 via [uv](https://docs.astral.sh/uv/), Node 20+ with
-[pnpm](https://pnpm.io/), and a TypeSafe API key for live judging. Everything
+Requirements: Python 3.12 via [uv](https://docs.astral.sh/uv/), Node 20.19+
+or 22.12+ with [pnpm](https://pnpm.io/), and a TypeSafe API key for live judging. Everything
 also runs offline in mock mode, which replays cached Jev answers and escalates
 anything it has not seen.
 
@@ -183,8 +206,9 @@ Run a shielded episode headlessly, with per-step output and a JSONL log:
 
 ```
 uv run interlock run --shield on
-uv run interlock run --shield off --seed 3
-uv run interlock run --jev mock --zone-at-step 10
+uv run interlock run --shield off --seed 3          # also warms the unshielded twin for seed 3
+uv run interlock run --jev mock --zone-at-step 10   # offline, drop the work zone mid-episode
+uv run interlock run --floor-s 0                    # no physics floor; eval and console take the same flag
 ```
 
 Run the console. One command starts the WebSocket server on :8000 and the Vite
@@ -200,11 +224,13 @@ uv run interlock console --reload --open                       # dev loop, open 
 The console flags map onto the server's environment variables: `--jev` sets
 `JEV_MODE` (default: live when the key is present), `--escalation-timeout`
 sets `ESCALATION_TIMEOUT_S` (default 20; 0 waits for the operator
-indefinitely, recommended for a live demo), and `--seed`, `--model-path` and
-`--cache` set `SEED`, `MODEL_PATH` and `JEV_CACHE_PATH`. The two halves still
-run on their own with `uv run uvicorn backend.server:app --reload` and
-`cd frontend && pnpm dev`, or `uv run interlock console --no-ui` for the
-server alone.
+indefinitely, recommended for a live demo), `--floor-s` sets `FLOOR_S`
+(default 2.0; 0 disables the physics floor), and `--seed`, `--model-path` and
+`--cache` set `SEED`, `MODEL_PATH` and `JEV_CACHE_PATH`; an empty cache file
+makes every step escalate. `--port` and `--ui-port` move the two servers. The
+two halves still run on their own with `uv run uvicorn backend.server:app
+--reload` and `cd frontend && pnpm dev`, or `uv run interlock console --no-ui`
+for the server alone.
 
 Evaluate and plot:
 
@@ -212,6 +238,14 @@ Evaluate and plot:
 uv run interlock eval --seeds 0-19 --all --concurrency 2   # off, five threshold pairs, report
 uv run interlock eval --report                             # rebuild internal/eval and internal/plots
 ```
+
+The remaining subcommands feed the calibration and the comparisons:
+`interlock autolabel` labels the two fuzzy rules by the fixed standard,
+`interlock label` hand-labels one rule from a run, `interlock baseline` puts
+the same checks to chat models (needs `ANTHROPIC_API_KEY`), and
+`interlock spike` reruns the Day 1 Jev checklist. `uv run interlock <command>
+--help` lists each one's flags, and the docs have a
+[command line page](https://sequenzia.github.io/interlock/user-guide/cli/).
 
 Frontend checks:
 
@@ -246,11 +280,13 @@ curl http://127.0.0.1:8000/health
 ```
 
 The image carries the lock, `backend/`, `models/dqn_highway.zip`, the eval
-report for the metrics tab and the warm Jev cache when
-`backend/logs/jev_cache.jsonl` exists, so demo seeds answer from cache.
-`backend/.env` never enters the image. The container reads the same variables
-from its environment: `TYPESAFE_API_KEY`, `JEV_MODE`, `ESCALATION_TIMEOUT_S`,
-`SEED`, plus two for hosting:
+report for the metrics tab, the warm Jev cache when
+`backend/logs/jev_cache.jsonl` exists, so demo seeds answer from cache, and
+the shield-off logs that draw the unshielded twin. `.dockerignore` is an
+allowlist, so a new runtime file has to be added there. `backend/.env` never
+enters the image. The container reads the same variables from its
+environment: `TYPESAFE_API_KEY`, `JEV_MODE`, `ESCALATION_TIMEOUT_S`, `SEED`,
+`MODEL_PATH`, `JEV_CACHE_PATH`, `FLOOR_S`, plus two for hosting:
 
 - `CONSOLE_ORIGINS`: comma-separated console origins allowed to fetch
   `/health` and `/eval/latest` cross-origin, for example
@@ -305,24 +341,30 @@ backend/
   facts.py         simulator state to structured facts and sentences
   constraints.py   rule store, presets, zone lifecycle
   jev_client.py    Jev through typesafe-sdk, content cache, mock mode
-  shield.py        allow / fallback / escalate rules
+  shield.py        allow / fallback / escalate rules and the physics floor
   checkers.py      ground-truth checkers, scoring only
   logger.py        the JSONL record
   episode.py       the per-step loop shared by the CLI and the server
   cli.py           the interlock command: run, eval, train, spike, label, autolabel, baseline, console
   run_episode.py   headless episode, behind interlock run
   server.py        FastAPI WebSocket server, live and replay
+  twin.py          the shield-off log for a seed, drawn under the road view
   metrics.py       episode metrics, aggregates, calibration
   evaluate.py      batch evaluation and report
   label.py         hand-label fuzzy rules for calibration, behind interlock label
   autolabel.py     the fixed standard for the fuzzy rules, behind interlock autolabel
+  baseline_llm.py  chat-LLM baseline on logged checks, behind interlock baseline
   plots.py         slide plots
+  paths.py         repo-relative paths shared by the modules
   spike/           the Day 1 Jev spike
+  logs/labels/     the committed labels for the two fuzzy rules
+  prices.example.json  model prices for the baseline's cost column; copy to prices.json
 frontend/          Vite, React, TypeScript, Tailwind, Zustand, Recharts, Playwright
 docs/              documentation site source (MkDocs Material), published to GitHub Pages
-internal/          project brief, build plan, spike results, evaluation report, plots
+internal/          project brief, build plan, spike results, labeling guide, evaluation report, plots
 models/            trained checkpoints (gitignored)
 tests/             pytest suite
+Dockerfile         the backend image; fly.toml runs it on Fly.io
 ```
 
 ## Design decisions worth knowing
@@ -338,7 +380,12 @@ tests/             pytest suite
   and passing the last zone retires it.
 - **Fuzzy rules escalate by design.** "Keep the left lane for passing only"
   sits near 0.5 for Jev regardless of phrasing. That is the human-on-the-loop
-  moment, not a bug to prompt away.
-- **The shield enforces rules, not collision safety.** An unattended
-  default-deny can override the policy's own crash avoidance, which argues for
-  a following-distance rule in the rule set and for no auto-deny in a live demo.
+  moment, not a bug to prompt away. The labeled fuzzy rules show the limit of
+  it: the band catches a judge that is unsure, not one whose number does not
+  move with the facts.
+- **Physics is code, rules are the model's, judgment is the human's.** The
+  2 second time-to-collision floor removes the closest calls before any rule
+  is judged and no console message changes it. When no candidate satisfies
+  every rule the shield asks the operator to choose rather than running a
+  last resort, because a silent default-deny can override the policy's own
+  crash avoidance.

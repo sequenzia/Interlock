@@ -72,7 +72,7 @@ The report shape is in [Evaluation report](../contracts/eval-report.md). The met
 2. `state`: playing, pause reason, shield, source, judge mode, seed, run id, speed, step, total steps (replay only), done, thresholds, floor in seconds.
 3. `history`: every record of the current episode (or the replayed prefix), so a refresh mid-run keeps the timeline.
 4. `metrics`: the runner's running summary, or counters recomputed from the replayed records.
-5. `twin`: the shield-off run of the current seed as a compact strip, from `backend/twin.py`; empty when no such log exists. Also sent after `reset` and after a replay load.
+5. `twin`: the shield-off run of the current seed as a compact strip, from `backend/twin.py`, scored against the rules the console shows; empty when no such log exists. The log's records are loaded on `reset` and on a replay load and kept on the session. `broadcast_constraints` sends the strip again whenever the scored rule set (enabled rules with a checker, by id, text and checker) changed; it is also sent after `reset` and after a replay load.
 6. `escalation`: only when one is open, so a late joiner can answer it.
 
 Message bodies are specified in [WebSocket protocol](../contracts/websocket-protocol.md). `disconnect` removes the socket; `broadcast` iterates a copy of `clients` and drops any socket whose send fails.

@@ -312,6 +312,65 @@ def test_reset_sends_the_twin_of_the_new_seed(client: TestClient, tmp_path: Path
         ws.send_json({"type": "reset", "seed": 7})
         twin = recv_until(ws, "twin")
         assert twin["seed"] == 7 and twin["run_id"] == "r7" and len(twin["steps"]) == 1
-        assert twin["violations_total"] == 1 and twin["crashed_at"] is None
+        # No rule is on yet, so nothing is scored on either side.
+        assert twin["rules"] == 0 and twin["violations_total"] == 0 and twin["crashed_at"] is None
         ws.send_json({"type": "reset", "seed": 8})
         assert recv_until(ws, "twin")["steps"] == []
+
+
+def test_twin_is_rescored_and_resent_when_the_scored_rules_change(
+    client: TestClient, tmp_path: Path
+) -> None:
+    from tests.test_twin import record, write
+
+    write(tmp_path / "runs" / "2026-10-18T01-00-00_seed7_off.jsonl", [record(0, 7, False, True)])
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "reset", "seed": 7})
+        assert recv_until(ws, "twin")["violations_total"] == 0
+
+        # A rule with a checker: the constraints message, then the twin scored against it.
+        ws.send_json({"type": "add_constraint", "text": "Speed limit 25 m/s"})
+        constraints = recv_until(ws, "constraints")
+        speed_id = constraints["constraints"][0]["id"]
+        twin = ws.receive_json()
+        assert twin["type"] == "twin" and twin["rules"] == 1 and twin["rule_ids"] == [speed_id]
+        assert twin["violations_total"] == 1 and twin["steps"][0]["violations"] == 1
+
+        # A rule without a checker changes nothing the twin can see: no twin message follows.
+        ws.send_json({"type": "add_constraint", "text": "Drive conservatively in dense traffic"})
+        assert ws.receive_json()["type"] == "constraints"
+        ws.send_json({"type": "pause"})
+        assert ws.receive_json()["type"] == "state"
+
+        # Switching the scored rule off takes its violations out of the twin's count.
+        ws.send_json({"type": "toggle_constraint", "id": speed_id, "enabled": False})
+        assert ws.receive_json()["type"] == "constraints"
+        twin = ws.receive_json()
+        assert twin["type"] == "twin" and twin["rules"] == 0 and twin["violations_total"] == 0
+
+        # Late joiners get the twin scored against the rules as they stand.
+        ws.send_json({"type": "toggle_constraint", "id": speed_id, "enabled": True})
+    with client.websocket_connect("/ws") as late:
+        for _ in range(4):
+            late.receive_json()
+        twin = late.receive_json()
+        assert twin["type"] == "twin" and twin["rules"] == 1 and twin["violations_total"] == 1
+
+
+def test_replay_scores_the_twin_against_the_replayed_records_rules(
+    client: TestClient, tmp_path: Path
+) -> None:
+    from tests.test_twin import record, write
+
+    write(tmp_path / "runs" / "2026-10-18T01-00-00_seed7_off.jsonl", [record(0, 7, False, True)])
+    write(tmp_path / "runs" / "2026-10-18T02-00-00_seed7_on.jsonl", [record(0, 7, True, False)])
+    with client.websocket_connect("/ws") as ws:
+        drain_greeting(ws)
+        ws.send_json({"type": "load_replay", "run_id": "2026-10-18T02-00-00_seed7_on"})
+        twin = recv_until(ws, "twin")
+        # The session has no rules on, but the replayed record has the speed limit enabled.
+        assert twin["seed"] == 7 and twin["rules"] == 1 and twin["rule_ids"] == ["c1"]
+        assert twin["violations_total"] == 1
+        ws.send_json({"type": "load_live"})
+        assert recv_until(ws, "twin")["rules"] == 0

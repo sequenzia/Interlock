@@ -2,10 +2,11 @@
 
 With the shield off the policy's top action always executes, so the trajectory
 depends only on the seed and the checkpoint, and any shield-off log for a seed
-is its twin. The server looks one up on connect, reset and replay load and
-sends a compact per-step strip; the console draws it under the road view and
-scrubs it with the live run. No Jev cost, no new state beyond the records.
-Plan section 16.5.
+is its twin. The server loads one on reset and replay load, scores each step's
+executed action against the rules the console has on, and sends a compact
+per-step strip; it re-sends the strip whenever that scored rule set changes, so
+the twin's count and the live count always answer the same question. No Jev
+cost, no new state beyond the records. Plan section 16.5.
 """
 
 from __future__ import annotations
@@ -13,11 +14,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from backend import checkers
+from backend.constraints import Constraint
 from backend.logger import read_log
 from backend.paths import LOGS_DIR
 
 RUNS_DIR = LOGS_DIR / "runs"
 EVAL_DIR = LOGS_DIR / "eval"
+
+ScoringKey = tuple[tuple[str, str, str], ...]
 
 
 def find_twin_log(
@@ -42,14 +47,40 @@ def find_twin_log(
     return None
 
 
-def twin_steps(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """One compact entry per record: scene, executed action, violations and crash flag."""
+def twin_records(seed: int, path: Path | None) -> list[dict[str, Any]]:
+    """The records of a usable shield-off log for ``seed``; empty for no log, a shielded log or another seed."""
+    if path is None:
+        return []
+    records = read_log(path)
+    if not records or records[0]["shield_on"] or records[0]["seed"] != seed:
+        return []
+    return records
+
+
+def scored_rules(constraints: list[Constraint]) -> list[Constraint]:
+    """Enabled rules that carry a ground-truth checker: the only ones either count can see."""
+    return [c for c in constraints if c.enabled and c.checker in checkers.CHECKERS]
+
+
+def scoring_key(constraints: list[Constraint]) -> ScoringKey:
+    """Everything the twin's count depends on. Unchanged key, no need to re-send the strip."""
+    return tuple((c.id, c.text, c.checker or "") for c in scored_rules(constraints))
+
+
+def twin_steps(records: list[dict[str, Any]], rules: list[Constraint]) -> list[dict[str, Any]]:
+    """One compact entry per record: scene, executed action, violations of ``rules`` and crash flag.
+
+    The executed candidate's logged facts are re-scored by the checkers, so the count
+    follows the rules passed in rather than the rules the log was written under.
+    """
     steps = []
     so_far = 0
     for r in records:
         executed = next((c for c in r["candidates"] if c["action"] == r["executed"]), None)
-        checks = executed["checks"] if executed else []
-        violations = sum(1 for c in checks if c["ground_truth"])
+        facts = executed.get("facts") if executed else None
+        violations = (
+            0 if facts is None else sum(1 for c in rules if checkers.label(facts, c) is True)
+        )
         so_far += violations
         steps.append(
             {
@@ -71,25 +102,27 @@ def empty_twin(seed: int) -> dict[str, Any]:
         "seed": seed,
         "run_id": None,
         "rules": 0,
+        "rule_ids": [],
         "steps": [],
         "violations_total": 0,
         "crashed_at": None,
     }
 
 
-def twin_message(seed: int, path: Path | None) -> dict[str, Any]:
-    """The ``twin`` message for ``seed`` from ``path``; empty when there is no usable log."""
-    if path is None:
+def twin_message(
+    seed: int, records: list[dict[str, Any]], constraints: list[Constraint]
+) -> dict[str, Any]:
+    """The ``twin`` message for ``seed`` from ``records``, scored against ``constraints``."""
+    if not records:
         return empty_twin(seed)
-    records = read_log(path)
-    if not records or records[0]["shield_on"] or records[0]["seed"] != seed:
-        return empty_twin(seed)
-    steps = twin_steps(records)
+    rules = scored_rules(constraints)
+    steps = twin_steps(records, rules)
     return {
         "type": "twin",
         "seed": seed,
         "run_id": records[0]["run_id"],
-        "rules": sum(1 for c in records[0]["constraints"] if c["enabled"]),
+        "rules": len(rules),
+        "rule_ids": [c.id for c in rules],
         "steps": steps,
         "violations_total": steps[-1]["violations_so_far"],
         "crashed_at": next((s["step"] for s in steps if s["crashed"]), None),

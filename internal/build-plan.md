@@ -472,6 +472,14 @@ As built on Oct 16 (`backend/server.py`, `frontend/src/types.ts`):
   so a browser refresh mid-demo keeps the timeline. Connect order is `hello`,
   `state`, `history`, `metrics`, then `escalation` if one is open.
 - `load_live` returns from replay to the live source.
+- `twin` (Oct 17, section 16.5) carries the shield-off run of the seed. Revised
+  Oct 20: its per-step violations are scored on the server against the rules
+  the console has on, not the rules of the logged run, so the twin's count and
+  the live count answer the same question. `rules` is the number of enabled
+  rules with a checker and `rule_ids` names them. The server re-sends `twin`
+  after any rule or zone change, and during replay when the streamed record's
+  rule set differs, whenever the scored set changed; it is sent on connect,
+  reset and replay load as before.
 - The escalation future is awaited with `asyncio.wait_for`; the timeout comes
   from `ESCALATION_TIMEOUT_S` (default 20, 0 means wait forever) and `JEV_MODE`
   picks live or mock (default: live when the key is present).
@@ -1112,6 +1120,21 @@ old all-blocked column; both were corrected on Oct 17.
   faded under the road view at the view step's index, clamped to the
   twin's last step, with violations so far and the crash step in the
   title. The image allowlists the off logs. Smoke test passes with it.
+- Revised Oct 20. The count was frozen at logging time: the eval off log
+  carries seven rules, five with checkers, so the strip read "109 of 109"
+  on seed 0 while the live run had two rules on, and the two numbers looked
+  comparable but were not. Now `twin.py` keeps the records and scores the
+  executed action's logged facts with the ground-truth checkers against the
+  rules the console has on (the store's in live mode, the streamed record's
+  in replay); the server re-sends the strip when that scored set changes.
+  The strip shows the twin's count beside the live count so far, names the
+  scored rules in its tooltip, and says "no scored rules on" when none of
+  the enabled rules has a checker. Rules without a checker, the two fuzzy
+  presets, count on neither side, as before. A rule added mid-episode
+  re-scores the whole twin, so the two counts can differ for the steps
+  before it was added; that is the honest reading of "what the unshielded
+  car does under the rules now on". A live work zone is not in the twin's
+  facts, so the lane-closed rule scores zero on the twin.
 
 ### 16.6 Phases and freeze
 

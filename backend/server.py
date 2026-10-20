@@ -35,6 +35,7 @@ from backend.constraints import (
     DEFAULT_ZONE_LENGTH_M,
     DEFAULT_ZONE_NAME,
     PRESETS,
+    Constraint,
     ConstraintStore,
     preset_checker,
 )
@@ -45,7 +46,7 @@ from backend.logger import JsonlLogger, default_log_path, read_log
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
 from backend.policy import Policy
 from backend.shield import DEFAULT_FLOOR_S, Answer, Thresholds
-from backend.twin import find_twin_log, twin_message
+from backend.twin import ScoringKey, find_twin_log, scoring_key, twin_message, twin_records
 
 log = logging.getLogger("shield.server")
 RUNS_DIR = LOGS_DIR / "runs"
@@ -132,6 +133,8 @@ class Session:
         self.replay: list[dict[str, Any]] = []
         self.replay_index = 0
         self.records: list[dict[str, Any]] = []  # this live episode, for late joiners
+        self.twin_records: list[dict[str, Any]] = []  # the shield-off log of the current seed
+        self._twin_key: ScoringKey = ()  # the scored rule set the last twin message used
         self._task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         self._reset_runner(seed)
@@ -181,10 +184,17 @@ class Session:
             "floor_s": self.runner.floor_s,
         }
 
+    def twin_constraints(self) -> list[Constraint]:
+        """The rules the console shows now: the store's, or the streamed replay record's."""
+        if self.source == "replay":
+            shown = self.replay[max(0, self.replay_index - 1)]
+            return [Constraint(**c) for c in shown["constraints"]]
+        return self.store.constraints
+
     def twin_msg(self) -> dict[str, Any]:
-        """The shield-off run of the current seed, or an empty twin when none is logged."""
+        """The shield-off run of the current seed scored against the rules shown now."""
         seed = self.runner.seed if self.source == "live" else int(self.replay[0]["seed"])
-        return twin_message(seed, find_twin_log(seed))
+        return twin_message(seed, self.twin_records, self.twin_constraints())
 
     def constraints_msg(self) -> dict[str, Any]:
         return {"type": "constraints", **self.store.snapshot()}
@@ -214,6 +224,16 @@ class Session:
     async def broadcast(self, msg: dict[str, Any]) -> None:
         for ws in list(self.clients):
             await self.send(ws, msg)
+
+    async def broadcast_twin(self) -> None:
+        self._twin_key = scoring_key(self.twin_constraints())
+        await self.broadcast(self.twin_msg())
+
+    async def broadcast_constraints(self, msg: dict[str, Any] | None = None) -> None:
+        """The constraints message, then the twin again when its scored rule set changed."""
+        await self.broadcast(self.constraints_msg() if msg is None else msg)
+        if scoring_key(self.twin_constraints()) != self._twin_key:
+            await self.broadcast_twin()
 
     # ------------------------------------------------------------------ connections
 
@@ -258,13 +278,13 @@ class Session:
                     await self.broadcast(self.state())
                 case "add_constraint":
                     self.store.add(str(msg["text"]), msg.get("checker"))
-                    await self.broadcast(self.constraints_msg())
+                    await self.broadcast_constraints()
                 case "toggle_constraint":
                     self.store.toggle(str(msg["id"]), bool(msg["enabled"]))
-                    await self.broadcast(self.constraints_msg())
+                    await self.broadcast_constraints()
                 case "remove_constraint":
                     self.store.remove(str(msg["id"]))
-                    await self.broadcast(self.constraints_msg())
+                    await self.broadcast_constraints()
                 case "drop_zone":
                     self.store.drop_zone(
                         self.runner.ego_x_m,
@@ -273,7 +293,7 @@ class Session:
                         length_m=float(msg.get("length_m", DEFAULT_ZONE_LENGTH_M)),
                         name=str(msg.get("name", DEFAULT_ZONE_NAME)),
                     )
-                    await self.broadcast(self.constraints_msg())
+                    await self.broadcast_constraints()
                 case "resolve":
                     await self.resolve(
                         str(msg["escalation_id"]), str(msg["decision"]), msg.get("action")
@@ -329,7 +349,7 @@ class Session:
         self.records.append(result.record)
         await self.broadcast({"type": "step", "record": result.record})
         if self.store.snapshot() != before:
-            await self.broadcast(self.constraints_msg())
+            await self.broadcast_constraints()
         await self.broadcast(self.metrics_msg())
         if result.done:
             self.done = True
@@ -345,7 +365,7 @@ class Session:
         record = self.replay[self.replay_index]
         self.replay_index += 1
         await self.broadcast({"type": "step", "record": record})
-        await self.broadcast(
+        await self.broadcast_constraints(
             {"type": "constraints", "constraints": record["constraints"], "zones": record["zones"]}
         )
         await self.broadcast(self.metrics_msg())
@@ -410,6 +430,7 @@ class Session:
         self.replay = []
         self.replay_index = 0
         self.records = []
+        self.twin_records = twin_records(seed, find_twin_log(seed))
 
     async def reset(self, seed: int) -> None:
         await self._cancel_inflight()
@@ -417,7 +438,7 @@ class Session:
         await self.broadcast(self.hello())
         await self.broadcast(self.state())
         await self.broadcast(self.metrics_msg())
-        await self.broadcast(self.twin_msg())
+        await self.broadcast_twin()
 
     async def load_replay(self, run_id: str) -> None:
         path = RUNS_DIR / f"{Path(run_id).name}.jsonl"
@@ -431,6 +452,8 @@ class Session:
         self.replay = records
         self.replay_index = 0
         self.done = False
+        seed = int(records[0]["seed"])
+        self.twin_records = twin_records(seed, find_twin_log(seed))
         await self.broadcast(self.state())
         await self.broadcast(
             {
@@ -440,7 +463,7 @@ class Session:
             }
         )
         await self.broadcast(self.metrics_msg())
-        await self.broadcast(self.twin_msg())
+        await self.broadcast_twin()
 
     async def close(self) -> None:
         await self._cancel_inflight()

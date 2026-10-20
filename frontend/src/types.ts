@@ -227,9 +227,10 @@ export interface TwinStep {
 export interface Twin {
   seed: number;
   run_id: string | null;
-  rules: number;
+  rules: number; // enabled rules with a checker in the session now: what the counts are scored against
+  rule_ids: string[]; // their ids, in rule order
   steps: TwinStep[]; // empty when no shield-off log exists for the seed
-  violations_total: number;
+  violations_total: number; // over the whole twin run, against those rules
   crashed_at: number | null;
 }
 

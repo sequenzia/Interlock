@@ -47,7 +47,7 @@ The shield switch in the strip toggles the shield for subsequent steps; it reads
 
 ## The unshielded twin
 
-Under the road view, when the seed has a shield-off log, a faded strip replays the unshielded run of the same seed in step with the live one. With the shield off the policy's top action always executes, so that run depends only on the seed and the checkpoint; it is the baseline the live run is being compared with, on screen. Its title counts the twin's violations so far against the same scored rules and marks where it crashed. Reset to a seed without a log and the strip disappears. See [Tour](tour.md#unshielded-twin).
+Under the road view, when the seed has a shield-off log, a faded strip replays the unshielded run of the same seed in step with the live one. With the shield off the policy's top action always executes, so that run depends only on the seed and the checkpoint; it is the baseline the live run is being compared with, on screen. Its title counts the twin's violations so far beside the live run's, both against the rules you have on that carry a checker, and marks where it crashed. Reset to a seed without a log and the strip disappears. See [Tour](tour.md#unshielded-twin).
 
 ## The decision badge
 

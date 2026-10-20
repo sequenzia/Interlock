@@ -1,30 +1,63 @@
 import { useEffect, useState } from "react";
 import { DECISION_CLASS, DECISION_LABEL, fmtMs, fmtUsd } from "../format";
+import { KeyboardIcon, PauseIcon, PlayIcon, ResetIcon, StepIcon } from "../icons";
 import { selectLatestStep, useStore } from "../store";
 import { send } from "../ws-client";
 
 const SPEEDS = [0.5, 1, 2, 4];
 const NO_RUNS: string[] = [];
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="flex flex-col items-end leading-tight">
-      <span className="text-[10px] tracking-[0.18em] text-zinc-500 uppercase">{label}</span>
-      <span className="text-[12px] text-zinc-200 tabular-nums">{value}</span>
+    <div className={`flex flex-col items-end leading-tight ${className ?? ""}`}>
+      <span className="stat-label">{label}</span>
+      <span className="num text-xs text-zinc-100">{value}</span>
     </div>
   );
 }
 
-export function StatusStrip() {
+/** One slot, one badge: the most urgent state wins, so the header never grows. */
+function StatusSlot() {
+  const session = useStore((s) => s.session);
+  const inspecting = useStore((s) => s.selectedStep);
+  const latest = useStore(selectLatestStep);
+  const paused = session?.paused_on_escalation_id != null;
+  const done = session?.done ?? false;
+  let badge: React.ReactNode = null;
+  if (paused) {
+    badge = (
+      <span className="badge min-w-0 border-escalate/60 bg-escalate/15 text-escalate">
+        <span className="truncate">waiting on operator</span>
+      </span>
+    );
+  } else if (inspecting !== null) {
+    badge = (
+      <span className="badge min-w-0 border-zinc-500 bg-zinc-800 text-zinc-100" title="arrow keys move, esc follows live">
+        <span className="truncate">inspecting {inspecting}</span>
+      </span>
+    );
+  } else if (done) {
+    badge = (
+      <span className="badge min-w-0 border-zinc-600 text-zinc-300">
+        <span className="truncate">episode over</span>
+      </span>
+    );
+  } else if (latest) {
+    badge = (
+      <span className={`badge min-w-0 ${DECISION_CLASS[latest.decision]}`}>
+        <span className="truncate">
+          {DECISION_LABEL[latest.decision]}
+          {latest.executed !== latest.candidates[0]?.action && <span className="font-mono"> → {latest.executed}</span>}
+        </span>
+      </span>
+    );
+  }
+  return <div className="flex min-w-0 flex-1 items-center overflow-hidden">{badge}</div>;
+}
+
+function Transport() {
   const connected = useStore((s) => s.connected);
   const session = useStore((s) => s.session);
-  const hello = useStore((s) => s.hello);
-  const metrics = useStore((s) => s.metrics);
-  const latest = useStore(selectLatestStep);
-  const runs = useStore((s) => s.hello?.runs) ?? NO_RUNS;
-  const view = useStore((s) => s.view);
-  const setView = useStore((s) => s.setView);
-  const inspecting = useStore((s) => s.selectedStep);
   const [seed, setSeed] = useState(0);
   const sessionSeed = session?.seed;
   useEffect(() => {
@@ -36,127 +69,241 @@ export function StatusStrip() {
   const paused = session?.paused_on_escalation_id != null;
   const done = session?.done ?? false;
   const replay = session?.source === "replay";
-  const total = replay ? session?.total_steps : hello?.config.duration;
+  const shieldOn = session?.shield_on ?? true;
 
   return (
-    <header className="panel flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
-      <div className="flex shrink-0 items-center gap-2">
-        <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-rose-500"}`} />
-        <span className="text-[12px] font-semibold tracking-[0.22em] text-zinc-200">INTERLOCK</span>
+    <>
+      <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/60 p-1">
+        <button
+          className="btn btn-flat h-7"
+          disabled={!ready}
+          onClick={() => send({ type: "reset", seed })}
+          aria-label="reset"
+          title="reset the episode on this seed"
+        >
+          <ResetIcon />
+          <span className="talk-hide max-2xl:hidden">reset</span>
+        </button>
+        <label className="flex h-7 items-center gap-1.5 pr-1 text-2xs text-zinc-400">
+          <span className="max-2xl:hidden">seed</span>
+          <input
+            type="number"
+            min={0}
+            aria-label="seed"
+            className="num h-6 w-11 rounded border border-zinc-700 bg-zinc-950 px-1.5 text-xs text-zinc-100 focus:border-accent focus-visible:outline-none"
+            value={seed}
+            onChange={(e) => setSeed(Number(e.target.value))}
+          />
+        </label>
+        <span className="h-4 w-px bg-zinc-700/70" />
+        <button
+          className="btn btn-flat h-7"
+          disabled={!ready || playing || paused || done}
+          onClick={() => send({ type: "step" })}
+          aria-label="step"
+          title="one step (n)"
+        >
+          <StepIcon />
+          <span className="max-2xl:hidden">step</span>
+        </button>
+        <button
+          className={`btn h-7 ${playing ? "" : "btn-primary"}`}
+          disabled={!ready || done}
+          onClick={() => send({ type: playing ? "pause" : "play" })}
+          aria-label={playing ? "pause" : "play"}
+          title="play or pause (space)"
+        >
+          {playing ? <PauseIcon /> : <PlayIcon />}
+          <span className="max-2xl:hidden">{playing ? "pause" : "play"}</span>
+        </button>
+        <select
+          aria-label="speed in steps per second"
+          title="steps per second"
+          className="btn btn-flat num h-7 pr-1 pl-2"
+          value={session?.speed ?? 2}
+          disabled={!ready}
+          onChange={(e) => send({ type: "set_speed", steps_per_sec: Number(e.target.value) })}
+        >
+          {SPEEDS.map((v) => (
+            <option key={v} value={v}>
+              {v}/s
+            </option>
+          ))}
+        </select>
       </div>
-      <div className="flex shrink-0 overflow-hidden rounded border border-zinc-700 text-[11px]">
-        {(["console", "metrics"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setView(v)}
-            className={`px-2 py-0.5 ${view === v ? "bg-zinc-700 text-zinc-100" : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"}`}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
-      <span className={`badge ${replay ? "border-amber-500/50 text-amber-300" : "border-zinc-700 text-zinc-300"}`}>
-        {session?.source ?? "offline"}
-      </span>
-      <span className={`badge ${session?.judge_mode === "live" ? "border-cyan-500/40 text-cyan-300" : "border-zinc-700 text-zinc-400"}`}>
-        jev {session?.judge_mode ?? "?"}
-      </span>
-
-      <div className="mx-1 h-5 w-px bg-zinc-800" />
-
-      <label className="flex items-center gap-1 text-[11px] text-zinc-400">
-        seed
-        <input
-          type="number"
-          min={0}
-          className="w-14 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-zinc-200"
-          value={seed}
-          onChange={(e) => setSeed(Number(e.target.value))}
-        />
-      </label>
-      <button className="btn" disabled={!ready} onClick={() => send({ type: "reset", seed })}>
-        reset
-      </button>
-      <button className="btn" disabled={!ready || playing || paused || done} onClick={() => send({ type: "step" })}>
-        step
-      </button>
-      <button
-        className={`btn ${playing ? "" : "btn-primary"}`}
-        disabled={!ready || done}
-        onClick={() => send({ type: playing ? "pause" : "play" })}
-      >
-        {playing ? "pause" : "play"}
-      </button>
-      <select
-        className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-300"
-        value={session?.speed ?? 2}
-        disabled={!ready}
-        onChange={(e) => send({ type: "set_speed", steps_per_sec: Number(e.target.value) })}
-      >
-        {SPEEDS.map((v) => (
-          <option key={v} value={v}>
-            {v} steps/s
-          </option>
-        ))}
-      </select>
-
-      <div className="mx-1 h-5 w-px bg-zinc-800" />
 
       <button
+        type="button"
+        role="switch"
+        aria-checked={shieldOn}
         disabled={!ready || replay}
-        onClick={() => send({ type: "set_shield", on: !(session?.shield_on ?? true) })}
-        className={`badge transition-colors ${
-          session?.shield_on
-            ? "border-cyan-500/60 bg-cyan-500/20 text-cyan-100"
-            : "border-zinc-700 bg-zinc-800 text-zinc-400"
-        }`}
+        onClick={() => send({ type: "set_shield", on: !shieldOn })}
+        className="flex shrink-0 items-center gap-1.5 text-xs text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="shield"
         title="Toggle the shield on the same seed"
       >
-        shield {session?.shield_on ? "on" : "off"}
+        <span className="switch" data-on={shieldOn} aria-hidden="true">
+          <span className="switch-knob" />
+        </span>
+        <span className="max-2xl:hidden">shield</span>
+        <span className={`num ${shieldOn ? "text-accent" : "text-zinc-400"}`}>{shieldOn ? "on" : "off"}</span>
       </button>
-      {paused && <span className="badge border-violet-500/60 bg-violet-500/20 text-violet-200">waiting on operator</span>}
-      {done && <span className="badge border-zinc-600 text-zinc-300">episode over</span>}
 
-      <div className="mx-1 h-5 w-px bg-zinc-800" />
+      <StatusSlot />
+    </>
+  );
+}
 
-      <select
-        className="max-w-[210px] rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-300"
-        value=""
-        disabled={!ready || runs.length === 0}
-        onChange={(e) => {
-          if (e.target.value) send({ type: "load_replay", run_id: e.target.value });
-        }}
-        title="Replay a logged run"
-      >
-        <option value="">{runs.length ? `replay a run (${runs.length})` : "no logged runs yet"}</option>
-        {runs.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
-      {replay && (
-        <button className="btn" onClick={() => send({ type: "load_live" })}>
-          back to live
-        </button>
-      )}
-      {inspecting !== null && (
-        <span className="badge border-violet-500/40 text-violet-200">inspecting {inspecting}</span>
-      )}
+/** "2026-10-20T02-14-00_seed0_on" reads as "10-20 02:14 seed0_on" in the menu. */
+function runLabel(runId: string): string {
+  return runId.replace(/^\d{4}-(\d\d-\d\d)T(\d\d)-(\d\d)-\d\d_/, "$1 $2:$3 ");
+}
 
-      <div className="flex-1" />
+/** One menu for the source: live, or any logged run to replay. */
+function SourceMenu() {
+  const connected = useStore((s) => s.connected);
+  const session = useStore((s) => s.session);
+  const runs = useStore((s) => s.hello?.runs) ?? NO_RUNS;
+  if (!session) return <span className="badge border-zinc-700 text-zinc-400">offline</span>;
+  const replay = session.source === "replay";
+  return (
+    <select
+      aria-label="source: live or a logged run"
+      title={replay ? `replaying ${session.run_id}. Pick live to go back.` : "Replay a logged run"}
+      className={`badge cursor-pointer bg-transparent ${replay ? "w-[12rem] border-fallback/50 text-fallback" : "w-[4.75rem] border-zinc-700 text-zinc-300"}`}
+      value={replay ? session.run_id : "live"}
+      disabled={!connected}
+      onChange={(e) => {
+        if (e.target.value === "live") send({ type: "load_live" });
+        else send({ type: "load_replay", run_id: e.target.value });
+      }}
+    >
+      <option value="live">live</option>
+      {replay && !runs.includes(session.run_id) && <option value={session.run_id}>replay {runLabel(session.run_id)}</option>}
+      {runs.map((r) => (
+        <option key={r} value={r}>
+          replay {runLabel(r)}
+        </option>
+      ))}
+    </select>
+  );
+}
 
-      {latest && (
-        <span className={`badge ${DECISION_CLASS[latest.decision]}`}>
-          {DECISION_LABEL[latest.decision]}
-          {latest.executed !== latest.candidates[0]?.action && ` -> ${latest.executed}`}
+function ReportMeta() {
+  const report = useStore((s) => s.report);
+  if (!report?.available || !report.before_after) {
+    return <span className="text-xs text-zinc-400">Evaluation report</span>;
+  }
+  const on = report.before_after.on ?? report.before_after.off;
+  const t = report.thresholds_default;
+  const generated = report.generated_at ? report.generated_at.slice(0, 16).replace("T", " ") : "?";
+  return (
+    <div className="flex min-w-0 items-center gap-4 overflow-hidden text-xs whitespace-nowrap text-zinc-400">
+      <span className="font-medium text-zinc-200">Evaluation report</span>
+      <span>
+        generated <span className="num text-zinc-200">{generated}</span>
+      </span>
+      <span>
+        seeds <span className="num text-zinc-200">{on?.seeds.length ?? 0}</span>
+      </span>
+      {t && (
+        <span>
+          thresholds{" "}
+          <span className="num text-zinc-200">
+            {t.t_allow} / {t.t_block}
+          </span>
         </span>
       )}
-      <Stat label="step" value={session ? `${session.step}${total ? ` / ${total}` : ""}` : "-"} />
-      <Stat label="jev" value={latest ? `${latest.judge.source} ${fmtMs(latest.judge.latency_ms)}` : "-"} />
-      <Stat label="cost" value={metrics ? fmtUsd(metrics.cost_usd) : "-"} />
-      <Stat label="violations" value={metrics ? String(metrics.violations_total) : "-"} />
+      {on && (
+        <span>
+          jev <span className="num text-zinc-200">{on.jev_mode}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function LiveStats() {
+  const session = useStore((s) => s.session);
+  const hello = useStore((s) => s.hello);
+  const metrics = useStore((s) => s.metrics);
+  const latest = useStore(selectLatestStep);
+  const replay = session?.source === "replay";
+  const total = replay ? session?.total_steps : hello?.config.duration;
+  return (
+    <div className="flex items-center gap-3">
+      <Stat label="step" value={session ? `${session.step}${total ? ` / ${total}` : ""}` : "-"} className="min-w-[3.5rem]" />
+      <Stat label="jev" value={latest ? `${latest.judge.source} ${fmtMs(latest.judge.latency_ms)}` : "-"} className="talk-hide min-w-[5rem] max-[1440px]:hidden" />
+      <Stat label="cost" value={metrics ? fmtUsd(metrics.cost_usd) : "-"} className="talk-hide min-w-[3.5rem] max-[1440px]:hidden" />
+      <Stat label="violations" value={metrics ? String(metrics.violations_total) : "-"} className="min-w-[4rem]" />
+    </div>
+  );
+}
+
+export function StatusStrip() {
+  const connected = useStore((s) => s.connected);
+  const session = useStore((s) => s.session);
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
+  const density = useStore((s) => s.density);
+  const setDensity = useStore((s) => s.setDensity);
+  const setShortcutsOpen = useStore((s) => s.setShortcutsOpen);
+  const talk = density === "talk";
+
+  return (
+    <header className="panel grid shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span
+            className={`h-2 w-2 rounded-full ${connected ? "bg-allow" : "pulse bg-blocked"}`}
+            title={connected ? "connected" : "reconnecting"}
+          />
+          <span className="text-xs font-semibold tracking-[0.18em] text-zinc-100">INTERLOCK</span>
+        </div>
+        <div role="tablist" className="flex overflow-hidden rounded-md border border-zinc-700 text-xs">
+          {(["console", "metrics"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={`px-2.5 py-0.5 transition-colors ${view === v ? "bg-zinc-700 text-zinc-50" : "bg-zinc-900 text-zinc-400 hover:text-zinc-100"}`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+        <SourceMenu />
+        {session?.judge_mode === "mock" && <span className="badge border-fallback/50 text-fallback">jev mock</span>}
+        {!connected && <span className="text-2xs text-blocked">reconnecting</span>}
+      </div>
+
+      <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">{view === "console" ? <Transport /> : <ReportMeta />}</div>
+
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-pressed={talk}
+            className={`btn btn-icon ${talk ? "border-accent/60 bg-accent/20 text-cyan-50" : ""}`}
+            title="Talk density: larger type for a projector"
+            onClick={() => setDensity(talk ? "normal" : "talk")}
+          >
+            Aa
+          </button>
+          <button
+            type="button"
+            className="btn btn-icon"
+            aria-label="keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <KeyboardIcon />
+          </button>
+        </div>
+        {view === "console" && <LiveStats />}
+      </div>
     </header>
   );
 }

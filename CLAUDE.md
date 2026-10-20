@@ -79,6 +79,12 @@ around Oct 23, 2026.
 - TypeScript: strict mode, kebab-case filenames, one Zustand store with
   slices for steps, constraints, queue and metrics. Zustand selectors must
   return stable references: never `?? []` or `?? {}` inside a selector.
+- Console design tokens live in `frontend/src/styles.css` under `@theme`:
+  prose in the sans face, numbers and ids in mono, 11px the smallest text,
+  outcome colors (`allow`, `fallback`, `escalate`, `blocked`) only for
+  outcomes, `hazard` for zones, `accent` for chrome. Sizes stay in rem so
+  the "Aa" button (or `?density=talk`) scales the whole console for a
+  projector. Buttons act, chips choose, badges report, switches toggle.
 - Keep the headless CLI working at all times; the server and UI sit on top
   of it, not beside it. `backend/episode.py` holds the per-step loop both share.
   `backend/cli.py` is the `interlock` command, a Typer app. Each subcommand is a

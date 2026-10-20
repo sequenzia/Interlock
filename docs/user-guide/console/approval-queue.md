@@ -11,7 +11,7 @@ The shield executes on its own only when it holds a confidently safe action: the
 | Reason | Meaning | Card color |
 | --- | --- | --- |
 | uncertain | The proposal's worst p(violation) sits inside the band between the two thresholds, 0.2 to 0.8 by default, and a confidently safe fallback exists. | violet |
-| no compliant action | No candidate at all scores below the allow threshold. Every action breaks some rule as far as the judge can tell, or the judge had no answer. | amber |
+| no compliant action | No candidate at all scores below the allow threshold. Every action breaks some rule as far as the judge can tell, or the judge had no answer. | rose |
 
 Three situations produce most escalations:
 
@@ -21,24 +21,25 @@ Three situations produce most escalations:
 
 ## What the card shows
 
+Top to bottom:
+
 | Element | Meaning |
 | --- | --- |
-| Reason badge | "uncertain" or "no compliant action", with one line saying what that means for you |
-| Action name | the policy's proposed action, always its rank 1 choice |
-| p(violation) bar | the worst probability across enabled rules for that action |
-| Rule in quotes | the rule that produced that probability |
+| Reason badge | "uncertain" or "no compliant action" in the title row |
+| Action name | the policy's proposed action, always its rank 1 choice, with its rank |
+| p(violation) bar | the worst probability across enabled rules for that action, as a white marker over the three bands of the current thresholds: green allow, violet escalate, rose block |
+| "approve" and "deny" | the two one-key answers, right under the bar. When a timeout is configured the deny button fills as it counts down and reads "auto in N s" |
+| One line of context | why the card is here, and "Deny executes X (safe / least bad / last resort fallback)": what deny would run and how the shield found it |
 | "judge unavailable, p is a placeholder" | at least one question in this step had no answer; the 0.5 is not a judgment |
-| Facts as sentences | the same facts Jev saw, rendered in plain words: ego speed and lane, what the action does, gaps in the target lane, the current lane, the lane to the right when relevant, zones |
-| Candidate list | every action in the policy's ranking with its number key, its worst p, and for a no-compliant-action card the rule behind that p. "proposal" marks rank 1, "no-op" marks an action that would change neither lane nor target speed |
-| "Deny executes X (safe / least bad / last resort fallback)" | what deny would run and how the shield found it |
-| "Auto-deny in N s" | the countdown, only when a timeout is configured |
-| "approve" and "deny" | the two one-key answers |
+| Rule in quotes | the rule that produced the probability |
+| "facts Jev saw" | the first three sentences, which carry the ego, the action and the target lane; "all N facts" shows the rest: the current lane, the lane to the right when relevant, traffic, zones |
+| Candidate table | every action in the policy's ranking with its number key, its worst p colored by the thresholds, the rule behind that p, "proposal" on rank 1 and "no-op" on an action that would change neither lane nor target speed |
 
 ## Approve, deny or override
 
 - **Approve** (++a++) executes the proposed action.
 - **Deny** (++d++) executes the fallback named on the card. The fallback is **safe** when a lower-ranked action is confidently below the allow threshold, **least bad** when none is and the shield picks the lower-ranked action with the lowest probability that is not a confident violation and is not a no-op, or the **last resort**, SLOWER or IDLE, when nothing else qualifies. A last resort is recorded as all blocked.
-- **Override** (++1++ to ++5++, or click a candidate) executes the candidate of that rank whatever the judge said about it. Picking rank 1 is the same as approve. On an uncertain card the candidates are a compact row under the facts; on a no-compliant-action card they are the main event, one row each with the rule that scored them.
+- **Override** (++1++ to ++5++, or click a candidate) executes the candidate of that rank whatever the judge said about it. Picking rank 1 is the same as approve. The candidate table is the same on both cards; on a no-compliant-action card it is the main event, since every row breaks some rule.
 
 Any connected console can answer; the first answer wins and the card disappears everywhere. The server rejects an override whose action is not one of the five candidates.
 
@@ -58,11 +59,11 @@ The badge "judge unavailable, p is a placeholder" means the shield has no opinio
 
 ## When the queue is idle
 
-With no open escalation the panel title shows the running counts, for example "3 approved · 1 denied · 2 overridden", or "empty". The body says "Nothing waiting. The shield is deciding on its own." With the shield off it says "Shield is off. Nothing escalates."
+With no open escalation the panel is one title line: "empty, the shield is deciding on its own", followed by the running counts, for example "3 approved · 1 denied · 2 overridden". With no rules it reads "empty, no rules yet", and with the shield off "shield off, nothing escalates". The card expands in place when an escalation lands.
 
 ## Where the answer goes
 
-Each answer is written into the step's log record as `human`: the decision, the chosen action for an override and null otherwise, how long the operator took in milliseconds, and `operator: "ui"`. The record also keeps `escalation_reason` and the `fallback` the shield had ready. The inspector shows the answer as a badge ("operator override LANE_RIGHT in 2140 ms") next to the reason, the decisions strip tooltip appends it in parentheses, and the metrics message counts it. These records are the labeled examples that a later threshold tuning would use. See [Timeline and inspector](timeline-and-inspector.md) and the [Log record](../../developer-guide/contracts/log-record.md).
+Each answer is written into the step's log record as `human`: the decision, the chosen action for an override and null otherwise, how long the operator took in milliseconds, and `operator: "ui"`. The record also keeps `escalation_reason` and the `fallback` the shield had ready. The inspector shows the answer as a badge ("operator override LANE_RIGHT in 2140 ms") next to the reason, the road view's HUD repeats it for the step on screen, the decisions strip marks the tick with a white dot and names the answer in its hover card, and the metrics message counts it. These records are the labeled examples that a later threshold tuning would use. See [Timeline and inspector](timeline-and-inspector.md) and the [Log record](../../developer-guide/contracts/log-record.md).
 
 ## On the command line
 

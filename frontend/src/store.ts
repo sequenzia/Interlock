@@ -1,15 +1,34 @@
 import { create } from "zustand";
 import type { StateCreator } from "zustand";
-import type { Constraint, Escalation, Hello, LogRecord, Metrics, SessionState, Twin, Zone } from "./types";
+import type { Constraint, Escalation, EvalReport, Hello, LogRecord, Metrics, SessionState, Twin, Zone } from "./types";
 
 // One store, four slices (plan: steps, constraints, queue, metrics) plus the
 // connection slice that holds hello and the session state.
 
 export type View = "console" | "metrics";
+export type Density = "normal" | "talk";
+
+const DENSITY_KEY = "interlock.density";
+
+// ?density=talk wins, then the remembered choice, then normal.
+function initialDensity(): Density {
+  if (typeof window === "undefined") return "normal";
+  const fromUrl = new URLSearchParams(window.location.search).get("density");
+  if (fromUrl === "talk" || fromUrl === "normal") return fromUrl;
+  try {
+    return window.localStorage.getItem(DENSITY_KEY) === "talk" ? "talk" : "normal";
+  } catch {
+    return "normal";
+  }
+}
 
 interface ConnectionSlice {
   view: View;
   setView: (view: View) => void;
+  density: Density;
+  setDensity: (density: Density) => void;
+  shortcutsOpen: boolean;
+  setShortcutsOpen: (open: boolean) => void;
   connected: boolean;
   hello: Hello | null;
   session: SessionState | null;
@@ -48,6 +67,8 @@ interface QueueSlice {
 interface MetricsSlice {
   metrics: Metrics | null;
   setMetrics: (metrics: Metrics) => void;
+  report: EvalReport | null; // the evaluation report once the metrics view has fetched it
+  setReport: (report: EvalReport | null) => void;
 }
 
 export type Store = ConnectionSlice & StepsSlice & ConstraintsSlice & QueueSlice & MetricsSlice;
@@ -57,6 +78,17 @@ const MAX_STEPS = 2000;
 const createConnectionSlice: StateCreator<Store, [], [], ConnectionSlice> = (set) => ({
   view: "console",
   setView: (view) => set({ view }),
+  density: initialDensity(),
+  setDensity: (density) => {
+    try {
+      window.localStorage.setItem(DENSITY_KEY, density);
+    } catch {
+      // Private mode or blocked storage: the choice lasts for the session only.
+    }
+    set({ density });
+  },
+  shortcutsOpen: false,
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   connected: false,
   hello: null,
   session: null,
@@ -123,6 +155,8 @@ const createQueueSlice: StateCreator<Store, [], [], QueueSlice> = (set) => ({
 const createMetricsSlice: StateCreator<Store, [], [], MetricsSlice> = (set) => ({
   metrics: null,
   setMetrics: (metrics) => set({ metrics }),
+  report: null,
+  setReport: (report) => set({ report }),
 });
 
 export const useStore = create<Store>()((...a) => ({

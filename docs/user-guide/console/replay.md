@@ -4,7 +4,7 @@ Every episode the server runs is written as one JSONL file under `backend/logs/r
 
 ## Starting a replay
 
-The replay picker in the status strip lists the logged runs, newest first, by run id: a timestamp, the seed and whether the shield was on, for example `2026-10-17T01-27-46_seed0_on`. Pick one. The source badge turns amber and reads `replay`, the step counter shows `0 / N` where N is the number of records, and the rules panel switches to the rules as they were at the start of that run.
+The source menu in the status strip, the badge that reads `live`, lists the logged runs, newest first, as `replay` plus the date, time, seed and whether the shield was on, for example `replay 10-17 01:27 seed0_on`. Pick one. The menu turns amber and shows the run, the step counter shows `0 / N` where N is the number of records, and the rules panel switches to the rules as they were at the start of that run.
 
 The list is read when the console connects and after a reset. A run that just finished appears after you press "reset" or refresh the page.
 
@@ -16,16 +16,16 @@ The list is read when the console connects and after a reset. A run that just fi
 | Decisions strip, inspector, scrubbing | work, since they only read records |
 | Road view | shows the logged vehicles and zones |
 | step / jev / cost / violations stats | recomputed from the records played so far |
-| "shield on" toggle | disabled |
-| Rules, presets, zones, thresholds | read-only; the panel follows each record's rule list |
+| shield switch | disabled |
+| Rules, presets, zones, thresholds | read-only, the panel says so in its title; it follows each record's rule list |
 | Approval queue | shows nothing; escalations in the log are already resolved and appear in the inspector with the operator's answer |
-| seed and "reset" | start a new live episode on that seed |
+| seed and reset | start a new live episode on that seed |
 
 The metrics message in replay (decision counts, violations, human answers, cost) is recomputed from the records rather than carried over, so the numbers are exactly those of the logged run up to the current step.
 
 ## Back to live
 
-"back to live" ends the replay and starts a fresh live episode on the seed the session had before. Reset does the same with the seed you typed.
+Pick `live` at the top of the source menu to end the replay and start a fresh live episode on the seed the session had before. Reset does the same with the seed you typed.
 
 ## Uses
 

@@ -4,7 +4,7 @@ An episode is one drive of up to 60 steps on one seed. It ends early if the ego 
 
 ## Seed and reset
 
-The seed in the status strip sets the traffic. Type a number and press "reset" to start a new episode on it. Reset discards the current episode, opens a new log file under `backend/logs/runs/`, cancels any open escalation, and keeps the rule list. The same seed always produces the same opening scene, which is what makes a shield on versus off comparison fair.
+The seed in the status strip sets the traffic. Type a number and press the reset button (the circular arrow next to it) to start a new episode on it. Reset discards the current episode, opens a new log file under `backend/logs/runs/`, cancels any open escalation, and keeps the rule list. The same seed always produces the same opening scene, which is what makes a shield on versus off comparison fair.
 
 ## Step, play, speed
 
@@ -27,7 +27,7 @@ The whole step is one message on the wire, which is why replay and the inspector
 
 ## Shield on and off
 
-The "shield on" badge toggles the shield for subsequent steps. You can flip it mid-episode. The usual demo is: run a seed with the shield off, press "reset", flip the shield on, run the same seed again.
+The shield switch in the strip toggles the shield for subsequent steps; it reads "on" in cyan or "off". You can flip it mid-episode. The usual demo is: run a seed with the shield off, press reset, flip the shield on, run the same seed again.
 
 !!! note "Shield off still judges"
     With the shield off the top action always executes, but facts, Jev and the checkers still run in shadow. Decisions are logged as allowed, the violations counter still counts, and the step still costs the same Jev tokens. Before and after numbers come from the same code path.
@@ -36,13 +36,14 @@ The "shield on" badge toggles the shield for subsequent steps. You can flip it m
 
 ![The road view with a hatched work zone ahead in lane 3](../../assets/screenshots/road-view-zone.png)
 
-- Lanes are numbered from the left starting at 1, matching the facts and the rules. Lane labels sit at the left edge.
-- The ego is cyan with a glow and its speed is printed under it.
-- A **solid arrow** from the ego shows the action that executed, colored by the decision: green allowed, amber fallback, violet escalated, rose all blocked. Left and right arrows are lane changes, a long forward arrow is FASTER, a short forward arrow is IDLE, a backward arrow is SLOWER.
-- A **dashed rose arrow** is a ghost of the policy's top action when something else executed. Seeing both at once is the shield intervening.
-- A closed zone is a hatched amber stretch of one lane labeled with its name, for example `WORK ZONE lane 3 closed`. Zones are placed with the "drop work zone ahead" button, see [Rules and zones](rules-and-zones.md).
-- `CRASH` in rose above the ego marks the step that ended the episode in a collision.
-- The line above the road repeats the step, lane, longitudinal position in metres, the decision, the blocked action if any, and the executed action.
+- Lanes are numbered from the left starting at 1, matching the facts and the rules. Lane labels sit in the gutter at the left, outside the road.
+- Every car has headlights at its front (the right end) and taillights at its rear. The ego is cyan with a white outline and a glow; traffic is grey.
+- The **chip** above and to the right of the ego names the policy's choice and what ran: `FASTER ✓` when the policy's own choice executed, `FASTER ✕ → IDLE` when something else did.
+- A **solid arrow** from the ego shows the action that executed, colored by the decision: green allowed, amber fallback, violet escalated, rose all blocked. Left and right arrows are lane changes, a forward arrow is FASTER, a backward arrow is SLOWER. IDLE, or a lane change at the edge of the road that changes nothing, is drawn as two short bars under the car, a hold mark.
+- A **dashed arrow** is a ghost of the policy's top action when something else executed: rose when a rule blocked it, amber when the physics floor removed it. Seeing both at once is the shield intervening.
+- A closed zone is a hatched orange stretch of one lane labeled with its name, for example `WORK ZONE · lane 3 closed`. Zones are placed with the "drop work zone ahead" button, see [Rules and zones](rules-and-zones.md).
+- `CRASH` in rose beside the ego marks the step that ended the episode in a collision.
+- The HUD at the top left shows the step, lane and speed, the outcome badge with the blocked action if any, and the operator's answer when there was one. The legend at the bottom right names the colors and arrows.
 
 ## The unshielded twin
 
@@ -50,7 +51,7 @@ Under the road view, when the seed has a shield-off log, a faded strip replays t
 
 ## The decision badge
 
-The badge at the right of the status strip is the latest step's outcome. `fallback -> IDLE` means the top action was confidently a violation and IDLE was the first lower-ranked action that was confidently safe. `escalated -> SLOWER` means the operator denied and the fallback ran. `allowed` with no arrow means the policy's own choice ran.
+The status badge in the strip shows the latest step's outcome whenever nothing more urgent is going on. `fallback → IDLE` means the top action was confidently a violation and IDLE was the first lower-ranked action that was confidently safe. `escalated → SLOWER` means the operator denied and the fallback ran. `allowed` with no arrow means the policy's own choice ran. The same badge sits in the road view's HUD.
 
 ## No compliant action
 
@@ -61,4 +62,4 @@ When no candidate at all is confidently safe, the shield does not pick for you. 
 
 ## When the episode ends
 
-After step 60, or on a crash, the strip shows "episode over" and "step" and "play" grey out. Press "reset" for another episode, or pick the finished run in the replay picker to walk through it again.
+After step 60, or on a crash, the strip shows "episode over" and "step" and "play" grey out. Press reset for another episode, or pick the finished run in the source menu to walk through it again.

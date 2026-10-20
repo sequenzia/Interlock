@@ -6,11 +6,13 @@
 
 | Slice | Fields | Actions |
 | --- | --- | --- |
-| Connection | `view`, `connected`, `hello`, `session`, `errors` | `setView`, `setConnected`, `setHello`, `setSession`, `pushError`, `dismissErrors` |
-| Steps | `steps`, `selectedStep` | `pushStep`, `replaceSteps`, `resetSteps`, `selectStep` |
+| Connection | `view`, `density`, `shortcutsOpen`, `connected`, `hello`, `session`, `errors` | `setView`, `setDensity`, `setShortcutsOpen`, `setConnected`, `setHello`, `setSession`, `pushError`, `dismissErrors` |
+| Steps | `steps`, `selectedStep`, `twin` | `pushStep`, `replaceSteps`, `resetSteps`, `selectStep`, `setTwin` |
 | Constraints | `constraints`, `zones`, `zoneNote` | `setConstraints`, `clearZoneNote` |
 | Queue | `escalation` | `setEscalation` |
-| Metrics | `metrics` | `setMetrics` |
+| Metrics | `metrics`, `report` | `setMetrics`, `setReport` |
+
+`density` is `normal` or `talk`; it starts from `?density=talk` in the URL, else the value remembered in `localStorage`, and `setDensity` writes it back. `App` mirrors it onto `<html data-density>`. `report` holds the evaluation report once the metrics view has fetched `/eval/latest`, so the status strip can show its metadata and the fetch happens once per page load.
 
 `hello` is the server's `hello` message (config, presets, zone defaults, logged runs, initial constraints). `session` is the latest `state` message. `steps` is this episode's log records in order. `metrics` is the running counters the server sends after every step. The message shapes are in [WebSocket protocol](../contracts/websocket-protocol.md) and the record in [Log record](../contracts/log-record.md).
 

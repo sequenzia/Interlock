@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
+import { DECISION_COLOR, isLaneNoop, uiScale } from "../format";
 import { selectViewStep, useStore } from "../store";
 import type { TwinStep } from "../types";
-import { arrowFor, drawArrow, drawCar, EGO_OFFSET_M, lerp, VIEW_M } from "./road-view";
+import { arrowFor, carSize, drawArrow, drawCar, drawHold, EGO_OFFSET_M, GUTTER_PX, lerp, SANS, VIEW_M } from "./road-view";
 
 // The unshielded twin: the shield-off run of the same seed, drawn faded under the
 // road view at the same step index as the live run, so playback and scrubbing
@@ -16,7 +17,7 @@ interface TwinFrame {
 
 const CAR = "#6b7280";
 const EGO = "#67e8f9";
-const ARROW = "#a1a1aa";
+const ARROW = "#d4d4d8";
 
 function renderTwin(canvas: HTMLCanvasElement, f: TwinFrame, laneCount: number, ended: boolean): void {
   const ctx = canvas.getContext("2d");
@@ -31,54 +32,75 @@ function renderTwin(canvas: HTMLCanvasElement, f: TwinFrame, laneCount: number, 
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  const pxPerM = W / VIEW_M;
-  const laneH = Math.max(14, Math.min(26, (H - 8) / laneCount));
+  const s = uiScale();
+  const gutter = GUTTER_PX * s;
+  const pxPerM = (W - gutter) / VIEW_M;
+  const laneH = Math.max(12, Math.min(24 * s, (H - 14 * s) / laneCount));
   const roadTop = Math.max(4, (H - laneCount * laneH) / 2);
   const laneToY = (lane: number): number => roadTop + (lane - 0.5) * laneH;
+  const cur = f.cur;
+  const prev = f.prev ?? cur;
+  const alpha = cur ? Math.min(1, Math.max(0, (performance.now() - f.t0) / f.intervalMs)) : 0;
+  const egoX = cur && prev ? lerp(prev.ego.x_m, cur.ego.x_m, alpha) : 0;
+  const xToPx = (xm: number): number => gutter + (xm - egoX + EGO_OFFSET_M) * pxPerM;
 
   ctx.globalAlpha = 0.6;
-  ctx.fillStyle = "#1c1c20";
-  ctx.fillRect(0, roadTop, W, laneCount * laneH);
+  ctx.fillStyle = "#1a1a1e";
+  ctx.fillRect(gutter, roadTop, W - gutter, laneCount * laneH);
+  const period = 18 * s;
   for (let i = 0; i <= laneCount; i++) {
     const y = roadTop + i * laneH;
     const edge = i === 0 || i === laneCount;
-    ctx.strokeStyle = edge ? "#71717a" : "#3f3f46";
+    ctx.strokeStyle = edge ? "#8b8b94" : "#4a4a52";
     ctx.lineWidth = 1;
-    ctx.setLineDash(edge ? [] : [10, 8]);
+    ctx.setLineDash(edge ? [] : [10 * s, 8 * s]);
+    ctx.lineDashOffset = edge ? 0 : ((egoX - EGO_OFFSET_M) * pxPerM) % period;
     ctx.beginPath();
-    ctx.moveTo(0, y + 0.5);
+    ctx.moveTo(gutter, y + 0.5);
     ctx.lineTo(W, y + 0.5);
     ctx.stroke();
   }
   ctx.setLineDash([]);
-  const cur = f.cur;
-  if (!cur) {
-    ctx.globalAlpha = 1;
-    return;
-  }
-  const prev = f.prev ?? cur;
-  const alpha = Math.min(1, Math.max(0, (performance.now() - f.t0) / f.intervalMs));
-  const egoX = lerp(prev.ego.x_m, cur.ego.x_m, alpha);
-  const egoLane = lerp(prev.ego.lane, cur.ego.lane, alpha);
-  const xToPx = (xm: number): number => (xm - egoX + EGO_OFFSET_M) * pxPerM;
+  ctx.lineDashOffset = 0;
+  ctx.globalAlpha = 1;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "right";
+  ctx.font = `${10 * s}px ${SANS}`;
+  ctx.fillStyle = "#71717a";
+  for (let lane = 1; lane <= laneCount; lane++) ctx.fillText(String(lane), gutter - 8 * s, laneToY(lane));
+  ctx.textAlign = "left";
+  if (!cur || !prev) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(gutter, 0, W - gutter, H);
+  ctx.clip();
+  ctx.globalAlpha = 0.65;
   const prevById = new Map(prev.vehicles.map((v) => [v.id, v]));
   for (const v of cur.vehicles) {
     const pv = prevById.get(v.id) ?? v;
     const x = xToPx(lerp(pv.x_m, v.x_m, alpha));
-    if (x < -30 || x > W + 30) continue;
+    if (x < gutter - 30 || x > W + 30) continue;
     drawCar(ctx, x, laneToY(lerp(pv.lane, v.lane, alpha)), pxPerM, laneH, CAR, false);
   }
   const ex = xToPx(egoX);
-  const ey = laneToY(egoLane);
+  const ey = laneToY(lerp(prev.ego.lane, cur.ego.lane, alpha));
   drawCar(ctx, ex, ey, pxPerM, laneH, EGO, true);
-  const [dx, dy] = arrowFor(cur.executed, laneH);
-  drawArrow(ctx, ex + (cur.executed === "FASTER" ? 10 : 0), ey, dx * 0.7, dy * 0.7, ARROW, false);
+  const [carW, carH] = carSize(pxPerM, laneH).map((v) => v * 1.12) as [number, number];
+  if (isLaneNoop(cur.executed, cur.ego.lane, laneCount) || cur.executed === "IDLE") {
+    drawHold(ctx, ex, ey + carH / 2 + 7 * s, ARROW, false, s * 0.8);
+  } else {
+    const [dx, dy] = arrowFor(cur.executed, laneH);
+    const ox = cur.executed === "FASTER" ? ex + carW / 2 : cur.executed === "SLOWER" ? ex - carW / 2 : ex;
+    drawArrow(ctx, ox, ey, dx * 0.7, dy * 0.7, ARROW, false, s * 0.8);
+  }
   ctx.globalAlpha = 1;
   if (cur.crashed || ended) {
-    ctx.fillStyle = "rgba(244,63,94,0.9)";
-    ctx.font = "bold 12px ui-monospace, monospace";
-    ctx.fillText("CRASHED", ex - 26, Math.max(10, ey - laneH * 0.9));
+    ctx.fillStyle = DECISION_COLOR.all_blocked;
+    ctx.font = `700 ${12 * s}px ${SANS}`;
+    ctx.fillText("CRASHED", ex + carW / 2 + 8 * s, ey);
   }
+  ctx.restore();
 }
 
 export function TwinStrip() {
@@ -116,24 +138,32 @@ export function TwinStrip() {
 
   if (steps.length === 0 || !twin) return null;
   const shown = cur?.violations_so_far ?? 0;
-  const where = cur ? `step ${cur.step}` : "waiting";
   return (
-    <section className="panel flex h-[132px] shrink-0 flex-col">
+    <section className="panel flex h-[8.25rem] shrink-0 flex-col overflow-hidden">
       <div className="panel-title">
-        <span>
-          Unshielded twin
-          <span className="font-normal tracking-normal text-zinc-500 normal-case"> · same seed, shield off, {twin.rules} rules scored</span>
+        <span className="flex items-center gap-2">
+          Without the shield
+          <span
+            className="panel-subtitle"
+            title={`The same seed with the shield off, scored against the ${twin.rules} rules of the logged run${twin.run_id ? ` (${twin.run_id})` : ""}.`}
+          >
+            same seed, shield off{cur ? ` · step ${cur.step}` : " · waiting"}
+          </span>
         </span>
-        <span className="font-normal tracking-normal text-zinc-500 normal-case tabular-nums">
-          {where} · violations so far <span className="text-orange-300">{shown}</span> of {twin.violations_total}
-          {twin.crashed_at !== null && (
-            <>
-              {" "}· <span className="text-rose-300">crashed at step {twin.crashed_at}</span>
-            </>
-          )}
+        <span className="panel-subtitle flex items-center gap-2">
+          <span className="num text-sm font-semibold text-blocked">{shown}</span>
+          <span>
+            of {twin.violations_total} violations so far
+            {twin.crashed_at !== null && (
+              <>
+                {" "}
+                · <span className="text-blocked">crashes at step {twin.crashed_at}</span>
+              </>
+            )}
+          </span>
         </span>
       </div>
-      <canvas ref={canvasRef} className="block h-full w-full flex-1" />
+      <canvas ref={canvasRef} className="block min-h-0 w-full flex-1" />
     </section>
   );
 }

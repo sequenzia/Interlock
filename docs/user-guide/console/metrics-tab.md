@@ -1,6 +1,6 @@
 # Metrics tab
 
-The "metrics" switch in the status strip replaces the console with the evaluation report: the measured effect of the shield over seeded episodes. The numbers are not from the episode you are watching. They come from `interlock eval`, see [Evaluation and results](../evaluation.md).
+The "metrics" tab in the status strip replaces the console with the evaluation report: the measured effect of the shield over seeded episodes. The numbers are not from the episode you are watching. They come from `interlock eval`, see [Evaluation and results](../evaluation.md). While the tab is open the strip shows the report's generation time, seed count, thresholds and judge mode in place of the transport controls.
 
 ![The metrics tab](../../assets/screenshots/metrics-tab.png)
 
@@ -16,15 +16,15 @@ The backend container ships with the report baked in, so the hosted console alwa
 
 ## The five tiles
 
-Each tile shows the shield-off value in orange and the shield-on value in blue, both at the default thresholds.
+Each tile leads with the difference the shield makes and shows the shield-off value in orange and the shield-on value in blue under it, both at the default thresholds.
 
-| Tile | Meaning |
-| --- | --- |
-| violations per episode | executed actions the ground-truth checkers labeled as violations, averaged over seeds |
-| task return | the environment's own reward summed per episode, averaged: the cost of safety |
-| crash rate | share of episodes that ended in a collision |
-| escalation rate | share of steps sent to the operator (always 0 with the shield off) |
-| cost per episode | Jev input tokens priced per episode |
+| Tile | Headline | Meaning |
+| --- | --- | --- |
+| violations per episode | `30× fewer`, or `none with the shield` | executed actions the ground-truth checkers labeled as violations, averaged over seeds |
+| task return | `-9.4% return` | the environment's own reward summed per episode, averaged: the cost of safety |
+| crash rate | `40% → 0%` | share of episodes that ended in a collision |
+| steps escalated | `16.5% of steps` | share of steps sent to the operator (always 0 with the shield off) |
+| cost per episode | `$0.0005 / episode` | Jev input tokens priced per episode |
 
 ## The four charts
 
@@ -32,15 +32,15 @@ Each tile shows the shield-off value in orange and the shield-on value in blue, 
 
 **Task return per seed.** The same layout for return. Expect the shielded bars to be a little lower: the speed limit costs speed reward.
 
-**Choosing the thresholds.** One point per threshold pair in the sweep, plotted as violations per episode against the share of steps escalated, labeled `t_allow/t_block`. Moving left along the curve asks the operator less; moving down violates less. The knee is where to operate when operator attention is the scarce resource.
+**Choosing the thresholds.** One point per threshold pair in the sweep, plotted as violations per episode against the share of steps escalated, with a table beside it that names each pair and marks the default. Moving left along the curve asks the operator less; moving down violates less. The knee is where to operate when operator attention is the scarce resource.
 
-**Is p(violation) calibrated?** A reliability diagram. Jev's probabilities are bucketed into ten bins; for each bin the chart plots the mean predicted probability against the observed violation rate from the checkers. The grey diagonal is perfect calibration. One dashed line for all rules together and one solid line per preset rule. The legend carries each line's expected calibration error.
+**Is p(violation) calibrated?** A reliability diagram. Jev's probabilities are bucketed into ten bins; for each bin the chart plots the mean predicted probability against the observed violation rate from the checkers. The grey diagonal is perfect calibration. One dashed line for all rules together and one solid line per preset rule. The table beside the chart gives each line's expected calibration error, how many checks it rests on and where its labels came from (the checker, or the labeling of the two fuzzy rules).
 
 ## The floor table
 
-**The physics floor.** Below the charts, when a threshold pair was run with more than one floor, one row per pair and floor shows crash rate, violations per episode, task return, the share of steps escalated and the share of steps on which the floor removed at least one candidate. "off" is a run with no floor.
+**The physics floor.** Below the charts, when a threshold pair was run with more than one floor, one row per pair and floor shows crash rate, violations per episode, task return, the share of steps escalated and the share of steps on which the floor removed at least one candidate. "off" is a run with no floor. Rows are banded by pair and the default pair and floor is marked.
 
-**Jev against chat models.** When `interlock baseline` has run, a second reliability diagram puts Jev's line next to one line per chat model on the same sampled checks, with ECE, Brier and accuracy in the legend and answered, failed, latency and cost per model underneath.
+**Jev against chat models.** When `interlock baseline` has run, a second reliability diagram puts Jev's line next to one line per chat model on the same sampled checks. The table beside it gives ECE, Brier, accuracy at 0.5, median latency and cost per judge, and how many checks a model failed to answer.
 
 ## Reading a reliability diagram
 

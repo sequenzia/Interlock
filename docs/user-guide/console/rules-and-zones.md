@@ -8,11 +8,11 @@ The operator rules panel is where the plain-English part of Interlock lives. Eve
 
 Type a sentence in the box and press "add" or ++enter++. The text is sent to Jev verbatim inside every question from then on. Whitespace is collapsed, nothing else is changed.
 
-Each rule gets an id (`c1`, `c2`, ...) that is stable for the session, and a line under the text that names its checker or says "no checker, not scored".
+Each rule gets an id (`c1`, `c2`, ...) that is stable for the session. The line under the text carries the id, a `scored` tag (hover it for the checker's name) or `not scored` when no checker exists, and `fired N×` once the rule has decided the outcome of a step.
 
 ## The eight presets
 
-The chips add one of the eight built-in rules. A chip greys out once a rule with that text is in the list. Six presets carry a checker that scores them; the last two are fuzzy on purpose, Jev alone enforces them, and they are scored by hand labels (see [Evaluation](../evaluation.md)).
+The chips under the rule list add one of the eight built-in rules. A chip disappears once a rule with that text is in the list, and the "Presets" heading collapses the row. Six presets carry a checker that scores them; the last two are fuzzy on purpose, Jev alone enforces them, and they are scored by hand labels (see [Evaluation](../evaluation.md)).
 
 | Rule text | Checker id | What the checker labels as a violation |
 | --- | --- | --- |
@@ -44,7 +44,7 @@ Anything else is a **free-text rule**. The shield enforces it exactly like the o
 
 ## Enable, disable, remove
 
-The checkbox disables a rule without removing it. Disabled rules are not asked about and do not count. The "×" removes the rule. Both are immediate and both are broadcast to every connected console.
+The switch disables a rule without removing it. Disabled rules are not asked about and do not count. The "×" removes the rule. Both are immediate and both are broadcast to every connected console.
 
 ## The rephrase hint
 
@@ -54,7 +54,7 @@ Jev reads literally and scores negated rules softer than positive ones. When the
 
 "drop work zone ahead" places a closed stretch of lane 3 starting 120 m ahead of the ego and 200 m long, in absolute road coordinates. Two things happen at once:
 
-1. The zone appears in the list (`work zone · lane 3 · 420 to 620 m`) and as an amber hatch in the road view.
+1. The zone appears in the list (`work zone · lane 3 · 420 to 620 m`) and as an orange hatch in the road view.
 2. The rule "Lane 3 is closed ahead for a work zone" is added with the `lane_closed` checker, or re-enabled if it already exists.
 
 From then on every candidate's facts carry the zone: how far ahead it starts and ends, and whether that action would put the ego inside it on the next step.
@@ -66,13 +66,13 @@ You can press the button more than once to queue several zones. Only zones ahead
 
 ## Thresholds
 
-Two sliders at the bottom set the allow and block thresholds, 0 to 1 in steps of 0.05, defaults 0.30 and 0.70. The label between them reads `allow < 0.30 · escalate · block > 0.70`. The allow slider cannot be dragged above the block slider and vice versa. The value is sent when you release the slider and applies to the next step.
+One band at the bottom sets both thresholds: green up to the allow threshold ("runs on its own"), violet between the two ("asks a person"), rose above the block threshold ("falls back"). Drag the two handles in steps of 0.05; defaults 0.30 and 0.70, and the label above reads `allow < 0.30 · escalate · block > 0.70`. The allow handle cannot pass the block handle and vice versa. The value is sent when you release a handle and applies to the next step. While an escalation is open a white marker on the band shows where its probability landed.
 
 Narrow the band (for example 0.4 and 0.6) and the shield asks less and decides more. Widen it (0.1 and 0.9) and nearly everything uncertain comes to you. The measured tradeoff is on [Evaluation and results](../evaluation.md).
 
 ## The physics floor
 
-The line under the sliders states the physics floor, 2 seconds by default. A candidate that would close on the vehicle ahead in under that time is removed before the rules are judged, so it never runs and never appears in the approval queue; the inspector fades such rows and tags them `floor`. There is no control for it on purpose: it is set when the backend starts (`interlock console --floor-s 0` turns it off) and no rule you type can override it.
+The line under the band states the physics floor, 2 seconds by default; hover it for the explanation. A candidate that would close on the vehicle ahead in under that time is removed before the rules are judged, so it never runs and never appears in the approval queue; the inspector fades such rows and tags them `floor`. There is no control for it on purpose: it is set when the backend starts (`interlock console --floor-s 0` turns it off) and no rule you type can override it.
 
 ## What persists
 

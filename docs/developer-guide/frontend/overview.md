@@ -26,16 +26,21 @@ Scripts in `package.json`: `dev`, `build` (`tsc` then `vite build`), `typecheck`
 | `src/ws-client.ts` | One socket, reconnect, `apply()` server messages to the store, `send()` |
 | `src/store.ts` | The Zustand store: five slices and the step selectors |
 | `src/types.ts` | TypeScript mirror of the log record, the protocol and the eval report |
-| `src/format.ts` | Number formatters and the decision labels, classes and colors |
-| `src/styles.css` | Tailwind import, the theme font and six shared utility classes |
-| `src/components/status-strip.tsx` | Header: transport, playback, shield toggle, replay picker, live stats |
-| `src/components/road-view.tsx` | Canvas 2D road, ego-centered, interpolated between steps |
-| `src/components/decision-strip.tsx` | One tick per step, click to inspect |
+| `src/format.ts` | Number formatters, the decision labels, classes and colors, `isLaneNoop()` and `uiScale()` |
+| `src/icons.tsx` | Inline SVG icons for the transport, navigation and close buttons |
+| `src/styles.css` | Tailwind import, the `@theme` tokens (fonts, sizes, outcome colors), the shared control classes, the density rule |
+| `src/components/status-strip.tsx` | Header: source menu, transport, shield switch, status slot, density and shortcut buttons, live stats or report metadata |
+| `src/components/road-view.tsx` | Canvas 2D road, ego-centered, interpolated between steps, with a DOM HUD and legend over it |
+| `src/components/twin-strip.tsx` | The unshielded twin under the road view |
+| `src/components/decision-strip.tsx` | One tick per step with an axis, hover card and the twin's violations; click to inspect |
 | `src/components/inspector-drawer.tsx` | Candidates, probability grid, facts, raw Jev exchange |
 | `src/components/approval-queue.tsx` | The open escalation with approve, deny and override |
-| `src/components/constraint-panel.tsx` | Rules, presets, zones, thresholds |
-| `src/components/metrics-view.tsx` | The evaluation report as tiles and charts |
-| `e2e/smoke.spec.ts` | Two Playwright tests |
+| `src/components/constraint-panel.tsx` | Rules, presets, zones |
+| `src/components/threshold-band.tsx` | The two-handle threshold band |
+| `src/components/metrics-view.tsx` | The evaluation report as tiles, charts and tables |
+| `src/components/toasts.tsx` | Server errors, top center, self-clearing |
+| `src/components/shortcuts-overlay.tsx` | The keyboard shortcut list |
+| `e2e/smoke.spec.ts` | Three Playwright tests |
 
 ## Data flow
 
@@ -66,26 +71,33 @@ StatusStrip
 view === "metrics"
   ? MetricsView
   : row
-      column (flex-1): RoadView, InspectorDrawer, DecisionStrip
-      aside (400px, scrolls): ApprovalQueue, ConstraintPanel
-error toast (fixed, bottom right, when errors is not empty)
+      column (flex-1): RoadView, (selectedStep !== null ? InspectorDrawer : TwinStrip), DecisionStrip
+      aside (clamp(20rem, 27vw, 25rem), scrolls): ApprovalQueue, ConstraintPanel
+Toasts (fixed, top center, when errors is not empty)
+ShortcutsOverlay (fixed, centered, when shortcutsOpen)
 ```
 
-`InspectorDrawer` renders nothing until a tick is selected, so the road view takes the full column height during normal playback. The `view` field in the store switches between the console and the metrics tab; the status strip stays on both.
+The inspector takes the twin's slot while a step is selected and is capped at `min(22rem, 42vh)`, so the decisions strip, the only way to move between steps, never leaves the screen. The road view has no minimum beyond 15rem and absorbs the rest. The `view` field in the store switches between the console and the metrics tab; the status strip stays on both and swaps its middle for the report's metadata.
 
 ## Styling
 
-`styles.css` imports Tailwind 4 and sets `--font-mono` to JetBrains Mono with a monospace fallback. The body is `bg-zinc-950`, 13 px, antialiased. Six classes are shared across components and nothing else is abstracted:
+`styles.css` imports Tailwind 4 and declares the design tokens in `@theme`: `--font-sans` (Inter or the system face) for prose and labels, `--font-mono` (JetBrains Mono or the system monospace) for numbers, action names, ids and JSON, a `text-2xs` size of 11 px that is the floor for any text, the four outcome colors (`allow`, `fallback`, `escalate`, `blocked`), `hazard` for work zones and `accent` for interactive chrome and the ego car. Every size is in rem, so `html[data-density="talk"]`, which raises the root font size by 15 percent, scales the whole console; canvas text reads the same factor through `uiScale()`. `color-scheme: dark` makes native selects and ranges render dark, and `:focus-visible` draws the accent ring.
+
+The shared classes, and what each one means:
 
 | Class | Use |
 | --- | --- |
-| `panel` | Rounded zinc-900 card with a zinc-800 border |
-| `panel-title` | Uppercase, tracked title row with a bottom border |
-| `btn`, `btn-primary` | Buttons; primary is the cyan variant |
-| `chip` | Pill for presets, tabs and small actions |
-| `badge` | Uppercase status tag with a border |
+| `panel`, `panel-title`, `panel-subtitle` | Card, its title row, and the quieter right-hand text in the title |
+| `btn`, `btn-primary`, `btn-danger`, `btn-icon` | Buttons act |
+| `chip`, `chip-on` | Chips choose: presets, candidates, tabs |
+| `badge` | Badges report; never clickable |
+| `switch`, `switch-knob` | Switches toggle: the shield, each rule |
+| `stat-label`, `num`, `kbd` | Small uppercase label, mono tabular number, key cap |
+| `enter`, `pulse` | 150 ms rise for cards and drawers; the reconnecting dot |
+| `band-range` | The two overlaid range inputs of the threshold band |
+| `talk-hide` | Hidden at talk density so the header keeps one row |
 
-Decision colors come from `format.ts` and are the same on the canvas, the timeline and the badges: emerald for allow, amber for fallback, violet for escalate, rose for all blocked. The metrics charts use a separate palette of blue for shield on, orange for shield off and aqua for the third checker.
+Outcome colors come from `format.ts` as both classes and hex, so the canvas, the timeline and the badges agree: green for allow, amber for fallback, violet for escalate, rose for all blocked. They are used only for outcomes; a top candidate removed by the physics floor is drawn in amber because the floor is code, not a rule. The metrics charts use a separate palette of blue for shield on, orange for shield off and aqua for the third checker.
 
 ## Backend URL
 
@@ -108,11 +120,14 @@ Browsers do not apply CORS to the WebSocket upgrade, so the cross-origin case ne
 | ++1++ to ++5++ | `resolve` the open escalation with the candidate of that rank: rank 1 approves, the rest override |
 | ++arrow-left++ | Select the previous step; from live, select the last step |
 | ++arrow-right++ | Select the next step; past the last step returns to live |
-| ++esc++ | Deselect, follow live again |
+| ++esc++ | Close the shortcut list if open, else deselect and follow live |
+| ++question++ | Toggle the shortcut list |
 
-## Error toast
+Events with a modifier key held are ignored, so browser shortcuts still work.
 
-`pushError` keeps the last five messages. Anything the server rejects (an unknown message type, a bad threshold pair, a missing replay) arrives as an `error` message and shows in the fixed toast at the bottom right until dismissed. `send()` pushes its own "not connected to the server" entry when the socket is not open.
+## Toasts
+
+`pushError` keeps the last five messages. Anything the server rejects (an unknown message type, a bad threshold pair, a missing replay) arrives as an `error` message and shows in `toasts.tsx`, fixed at the top center under the strip. An effect clears the list six seconds after the last message; the "×" clears it sooner. `send()` pushes its own "not connected to the server" entry when the socket is not open, and the strip's dot pulses red with "reconnecting" while `connected` is false.
 
 ## TypeScript configuration
 

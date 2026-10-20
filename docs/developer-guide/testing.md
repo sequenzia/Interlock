@@ -1,6 +1,6 @@
 # Testing
 
-The backend has a pytest suite that runs offline in about five seconds: 100 tests collected from 14 files under `tests/`, with no network, no API key and no trained checkpoint required. The frontend has a strict typecheck and a two-test Playwright smoke run against a mock backend. There are no live Jev tests and no frontend unit tests.
+The backend has a pytest suite that runs offline in about five seconds: 100 tests collected from 14 files under `tests/`, with no network, no API key and no trained checkpoint required. The frontend has a strict typecheck and a three-test Playwright smoke run against a mock backend. There are no live Jev tests and no frontend unit tests.
 
 ## Running
 
@@ -57,7 +57,7 @@ cd frontend && pnpm test:e2e
 - `uv run uvicorn backend.server:app --host 127.0.0.1 --port 8001` from the repo root with `JEV_MODE=mock`, `ESCALATION_TIMEOUT_S=0`, `SEED=0` and `JEV_CACHE_PATH=frontend/e2e/.cache/jev_cache.jsonl`, a cache path that holds nothing, so every question misses.
 - `pnpm exec vite --port 5174 --strictPort` with `SHIELD_BACKEND=http://127.0.0.1:8001`.
 
-The first test connects, sees `jev mock` and the empty rules message, adds the speed limit preset, steps once, waits for `waiting on operator` and the `judge unavailable` badge, denies, opens step 0 in the inspector, confirms `operator deny`, presses Escape, drops a work zone and checks the zone row and its `lane_closed` checker appear. The second test switches to the metrics view and accepts either the report's first tile or the "No evaluation yet" message, then returns to the console. Viewport is 1600 by 900, Chromium only, traces kept on failure under `frontend/test-results/`.
+The first test connects, sees `jev mock` and the empty rules message, adds the speed limit preset, steps once, waits for `waiting on operator` and the `judge unavailable` badge, denies, opens step 0 in the inspector, confirms `operator deny`, presses Escape, drops a work zone and checks the zone row and its `lane_closed` checker appear. The second test switches to the metrics view and accepts either the report's first tile or the "No evaluation yet" message, then returns to the console. Viewport is 1280 by 800, the narrowest window the console is designed for, so the header's one-row layout is checked on every run; Chromium only, traces kept on failure under `frontend/test-results/`.
 
 ## What is not covered
 

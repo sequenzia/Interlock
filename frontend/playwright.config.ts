@@ -11,8 +11,9 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   retries: 0,
   reporter: [["list"]],
-  use: { baseURL: FRONTEND, trace: "retain-on-failure", viewport: { width: 1600, height: 900 } },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  use: { baseURL: FRONTEND, trace: "retain-on-failure" },
+  // 1280 px is the narrowest window the console is designed for; the header must still fit on one row.
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } }],
   webServer: [
     {
       command: "uv run uvicorn backend.server:app --host 127.0.0.1 --port 8001",

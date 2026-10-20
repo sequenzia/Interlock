@@ -905,7 +905,7 @@ mid-episode zone drop.
 - [x] N for the passing-lane rule is 40 m (`facts.SLOWER_AHEAD_RANGE_M`).
 - [ ] After the talk: `fly apps destroy interlock-backend`. The machine is always-on by design and bills around ten dollars a month while it exists.
 - [x] Backend host: Fly.io, `fly.toml` at the repo root, app `interlock-backend` in `iad` (Oct 16).
-- [x] Console deployed Oct 16: Vercel project `interlock-console`, https://interlock-console-pied.vercel.app, `VITE_BACKEND_URL=https://interlock-backend.fly.dev`. `CONSOLE_ORIGINS` in `fly.toml` carries every production alias; on Oct 18 the pied alias was found to redirect to `interlock-sequenzia.vercel.app`, which was missing from the list, so the metrics fetch was CORS-blocked until that origin was added.
+- [x] Console deployed Oct 16: Vercel project `interlock-console`, https://interlock-console-pied.vercel.app, `VITE_BACKEND_URL=https://interlock-backend.fly.dev`. `CONSOLE_ORIGINS` in `fly.toml` carries every production alias; on Oct 18 the pied alias was found to redirect to `interlock-sequenzia.vercel.app`, which was missing from the list, so the metrics fetch was CORS-blocked until that origin was added. On Oct 19 the production domain moved to https://interlock-demo.vercel.app: the pied alias no longer resolves, `interlock-sequenzia` redirects to the new domain, and `CONSOLE_ORIGINS` was changed to match.
 - [ ] After the talk: experiment tracker. Assessed Oct 19 and deferred past the
   freeze; the reasoning and the phased plan are in `experiment-tracker.md`.
   Start with `interlock eval --list`, then Weights & Biases behind `--track`.

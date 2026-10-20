@@ -78,7 +78,7 @@ Until step 3 the console connects and runs, but the metrics tab's fetch of `/eva
 
 | Piece | URL |
 | --- | --- |
-| Console | <https://interlock-console-pied.vercel.app> |
+| Console | <https://interlock-demo.vercel.app> |
 | Backend | <https://interlock-backend.fly.dev> |
 
 !!! warning "One session per backend"

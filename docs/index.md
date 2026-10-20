@@ -115,7 +115,7 @@ them.
 | What | Where |
 | --- | --- |
 | Source | [github.com/sequenzia/interlock](https://github.com/sequenzia/interlock) |
-| Live console | [interlock-console-pied.vercel.app](https://interlock-console-pied.vercel.app) |
+| Live console | [interlock-demo.vercel.app](https://interlock-demo.vercel.app) |
 | Live backend | [interlock-backend.fly.dev](https://interlock-backend.fly.dev) |
 | Backend | `backend/`, Python 3.12 via uv |
 | Console | `frontend/`, Vite, React, TypeScript |

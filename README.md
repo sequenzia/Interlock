@@ -254,7 +254,7 @@ from its environment: `TYPESAFE_API_KEY`, `JEV_MODE`, `ESCALATION_TIMEOUT_S`,
 
 - `CONSOLE_ORIGINS`: comma-separated console origins allowed to fetch
   `/health` and `/eval/latest` cross-origin, for example
-  `https://interlock-console-pied.vercel.app`. Unset keeps the server same-origin only,
+  `https://interlock-demo.vercel.app`. Unset keeps the server same-origin only,
   which is what the Vite proxy needs locally.
 - `PORT`: listen port, default 8000. Hosts that inject their own port work as is.
 
@@ -289,7 +289,7 @@ to that origin and the socket to the same host as `wss`. Unset, which is the
 local and e2e case, everything stays on the page's own origin behind the Vite
 proxy. Then add the Vercel production aliases to `CONSOLE_ORIGINS` under `[env]` in
 `fly.toml` and run `fly deploy` again. The live console is
-https://interlock-console-pied.vercel.app and the backend is https://interlock-backend.fly.dev.
+https://interlock-demo.vercel.app and the backend is https://interlock-backend.fly.dev.
 
 One session per backend, by design: every browser on the console URL sees the
 same episode, and any of them can press play, reset or approve. Share the URL

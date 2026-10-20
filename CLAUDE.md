@@ -102,7 +102,7 @@ around Oct 23, 2026.
   auto-stop off at https://interlock-backend.fly.dev. `CONSOLE_ORIGINS` lives
   under its `[env]`; the API key is a Fly secret and never goes in the file.
   The console is the Vercel project `interlock-console` at
-  https://interlock-console-pied.vercel.app.
+  https://interlock-demo.vercel.app.
 - Linux installs CPU-only torch through `[tool.uv.sources]` in `pyproject.toml`.
   Keep that when bumping torch, or the image grows by the CUDA libraries.
 - The docs site deploys to GitHub Pages at https://sequenzia.github.io/interlock/

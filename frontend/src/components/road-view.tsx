@@ -390,6 +390,15 @@ function ArrowGlyph({ dashed, className }: { dashed: boolean; className?: string
   );
 }
 
+/** The two-bar hold mark, as drawn under the car when the action changes nothing. */
+function HoldGlyph() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 12 10" className="h-2.5 w-3 text-zinc-100">
+      <path d="M4 1v8M8 1v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Cell({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline gap-1">
@@ -471,6 +480,10 @@ export function RoadView() {
           <span className="flex items-center gap-1.5">
             <ArrowGlyph dashed={false} />
             ran
+          </span>
+          <span className="flex items-center gap-1.5" title="the action changed nothing: IDLE, or a lane change at the road edge">
+            <HoldGlyph />
+            hold
           </span>
           <span className="flex items-center gap-1.5">
             <ArrowGlyph dashed />

@@ -57,15 +57,15 @@ See [WebSocket protocol](contracts/websocket-protocol.md) and [Socket client](fr
 
 ## Add a CLI subcommand
 
-1. Write `backend/<name>.py` with `add_arguments(parser)`, `run_cli(args) -> int` and a `main(argv)` that builds its own parser, so `python -m backend.<name>` keeps working.
-2. `backend/cli.py`: one line in `build_parser`, `add("<name>", module, "summary")`. The dispatcher never grows flags of its own.
-3. `tests/test_cli.py`: assert `parse("<name>").func is module.run_cli` and add `module.main` to the `test_help_exits_zero` parametrize list.
+1. Write `backend/<name>.py` with a `command` function whose Typer-annotated parameters are the flags and whose docstring is the help page, plus a `main(argv)` that calls `run_standalone(command, argv)`, so `python -m backend.<name>` keeps working.
+2. `backend/cli.py`: one line, `app.command("<name>")(module.command)`. The dispatcher never grows flags of its own.
+3. `tests/test_cli.py`: add the module to `test_subcommands_are_the_modules_commands` and `module.main` to the `test_help_exits_zero` parametrize list.
 
 See [CLI internals](backend/cli.md).
 
 ## Change defaults
 
-- **Thresholds.** `Thresholds` in `backend/shield.py` holds the defaults (0.3 and 0.7, moved from 0.2 and 0.8 on Oct 17 after the sweep) and validates `0 <= t_allow <= t_block <= 1`. `run_episode.add_arguments` and `backend/evaluate.py` read their flag defaults from `Thresholds()`, and `evaluate.py` adds the `SWEEP` list. The console reads thresholds from every `state` message, so it needs nothing.
+- **Thresholds.** `Thresholds` in `backend/shield.py` holds the defaults (0.3 and 0.7, moved from 0.2 and 0.8 on Oct 17 after the sweep) and validates `0 <= t_allow <= t_block <= 1`. `run_episode.command` and `backend/evaluate.py` read their flag defaults from `Thresholds()`, and `evaluate.py` adds the `SWEEP` list. The console reads thresholds from every `state` message, so it needs nothing.
 - **Environment config.** `DEFAULT_CONFIG` in `backend/env.py` (`lanes_count` 4, `duration` 60, `vehicles_count` 30, `policy_frequency` 1) is sent in `hello`, so the road view's lane count and the timeline's length follow it. The policy was trained on this configuration; changing it means retraining with `interlock train` and re-running the evaluation. `facts.STEP_SECONDS` assumes `policy_frequency` 1.
 
 ## Swap the environment

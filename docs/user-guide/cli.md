@@ -1,10 +1,12 @@
 # Command line
 
-`interlock` is one command with five subcommands. `uv sync` installs it into the project environment, so it runs as `uv run interlock ...`, or as plain `interlock` once `.venv/bin` is on your `PATH`.
+`interlock` is one command with eight subcommands, built on [Typer](https://typer.tiangolo.com). `uv sync` installs it into the project environment, so it runs as `uv run interlock ...`, or as plain `interlock` once `.venv/bin` is on your `PATH`.
 
 ```bash
 uv run interlock --help
 uv run interlock run --help
+uv run interlock run -h                  # the same
+uv run interlock --install-completion    # tab completion for the current shell
 ```
 
 Every subcommand except `console` is a thin wrapper over a module in `backend/`, and the module runs standalone with the same flags:
@@ -15,6 +17,9 @@ Every subcommand except `console` is a thin wrapper over a module in `backend/`,
 | `eval` | `backend/evaluate.py` | `uv run python -m backend.evaluate` |
 | `train` | `backend/train.py` | `uv run python -m backend.train` |
 | `spike` | `backend/spike/jev_spike.py` | `uv run python -m backend.spike.jev_spike` |
+| `label` | `backend/label.py` | `uv run python -m backend.label` |
+| `autolabel` | `backend/autolabel.py` | `uv run python -m backend.autolabel` |
+| `baseline` | `backend/baseline_llm.py` | `uv run python -m backend.baseline_llm` |
 | `console` | `backend/cli.py` | none; it starts uvicorn and Vite as children |
 
 How the dispatcher works is on [CLI internals](../developer-guide/backend/cli.md).

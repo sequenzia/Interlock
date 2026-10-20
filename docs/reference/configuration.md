@@ -28,7 +28,7 @@ See [Server and session](../developer-guide/backend/server.md) and [Deployment i
 
 ## Command-line flags
 
-All flags are defined in each module's `add_arguments`; `interlock <cmd>` and `python -m backend.<module>` take the same ones. See [CLI internals](../developer-guide/backend/cli.md) and [Command line](../user-guide/cli.md).
+All flags are the parameters of each module's `command`; `interlock <cmd>` and `python -m backend.<module>` take the same ones. See [CLI internals](../developer-guide/backend/cli.md) and [Command line](../user-guide/cli.md).
 
 ### `interlock run` (`backend/run_episode.py`)
 

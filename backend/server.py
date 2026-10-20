@@ -40,7 +40,7 @@ from backend.constraints import (
 )
 from backend.env import ACTION_NAMES, DEFAULT_CONFIG
 from backend.episode import EpisodeRunner, Escalation
-from backend.jev_client import DEFAULT_CACHE_PATH, JevClient, make_client
+from backend.jev_client import DEFAULT_CACHE_PATH, JevClient, make_client, resolve_jev_mode
 from backend.logger import JsonlLogger, default_log_path, read_log
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
 from backend.policy import Policy
@@ -452,9 +452,7 @@ class Session:
 
 def session_from_env() -> Session:
     load_dotenv(ENV_FILE)
-    mode = os.environ.get("JEV_MODE", "auto")
-    if mode == "auto":
-        mode = "live" if os.environ.get("TYPESAFE_API_KEY") else "mock"
+    mode = resolve_jev_mode(os.environ.get("JEV_MODE", "auto"))  # type: ignore[arg-type]
     timeout = float(os.environ.get("ESCALATION_TIMEOUT_S", DEFAULT_ESCALATION_TIMEOUT_S))
     model_path = Path(os.environ.get("MODEL_PATH", DEFAULT_MODEL_PATH))
     floor_s = float(os.environ.get("FLOOR_S", DEFAULT_FLOOR_S))
@@ -472,7 +470,7 @@ def session_from_env() -> Session:
     )
     return Session(
         Policy.load(model_path),
-        make_client(mode, cache_path=cache_path),  # type: ignore[arg-type]
+        make_client(mode, cache_path=cache_path),
         seed=int(os.environ.get("SEED", "0")),
         escalation_timeout_s=timeout,
         floor_s=floor_s,

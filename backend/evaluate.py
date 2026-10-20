@@ -1,12 +1,6 @@
 """Batch evaluation: before/after, threshold sweep, calibration, plots. Plan section 10.
 
-    uv run python -m backend.evaluate --seeds 0-19 --mode off
-    uv run python -m backend.evaluate --seeds 0-19 --mode on --t-allow 0.2 --t-block 0.8
-    uv run python -m backend.evaluate --seeds 0-19 --sweep          # five threshold pairs, shield on
-    uv run python -m backend.evaluate --seeds 0-19 --all            # off, the sweep, then the report
-    uv run python -m backend.evaluate --report                      # newest run per configuration
-    uv run interlock eval --report                                  # same flags via backend/cli.py
-
+Behind ``interlock eval``; ``python -m backend.evaluate`` takes the same flags.
 Each configuration writes backend/logs/eval/<stamp>_<label>/ with one JSONL per
 seed and a metrics.json. The report aggregates the newest run per label into
 internal/eval/latest.json (feeds the metrics tab) and internal/plots/*.png.
@@ -15,22 +9,21 @@ The simulated operator answers escalations with the ground-truth checkers.
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import json
-import os
-import sys
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
+import typer
 from dotenv import load_dotenv
 
+from backend.cli_support import repo_relative, run_standalone
 from backend.constraints import CHECKER_LANE_CLOSED, PRESETS, ConstraintStore
 from backend.episode import EpisodeRunner, simulated_operator
-from backend.jev_client import DEFAULT_MODEL, JevClient, make_client
+from backend.jev_client import DEFAULT_MODEL, JevClient, JevMode, make_client, resolve_jev_mode
 from backend.label import Label, load_labels
 from backend.logger import JsonlLogger, read_log
 from backend.metrics import aggregate, calibration, episode_metrics
@@ -328,109 +321,130 @@ def print_summary(report: dict[str, Any]) -> None:
     )
 
 
-async def main_async(args: argparse.Namespace) -> int:
+def command(
+    seeds: Annotated[str, typer.Option(help='"0-19" or "3,7,11"')] = "0-19",
+    mode: Annotated[
+        Literal["off", "on", "shadow"] | None,
+        typer.Option(
+            help="one configuration; shadow is an alias of off: the judge and checkers run either way"
+        ),
+    ] = None,
+    t_allow: Annotated[
+        float, typer.Option(help="allow threshold for --mode on")
+    ] = DEFAULT_THRESHOLDS.t_allow,
+    t_block: Annotated[
+        float, typer.Option(help="block threshold for --mode on")
+    ] = DEFAULT_THRESHOLDS.t_block,
+    floor_s: Annotated[
+        float,
+        typer.Option(
+            metavar="S", help="time to collision floor in seconds for shield-on runs; 0 disables"
+        ),
+    ] = DEFAULT_FLOOR_S,
+    sweep: Annotated[
+        bool, typer.Option("--sweep", help="shield on over the five threshold pairs")
+    ] = False,
+    all_: Annotated[
+        bool, typer.Option("--all", help="off, then the sweep, then the report")
+    ] = False,
+    report: Annotated[
+        bool,
+        typer.Option(
+            "--report", help="aggregate the newest run per label into latest.json and plots"
+        ),
+    ] = False,
+    zone_at_step: Annotated[
+        int | None, typer.Option(help="drop the zone in every episode at this step")
+    ] = None,
+    jev: Annotated[
+        JevMode,
+        typer.Option(help="auto is live when TYPESAFE_API_KEY is set in backend/.env, else mock"),
+    ] = "auto",
+    concurrency: Annotated[
+        int, typer.Option(help="episodes in flight; keeps under the API rate limit")
+    ] = 3,
+    max_steps: Annotated[int | None, typer.Option(help="shorten every episode")] = None,
+    model_path: Annotated[
+        Path, typer.Option(help="DQN checkpoint", show_default=repo_relative(DEFAULT_MODEL_PATH))
+    ] = DEFAULT_MODEL_PATH,
+    out: Annotated[
+        Path, typer.Option(help="where runs are written", show_default=repo_relative(EVAL_DIR))
+    ] = EVAL_DIR,
+) -> None:
+    """Batch evaluation over seeds: before/after, threshold sweep, report and plots.
+
+    ```
+    interlock eval --seeds 0-19 --mode off
+    interlock eval --seeds 0-19 --mode on --t-allow 0.2 --t-block 0.8
+    interlock eval --seeds 0-19 --sweep                   # five threshold pairs, shield on
+    interlock eval --seeds 0-19 --all --concurrency 2     # off, the sweep, then the report
+    interlock eval --report                               # newest run per configuration
+    ```
+
+    Each configuration writes `backend/logs/eval/<stamp>_<label>/` with one JSONL per seed
+    and a `metrics.json`. The report aggregates the newest run per label into
+    `internal/eval/latest.json` and `internal/plots/*.png`. The simulated operator answers
+    escalations with the ground-truth checkers.
+    """
     load_dotenv(ENV_FILE)
-    if args.report and not (args.mode or args.sweep or args.all):
-        report = build_report(args.out)
-        print(json.dumps({k: v for k, v in report.items() if k in ("runs", "plots")}, indent=1))
-        return 0
-    jev_mode = args.jev
-    if jev_mode == "auto":
-        jev_mode = "live" if os.environ.get("TYPESAFE_API_KEY") else "mock"
-    seeds = parse_seed_range(args.seeds)
-    policy = Policy.load(args.model_path)
-    judge = make_client(jev_mode)  # type: ignore[arg-type]
+    if mode == "shadow":
+        mode = "off"
+    if not (mode or sweep or all_ or report):
+        typer.echo("choose --mode, --sweep, --all or --report", err=True)
+        raise typer.Exit(2)
+    if report and not (mode or sweep or all_):
+        result = build_report(out)
+        print(json.dumps({k: v for k, v in result.items() if k in ("runs", "plots")}, indent=1))
+        return
+
+    jev_mode = resolve_jev_mode(jev)
+    seed_list = parse_seed_range(seeds)
+    policy = Policy.load(model_path)
     print(
-        f"eval: jev {jev_mode} | seeds {seeds[0]}-{seeds[-1]} ({len(seeds)}) | concurrency {args.concurrency} | out {args.out}"
+        f"eval: jev {jev_mode} | seeds {seed_list[0]}-{seed_list[-1]} ({len(seed_list)})"
+        f" | concurrency {concurrency} | out {out}"
     )
     configs: list[tuple[bool, Thresholds]] = []
-    if args.all:
+    if all_:
         configs.append((False, DEFAULT_THRESHOLDS))
         configs.extend((True, Thresholds(a, b)) for a, b in SWEEP)
     else:
-        if args.mode:
-            configs.append((args.mode == "on", Thresholds(args.t_allow, args.t_block)))
-        if args.sweep:
+        if mode:
+            configs.append((mode == "on", Thresholds(t_allow, t_block)))
+        if sweep:
             configs.extend((True, Thresholds(a, b)) for a, b in SWEEP)
-    try:
-        for shield_on, thresholds in configs:
-            label = config_label(shield_on, thresholds, args.zone_at_step, args.floor_s)
-            print(f"\n== {label} ==", flush=True)
-            report = await run_config(
-                policy,
-                judge,
-                seeds,
-                shield_on=shield_on,
-                thresholds=thresholds,
-                out_dir=new_run_dir(args.out, label),
-                floor_s=args.floor_s,
-                zone_at_step=args.zone_at_step,
-                concurrency=args.concurrency,
-                max_steps=args.max_steps,
-            )
-            print_summary(report)
-    finally:
-        await judge.close()
-    if args.report or args.all:
-        report = build_report(args.out)
-        print("\nreport:", REPORT_PATH, "| plots:", ", ".join(report["plots"]))
-    return 0
 
+    async def run_configs() -> None:
+        judge = make_client(jev_mode)
+        try:
+            for shield_on, thresholds in configs:
+                label = config_label(shield_on, thresholds, zone_at_step, floor_s)
+                print(f"\n== {label} ==", flush=True)
+                summary = await run_config(
+                    policy,
+                    judge,
+                    seed_list,
+                    shield_on=shield_on,
+                    thresholds=thresholds,
+                    out_dir=new_run_dir(out, label),
+                    floor_s=floor_s,
+                    zone_at_step=zone_at_step,
+                    concurrency=concurrency,
+                    max_steps=max_steps,
+                )
+                print_summary(summary)
+        finally:
+            await judge.close()
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Flags shared by ``python -m backend.evaluate`` and ``interlock eval``."""
-    parser.add_argument("--seeds", default="0-19")
-    parser.add_argument(
-        "--mode",
-        choices=["off", "on", "shadow"],
-        default=None,
-        help="shadow is an alias of off: the judge and checkers run either way",
-    )
-    parser.add_argument("--t-allow", type=float, default=DEFAULT_THRESHOLDS.t_allow)
-    parser.add_argument("--t-block", type=float, default=DEFAULT_THRESHOLDS.t_block)
-    parser.add_argument(
-        "--floor-s",
-        type=float,
-        default=DEFAULT_FLOOR_S,
-        help="time to collision floor in seconds for shield-on runs; 0 disables",
-    )
-    parser.add_argument(
-        "--sweep", action="store_true", help="shield on over the five threshold pairs"
-    )
-    parser.add_argument("--all", action="store_true", help="off, then the sweep, then the report")
-    parser.add_argument(
-        "--report",
-        action="store_true",
-        help="aggregate the newest run per label into latest.json and plots",
-    )
-    parser.add_argument("--zone-at-step", type=int, default=None)
-    parser.add_argument("--jev", choices=["auto", "live", "mock"], default="auto")
-    parser.add_argument(
-        "--concurrency",
-        type=int,
-        default=3,
-        help="episodes in flight; keeps under the API rate limit",
-    )
-    parser.add_argument("--max-steps", type=int, default=None)
-    parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
-    parser.add_argument("--out", type=Path, default=EVAL_DIR)
-
-
-def run_cli(args: argparse.Namespace) -> int:
-    if args.mode == "shadow":
-        args.mode = "off"
-    if not (args.mode or args.sweep or args.all or args.report):
-        print("choose --mode, --sweep, --all or --report", file=sys.stderr)
-        return 2
-    return asyncio.run(main_async(args))
+    asyncio.run(run_configs())
+    if report or all_:
+        result = build_report(out)
+        print("\nreport:", REPORT_PATH, "| plots:", ", ".join(result["plots"]))
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    add_arguments(parser)
-    sys.exit(run_cli(parser.parse_args(argv)))
+    """``python -m backend.evaluate``: the ``interlock eval`` command on its own."""
+    run_standalone(command, argv)
 
 
 if __name__ == "__main__":

@@ -25,8 +25,8 @@ interlock/
 
 ## backend/
 
-Every module has a docstring that names its role. Flags for a subcommand live
-in that module's `add_arguments`, so `python -m backend.<module>` and
+Every module has a docstring that names its role. Flags for a subcommand are
+the parameters of that module's `command`, so `python -m backend.<module>` and
 `interlock <command>` stay equivalent.
 
 | File | Role |
@@ -37,7 +37,7 @@ in that module's `add_arguments`, so `python -m backend.<module>` and
 | `paths.py` | Repo-relative paths: models, logs, internal, the default checkpoint, the env file. |
 | `facts.py` | State plus one candidate action to JSON facts and plain sentences; the render snapshot. |
 | `constraints.py` | `Constraint`, `Zone`, `PRESETS`, `infer_checker`, `ConstraintStore` with the zone lifecycle. |
-| `jev_client.py` | `build_question`, `cache_key`, `JevCache`, `LiveJudge`, `JevClient` (shape B with cache), `make_client`. |
+| `jev_client.py` | `build_question`, `cache_key`, `JevCache`, `LiveJudge`, `JevClient` (shape B with cache), `make_client`, `resolve_jev_mode`. |
 | `shield.py` | `Thresholds`, `Decision`, `decide`, `fallback_action`, `resolve`. Pure functions. |
 | `checkers.py` | One closed-form checker per preset rule, `label` and `label_all`. Scoring only. |
 | `logger.py` | `build_record`, `JsonlLogger`, `read_log`, `make_run_id`, `default_log_path`. |
@@ -51,7 +51,8 @@ in that module's `add_arguments`, so `python -m backend.<module>` and
 | `autolabel.py` | The fixed standard for the two fuzzy presets, applied to every state the report pools. Behind `interlock autolabel`. |
 | `baseline_llm.py` | Chat-LLM baseline: the judge's questions on logged checks, sent to Claude models for one structured JSON number. Behind `interlock baseline`. |
 | `plots.py` | Three matplotlib figures from the report JSON. |
-| `cli.py` | The `interlock` entry point and the `console` subcommand that supervises uvicorn and Vite. |
+| `cli.py` | The `interlock` Typer app: every module's `command` under its subcommand name, plus the `console` subcommand that supervises uvicorn and Vite. |
+| `cli_support.py` | The Typer settings every app shares, the standalone runner behind each module's `main`, and `repo_relative` for help text. |
 | `spike/jev_spike.py` | The offline-checkable Jev probe behind `interlock spike`; writes raw requests under `backend/logs/spike/`. |
 | `.env.example` | Template for `backend/.env`, which holds `TYPESAFE_API_KEY` and is gitignored. |
 | `logs/` | Runtime output, gitignored except `labels/`: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `labels/` (one JSONL per fuzzy rule, committed so the fuzzy-rule calibration is reproducible), `jev_cache.jsonl`, `baseline_cache.jsonl` (chat-model replies). |

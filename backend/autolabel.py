@@ -1,9 +1,6 @@
 """Label the two fuzzy presets by a fixed standard, for calibration only. Plan 16.2, A5.
 
-    interlock autolabel                       # every state in the report's calibration pool, both rules
-    interlock autolabel --dry-run             # the split per rule, per action and per bin; nothing written
-    interlock autolabel --run backend/logs/eval/<stamp>_off --rule dense_traffic
-
+Behind ``interlock autolabel``; ``python -m backend.autolabel`` takes the same flags.
 The standard is the hand-labeling guide's, with its loose words pinned here
 on Oct 19. Rows go through ``label.label_session`` so they have the same
 shape as an interactive answer, with ``labeler: autolabel``, and a state
@@ -38,13 +35,15 @@ Cut in, "Leave plenty of room when moving in ahead of a faster vehicle":
 
 from __future__ import annotations
 
-import argparse
-import sys
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
+import typer
+
+from backend.cli_support import repo_relative, run_standalone
 from backend.constraints import PRESET_CUT_IN, PRESET_DENSE_TRAFFIC
 from backend.evaluate import calibration_pool
 from backend.label import (
@@ -101,6 +100,13 @@ def cut_in(f: Facts, gap_m: float, ttc_s: float) -> bool:
 STANDARDS: dict[str, Standard] = {PRESET_DENSE_TRAFFIC: dense_traffic, PRESET_CUT_IN: cut_in}
 
 
+class FuzzyPreset(StrEnum):
+    """The presets with a standard here, as ``--rule`` names them."""
+
+    dense_traffic = PRESET_DENSE_TRAFFIC
+    cut_in = PRESET_CUT_IN
+
+
 def answer(rule: str, facts: Facts) -> str:
     """``y``, ``n``, or ``s`` when the "about" thresholds leave the state unsettled."""
     standard = STANDARDS[rule]
@@ -144,66 +150,65 @@ def scripted(answers: Iterable[str]) -> Callable[[str], str]:
     return lambda _prompt: next(queue)
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Flags shared by ``python -m backend.autolabel`` and ``interlock autolabel``."""
-    parser.add_argument(
-        "--run",
-        type=Path,
-        action="append",
-        default=None,
-        help="a JSONL log or an eval run directory, repeatable (default: the calibration pool)",
-    )
-    parser.add_argument(
-        "--rule",
-        action="append",
-        choices=sorted(STANDARDS),
-        default=None,
-        help="a fuzzy preset id, repeatable (default: both)",
-    )
-    parser.add_argument(
-        "--labels-dir",
-        type=Path,
-        default=LABELS_DIR,
-        help="where existing labels are read and new ones go (default backend/logs/labels/)",
-    )
-    parser.add_argument(
-        "--labeler", default=LABELER, help=f"the labeler recorded on each row (default {LABELER})"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="print the split, write nothing")
+def command(
+    run: Annotated[
+        list[Path] | None,
+        typer.Option(
+            help="a JSONL log or an eval run directory, repeatable (default: the calibration pool)"
+        ),
+    ] = None,
+    rule: Annotated[
+        list[FuzzyPreset] | None, typer.Option(help="a fuzzy preset id, repeatable (default: both)")
+    ] = None,
+    labels_dir: Annotated[
+        Path,
+        typer.Option(
+            help="where existing labels are read and new ones go",
+            show_default=repo_relative(LABELS_DIR),
+        ),
+    ] = LABELS_DIR,
+    labeler: Annotated[str, typer.Option(help="the labeler recorded on each row")] = LABELER,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="print the split, write nothing")
+    ] = False,
+) -> None:
+    """Label the fuzzy presets by the fixed standard, for calibration only.
 
+    ```
+    interlock autolabel                       # every state in the calibration pool, both rules
+    interlock autolabel --dry-run             # the split per rule, per action and per bin
+    interlock autolabel --run backend/logs/eval/<stamp>_off --rule dense_traffic
+    ```
 
-def run_cli(args: argparse.Namespace) -> int:
-    runs = args.run or calibration_pool()
-    records = [r for run in runs for r in read_records(run)]
+    A state already labeled under the labels directory is skipped, so a rerun adds nothing.
+    """
+    runs = run or calibration_pool()
+    records = [r for path in runs for r in read_records(path)]
     if not records:
-        print("no records in " + ", ".join(str(r) for r in runs), file=sys.stderr)
-        return 2
+        typer.echo("no records in " + ", ".join(str(r) for r in runs), err=True)
+        raise typer.Exit(2)
     print("runs: " + ", ".join(r.name for r in runs))
-    done = set(load_labels(args.labels_dir))
+    done = set(load_labels(labels_dir))
     written = 0
-    for rule in args.rule or sorted(STANDARDS):
-        items = unlabeled_items(records, rule, done)
+    for name in [str(r) for r in rule] if rule else sorted(STANDARDS):
+        items = unlabeled_items(records, name, done)
         if not items:
-            print(f"{rule}: nothing left to label")
+            print(f"{name}: nothing left to label")
             continue
-        answers = [answer(rule, item.facts) for item in items]
-        print(summary(rule, items, answers))
-        if args.dry_run:
+        answers = [answer(name, item.facts) for item in items]
+        print(summary(name, items, answers))
+        if dry_run:
             continue
-        out = args.labels_dir / f"{rule_group(items[0].rule_text)}.jsonl"
-        written += label_session(items, scripted(answers), out, labeler=args.labeler)
+        out = labels_dir / f"{rule_group(items[0].rule_text)}.jsonl"
+        written += label_session(items, scripted(answers), out, labeler=labeler)
         print(f"  wrote to {out}")
-    if not args.dry_run:
+    if not dry_run:
         print(f"labeled {written}. Rebuild the report with: uv run interlock eval --report")
-    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    add_arguments(parser)
-    sys.exit(run_cli(parser.parse_args(argv)))
+    """``python -m backend.autolabel``: the ``interlock autolabel`` command on its own."""
+    run_standalone(command, argv)
 
 
 if __name__ == "__main__":

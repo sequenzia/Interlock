@@ -1,8 +1,6 @@
 """Hand-label candidate actions against a rule that has no checker. Plan 16.2, A5.
 
-    interlock label --run backend/logs/eval/<stamp>_on_ta0.30_tb0.70 --rule dense_traffic
-    interlock label --run backend/logs/runs/<run_id>.jsonl --rule "plenty of room" --sample 100
-
+Behind ``interlock label``; ``python -m backend.label`` takes the same flags.
 A label is keyed by a hash of the candidate's facts and the rule text, like
 the Jev cache, so it applies to every run that shows the same state and the
 same rule. Labels land in backend/logs/labels/<group>.jsonl and feed the
@@ -15,18 +13,19 @@ and the report shows that name as the rule's label source.
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import random
 import re
-import sys
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
+import typer
+
+from backend.cli_support import run_standalone
 from backend.constraints import PRESETS
 from backend.logger import read_log
 from backend.paths import LOGS_DIR
@@ -222,62 +221,59 @@ def label_session(
     return labeled
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Flags shared by ``python -m backend.label`` and ``interlock label``."""
-    parser.add_argument(
-        "--run", type=Path, required=True, help="a JSONL log or an eval run directory"
-    )
-    parser.add_argument(
-        "--rule", required=True, help="constraint id, preset id, or a substring of the rule text"
-    )
-    parser.add_argument(
-        "--sample", type=int, default=50, help="how many pairs to label (default 50)"
-    )
-    parser.add_argument("--seed", type=int, default=0, help="sampling seed (default 0)")
-    parser.add_argument(
-        "--labels",
-        type=Path,
-        default=None,
-        help="output file (default backend/logs/labels/<group>.jsonl)",
-    )
-    parser.add_argument(
-        "--show-p", action="store_true", help="show Jev's probability while labeling"
-    )
-    parser.add_argument(
-        "--include-scored", action="store_true", help="also offer pairs a checker already labeled"
-    )
+def command(
+    run: Annotated[Path, typer.Option(help="a JSONL log or an eval run directory")],
+    rule: Annotated[
+        str, typer.Option(help="constraint id, preset id, or a substring of the rule text")
+    ],
+    sample: Annotated[int, typer.Option(help="how many pairs to label")] = 50,
+    seed: Annotated[int, typer.Option(help="sampling seed")] = 0,
+    labels: Annotated[
+        Path | None,
+        typer.Option(help="output file (default `backend/logs/labels/<group>.jsonl`)"),
+    ] = None,
+    show_p: Annotated[
+        bool, typer.Option("--show-p", help="show Jev's probability while labeling")
+    ] = False,
+    include_scored: Annotated[
+        bool, typer.Option("--include-scored", help="also offer pairs a checker already labeled")
+    ] = False,
+) -> None:
+    """Hand-label candidates against a rule that has no checker, for calibration.
 
+    ```
+    interlock label --run backend/logs/eval/<stamp>_on_ta0.30_tb0.70 --rule dense_traffic
+    interlock label --run backend/logs/runs/<run_id>.jsonl --rule "plenty of room" --sample 100
+    ```
 
-def run_cli(args: argparse.Namespace) -> int:
-    records = read_records(args.run)
+    Answer `y` for a violation, `n` for none, `s` to skip, `q` to stop. Jev's probability stays
+    hidden unless `--show-p` is given, so the label is your judgment, not the judge's.
+    """
+    records = read_records(run)
     if not records:
-        print(f"no records under {args.run}", file=sys.stderr)
-        return 2
-    items = collect_items(records, args.rule, unlabeled_only=not args.include_scored)
+        typer.echo(f"no records under {run}", err=True)
+        raise typer.Exit(2)
+    items = collect_items(records, rule, unlabeled_only=not include_scored)
     if not items:
-        print(f"no candidate checks for rule {args.rule!r} in {args.run}", file=sys.stderr)
-        return 2
+        typer.echo(f"no candidate checks for rule {rule!r} in {run}", err=True)
+        raise typer.Exit(2)
     rule_text = items[0].rule_text
-    out_path = args.labels or LABELS_DIR / f"{rule_group(rule_text)}.jsonl"
+    out_path = labels or LABELS_DIR / f"{rule_group(rule_text)}.jsonl"
     done = set(load_labels(LABELS_DIR))
-    sample = sample_items(items, args.sample, random.Random(args.seed), done)
+    chosen = sample_items(items, sample, random.Random(seed), done)
     distinct = len({i.key for i in items})
     print(
         f'rule "{rule_text}": {len(items)} checks, {distinct} distinct states, '
-        f"{len({i.key for i in items} & done)} already labeled, {len(sample)} to label now. "
+        f"{len({i.key for i in items} & done)} already labeled, {len(chosen)} to label now. "
         f"Labels go to {out_path}."
     )
-    labeled = label_session(sample, input, out_path, show_p=args.show_p)
+    labeled = label_session(chosen, input, out_path, show_p=show_p)
     print(f"\nlabeled {labeled}. Rebuild the report with: uv run interlock eval --report")
-    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    add_arguments(parser)
-    sys.exit(run_cli(parser.parse_args(argv)))
+    """``python -m backend.label``: the ``interlock label`` command on its own."""
+    run_standalone(command, argv)
 
 
 if __name__ == "__main__":

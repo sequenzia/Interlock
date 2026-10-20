@@ -29,9 +29,8 @@ DQN training and checkpoint evaluation. Writes checkpoints and `.eval.json` file
 | `run_episode` | `(model: DQN, seed: int) -> dict[str, Any]` |
 | `evaluate_checkpoint` | `(path: Path, seeds: list[int]) -> dict[str, Any]` |
 | `parse_seed_range` | `(text: str) -> list[int]` |
-| `add_arguments` | `(parser: argparse.ArgumentParser) -> None` |
-| `run_cli` | `(args: argparse.Namespace) -> int` |
-| `main` | `(argv: Sequence[str] \| None = None) -> None` |
+| `command` | the `interlock train` command; its parameters are the flags |
+| `main` | `(argv: Sequence[str] \| None = None) -> None`, `python -m backend.train` |
 
 ### `backend/policy.py`
 
@@ -121,6 +120,8 @@ Live, cached and mock judging behind one interface. See [Jev integration](../dev
 | `JevClient.check` | `async (candidates: dict[str, Facts], constraints: list[Constraint]) -> CheckResult` |
 | `JevClient.close` | `async () -> None` |
 | `make_client` | `(mode: Literal["live", "mock"], cache_path: Path \| None = DEFAULT_CACHE_PATH, model: str = DEFAULT_MODEL) -> JevClient` |
+| `JevMode` | `Literal["auto", "live", "mock"]`, the `--jev` choices |
+| `resolve_jev_mode` | `(mode: JevMode) -> Literal["live", "mock"]`; `auto` is live when `TYPESAFE_API_KEY` is set, mock otherwise |
 
 ### `backend/shield.py`
 
@@ -179,7 +180,7 @@ The per-step loop shared by the CLI and the server. See [Per-step loop](../devel
 | `Escalation` | frozen dataclass: `id: str`, `step: int`, `action: str`, `sentences: list[str]`, `constraint_id: str \| None`, `constraint_text: str \| None`, `p: float`, `q_rank: int`, `fallback: str`, `fallback_kind: str`, `judge_unavailable: bool`, `reason: EscalationReason`, `candidates: list[dict[str, Any]]`, `ground_truth: bool \| None`, `violations_by_action: dict[str, int \| None]` |
 | `Operator` | `Callable[[Escalation], Awaitable[Answer]]` |
 | `simulated_operator`, `always_approve`, `always_deny` | each `async (escalation: Escalation) -> Answer` |
-| `OPERATORS` | `{"simulated", "approve", "deny"}` to the three above |
+| `OperatorName`, `OPERATORS` | `Literal["simulated", "approve", "deny"]`, the `--operator` choices, and that name to the three above |
 | `StepResult` | dataclass: `record: dict[str, Any]`, `escalation: Escalation \| None`, `terminated: bool`, `truncated: bool`; property `done` |
 | `Totals` | dataclass of running counters: `steps`, `reward`, `crashed`, `decisions`, `conflicts`, `violations`, `human`, `sources`, `latencies_ms`, `input_tokens`, `cost_usd` |
 | `EpisodeRunner.__init__` | keyword-only `(policy: Policy, judge: JevClient, store: ConstraintStore, thresholds: Thresholds \| None = None, shield_on: bool = True, operator: Operator \| None = None, operator_name: str = "simulated", logger: JsonlLogger \| None = None, env_config: dict[str, Any] \| None = None, source: str = "live")` |
@@ -197,8 +198,7 @@ Headless episode behind `interlock run`. Writes the JSONL log and prints a summa
 | Name | Signature |
 | --- | --- |
 | `format_step` | `(result: StepResult) -> str` |
-| `main_async` | `async (args: argparse.Namespace) -> int` |
-| `add_arguments`, `run_cli`, `main` | the module CLI triple |
+| `command`, `main` | the `interlock run` command and `python -m backend.run_episode` |
 
 ### `backend/server.py`
 
@@ -269,7 +269,7 @@ Batch evaluation and report. Writes `backend/logs/eval/<stamp>_<label>/`, `inter
 | `newest_runs` | `(root: Path) -> dict[str, Path]` |
 | `build_report` | `(root: Path = EVAL_DIR, report_path: Path = REPORT_PATH, plots_dir: Path = PLOTS_DIR, thresholds: Thresholds = DEFAULT_THRESHOLDS) -> dict[str, Any]` |
 | `print_summary` | `(report: dict[str, Any]) -> None` |
-| `main_async`, `add_arguments`, `run_cli`, `main` | the module CLI |
+| `command`, `main` | the `interlock eval` command and `python -m backend.evaluate` |
 
 ### `backend/plots.py`
 
@@ -299,7 +299,7 @@ Hand labels for rules without a checker. See [Command line](../user-guide/cli.md
 | `sample_items` | `(items: list[Item], n: int, rng: random.Random, done: set[str]) -> list[Item]`, round-robin over ten bins of p |
 | `render` | `(item: Item, index: int, total: int, show_p: bool) -> str` |
 | `label_session` | `(items, ask: Callable[[str], str], out_path: Path, *, show_p: bool = False, labeler: str = "human") -> int` |
-| `add_arguments`, `run_cli`, `main` | the module CLI |
+| `command`, `main` | the `interlock label` command and `python -m backend.label` |
 
 ### `backend/autolabel.py`
 
@@ -310,11 +310,12 @@ The fixed standard for the two fuzzy presets, behind `interlock autolabel`. See 
 | `LABELER`, `DENSE_AT`, `HEADWAY_S`, `GAP_M`, `GAP_BAND_M`, `TTC_S`, `TTC_BAND_S`, `MIN_TARGET_MPS` | `"autolabel"`, `4`, `2.0`, `15.0`, `1.0`, `5.0`, `0.5`, `20.0` |
 | `dense_traffic`, `cut_in` | `(f: Facts, gap_m: float, ttc_s: float) -> bool`, the two standards at the given thresholds |
 | `STANDARDS` | preset id to standard |
+| `FuzzyPreset` | `StrEnum` of the two preset ids, the `--rule` choices |
 | `answer` | `(rule: str, facts: Facts) -> str`: `y`, `n`, or `s` when a 1 m or 0.5 s shift of a threshold would flip it |
 | `unlabeled_items` | `(records, rule: str, done: set[str]) -> list[Item]`, one per distinct unlabeled state |
 | `summary` | `(rule: str, items, answers) -> str`, counts by answer, by action and by bin of p |
 | `scripted` | `(answers: Iterable[str]) -> Callable[[str], str]`, an `ask` that answers from a list |
-| `add_arguments`, `run_cli`, `main` | the module CLI |
+| `command`, `main` | the `interlock autolabel` command and `python -m backend.autolabel` |
 
 ### `backend/baseline_llm.py`
 
@@ -335,24 +336,36 @@ Chat-LLM baseline for the judge, offline for Jev. Behind `interlock baseline`. S
 | `AnthropicChat` | `ask(model, item) -> Reply` through `AsyncAnthropic` with `output_config.format`; a failed call, a cut-off reply or a refusal returns `p=None` |
 | `run_models` | `(items, models, ask, concurrency) -> dict[str, list[Reply]]` |
 | `judge_summary`, `summarize` | reliability overall and per rule, latency, tokens and cost per judge; Jev scored from the logged `p` |
-| `load_items`, `print_summary`, `add_arguments`, `run_cli`, `main` | CLI plumbing; `--dry-run` sends nothing |
+| `load_items`, `print_summary`, `command`, `main` | CLI plumbing; `--dry-run` sends nothing |
 
 ### `backend/cli.py`
 
-The `interlock` command. See [CLI internals](../developer-guide/backend/cli.md). `run_console` starts child processes.
+The `interlock` command, a Typer app. See [CLI internals](../developer-guide/backend/cli.md). `run_console` starts child processes.
 
 | Name | Signature or value |
 | --- | --- |
 | `FRONTEND_DIR`, `VITE_BIN`, `DEFAULT_SERVER_PORT`, `DEFAULT_UI_PORT`, `STOP_GRACE_S`, `POLL_S` | `frontend/`, `frontend/node_modules/.bin/vite`, `8000`, `5173`, `10.0`, `0.25` |
-| `add_console_arguments` | `(parser: argparse.ArgumentParser) -> None` |
-| `server_command`, `ui_command` | `(args: argparse.Namespace) -> list[str]` |
-| `server_env`, `ui_env` | `(args: argparse.Namespace) -> dict[str, str]` |
+| `app` | the `typer.Typer` named `interlock`, with every module's `command` registered under its subcommand name |
+| `ConsoleOptions` | frozen dataclass: `port`, `ui_port`, `ui`, `reload`, `open_browser`, and the server fields `jev`, `seed`, `escalation_timeout`, `model_path`, `floor_s`, `cache`, each `None` unless its flag was given |
+| `server_command`, `ui_command` | `(opts: ConsoleOptions) -> list[str]` |
+| `server_env`, `ui_env` | `(opts: ConsoleOptions) -> dict[str, str]` |
 | `terminate` | `(procs: Iterable[subprocess.Popen[bytes]]) -> None` |
 | `wait_all` | `(procs: Sequence[subprocess.Popen[bytes]], timeout_s: float) -> bool` |
 | `reap` | `(procs: Iterable[subprocess.Popen[bytes]], grace_s: float) -> None` |
-| `run_console` | `(args: argparse.Namespace) -> int` |
-| `build_parser` | `() -> argparse.ArgumentParser` |
+| `run_console` | `(opts: ConsoleOptions) -> int`, the process exit code |
+| `console` | the `interlock console` command; builds `ConsoleOptions` and exits with `run_console`'s code |
 | `main` | `(argv: Sequence[str] \| None = None) -> None` |
+
+### `backend/cli_support.py`
+
+Typer settings shared by the `interlock` command and the modules behind it. See [CLI internals](../developer-guide/backend/cli.md).
+
+| Name | Signature |
+| --- | --- |
+| `new_app` | `(*, add_completion: bool = False, **kwargs: Any) -> typer.Typer`: Markdown help, `-h`, no locals in tracebacks |
+| `standalone_app` | `(command: Callable[..., None]) -> typer.Typer`, one command as an app of its own |
+| `run_standalone` | `(command: Callable[..., None], argv: Sequence[str] \| None = None) -> None`, what every module's `main` calls |
+| `repo_relative` | `(path: Path) -> str`, a default path as the docs write it, for `show_default` |
 
 ### `backend/spike/jev_spike.py`
 
@@ -363,7 +376,7 @@ The Jev checklist against hand-written facts. Calls the API unless `--dry-run`; 
 | `RULES` | `dict[str, str]`: `speed`, `gap`, `passing`, `zone` to the four preset texts |
 | `GAP_RULE_POSITIVE` | The positive rephrase of the gap rule offered by the console |
 | `item_1_hello` ... `item_8_latency` | The eight checklist items: hello world and model version, fact sets, numeric probes, request shapes, JSON versus prose, negation, stability, latency |
-| `add_arguments`, `run_cli`, `main` | the module CLI (`--items`, `--repeats`, `--dry-run`) |
+| `command`, `main` | the `interlock spike` command (`--items`, `--repeats`, `--dry-run`, `--results`) and `python -m backend.spike.jev_spike` |
 
 ## Frontend
 

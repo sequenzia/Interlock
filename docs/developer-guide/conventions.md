@@ -9,7 +9,7 @@ The rules the codebase follows, so a change reads like the code around it. CLAUD
 - Every module starts with `from __future__ import annotations` and a docstring that says what the module is for and which part of the design it implements.
 - **Dataclasses for values**: `Thresholds`, `Decision`, `RankedAction`, `Escalation`, `Zone`, `Constraint`, `CheckResult`, `Exchange`. Frozen where the value is a result rather than a mutable record.
 - **Pure functions where the logic matters.** `shield.decide` and `resolve` take the ranking and the probability grid and return a `Decision`; no simulator, no network, so every branch has a unit test. The same holds for `checkers.label`, `metrics.episode_metrics` and `facts.sentences`.
-- Modules behind a subcommand expose `add_arguments(parser)` and `run_cli(args) -> int`, and keep a `main()` so `python -m backend.<module>` matches `interlock <command>`.
+- Modules behind a subcommand expose `command`, a Typer command whose parameters are the flags and whose docstring is the help page, and a `main()` that runs it through `cli_support.run_standalone` so `python -m backend.<module>` matches `interlock <command>`. A usage error raises `typer.BadParameter` or prints a hint and raises `typer.Exit(2)`; nothing returns an exit code.
 - `backend/paths.py` holds the repo-relative paths the modules share (models, logs, internal, the `.env` file). The spike computes its own from `__file__`.
 
 ## TypeScript

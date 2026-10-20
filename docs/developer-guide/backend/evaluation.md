@@ -38,12 +38,12 @@ Aggregates the newest run per label into `internal/eval/latest.json` and the thr
 
 ### CLI logic
 
-`add_arguments` defines `--seeds` (default `0-19`), `--mode off|on|shadow`, `--t-allow`, `--t-block`, `--sweep`, `--all`, `--report`, `--zone-at-step`, `--jev`, `--concurrency` (3), `--max-steps`, `--model-path`, `--out` (default `backend/logs/eval`).
+`command` takes `--seeds` (default `0-19`), `--mode off|on|shadow`, `--t-allow`, `--t-block`, `--floor-s`, `--sweep`, `--all`, `--report`, `--zone-at-step`, `--jev`, `--concurrency` (3), `--max-steps`, `--model-path`, `--out` (default `backend/logs/eval`).
 
-`run_cli` maps `shadow` to `off` (the judge and checkers run either way, so shadow is only a name) and exits 2 with a hint when none of `--mode`, `--sweep`, `--all` or `--report` is set. `main_async` then:
+It maps `shadow` to `off` (the judge and checkers run either way, so shadow is only a name) and exits 2 with a hint when none of `--mode`, `--sweep`, `--all` or `--report` is set. Then:
 
-- With `--report` alone: `build_report(args.out)`, print the run and plot paths, return.
-- Otherwise resolve `--jev auto` to live when the key is present, parse seeds with `parse_seed_range` from `backend/train.py`, load the policy once and make one client.
+- With `--report` alone: `build_report(out)`, print the run and plot paths, return.
+- Otherwise resolve `--jev auto` with `resolve_jev_mode` (live when the key is present), parse seeds with `parse_seed_range` from `backend/train.py`, load the policy once, and make one client inside the event loop so it closes on the loop that opened it.
 - `--all` queues shield off at the default thresholds followed by the five `SWEEP` pairs `(0.1, 0.9), (0.2, 0.8), (0.3, 0.7), (0.4, 0.6), (0.5, 0.5)`. Without `--all`, `--mode` adds one configuration and `--sweep` adds the five pairs.
 - Each configuration runs through `run_config` into a fresh stamped directory and prints `print_summary`.
 - `--report` or `--all` finishes with `build_report`.

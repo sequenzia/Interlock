@@ -11,8 +11,8 @@ from backend.baseline_llm import (
     Reply,
     build_messages,
     collect_items,
+    command,
     parse_probability,
-    run_cli,
     run_models,
     stratified_sample,
     summarize,
@@ -165,13 +165,10 @@ def test_dry_run_samples_from_the_newest_runs_and_sends_nothing(tmp_path: Path, 
     with (run / "seed0.jsonl").open("w") as fh:
         for step in range(3):
             fh.write(json.dumps(record(step, 0.9, 0.1)) + "\n")
-    import argparse
-
-    args = argparse.Namespace(
+    command(
         checks=10, models="m1", runs=tmp_path, seed=0, concurrency=1, prices=None,
         out=tmp_path / "baseline.json", cache=tmp_path / "cache.jsonl", dry_run=True,
     )  # fmt: skip
-    assert run_cli(args) == 0
     out = capsys.readouterr().out
     assert "4 distinct labeled checks, 4 sampled" in out and "json_schema" in out
     assert "tool_choice" not in out

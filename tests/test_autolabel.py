@@ -1,13 +1,13 @@
-import argparse
 import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-from backend.autolabel import LABELER, add_arguments, answer, cut_in, dense_traffic, run_cli
+from backend.autolabel import LABELER, answer, command, cut_in, dense_traffic
+from backend.cli_support import standalone_app
 from backend.constraints import PRESET_CUT_IN, PRESET_DENSE_TRAFFIC, PRESETS
 from backend.label import Label, label_key, load_labels
 from backend.metrics import calibration
+from typer.testing import CliRunner
 
 DENSE, CUT = PRESETS[PRESET_DENSE_TRAFFIC], PRESETS[PRESET_CUT_IN]
 
@@ -132,9 +132,14 @@ def record(step: int, candidates: list[tuple[str, dict[str, Any], float]]) -> di
     }
 
 
-def test_run_cli_labels_each_state_once_and_reruns_add_nothing(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def autolabel_cli(*argv: str) -> str:
+    """Run ``python -m backend.autolabel argv`` in-process and return what it printed."""
+    result = CliRunner().invoke(standalone_app(command), list(argv))
+    assert result.exit_code == 0, result.output
+    return result.output
+
+
+def test_command_labels_each_state_once_and_reruns_add_nothing(tmp_path: Path) -> None:
     faster, idle = facts("FASTER"), facts("IDLE", headway=1.5)
     records = [
         record(0, [("FASTER", faster, 0.9), ("IDLE", idle, 0.6)]),
@@ -143,19 +148,15 @@ def test_run_cli_labels_each_state_once_and_reruns_add_nothing(
     run = tmp_path / "run"
     run.mkdir()
     (run / "seed0.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
-    parser = argparse.ArgumentParser()
-    add_arguments(parser)
     labels_dir = tmp_path / "labels"
     base = ["--run", str(run), "--labels-dir", str(labels_dir)]
 
-    assert run_cli(parser.parse_args([*base, "--dry-run"])) == 0
+    out = autolabel_cli(*base, "--dry-run")
     assert not labels_dir.exists()
-    out = capsys.readouterr().out
     assert "dense_traffic: 2 states, 2 y, 0 n, 0 skipped" in out
     assert "cut_in: 2 states, 0 y, 2 n, 0 skipped" in out and "labeled" not in out
 
-    assert run_cli(parser.parse_args(base)) == 0
-    assert "labeled 4." in capsys.readouterr().out
+    assert "labeled 4." in autolabel_cli(*base)
     labels = load_labels(labels_dir)
     assert labels == {
         label_key(faster, DENSE): Label(True, LABELER),
@@ -170,18 +171,12 @@ def test_run_cli_labels_each_state_once_and_reruns_add_nothing(
         LABELER
     }
 
-    assert (
-        run_cli(parser.parse_args(base)) == 0
-    )  # everything is labeled: nothing offered, nothing written
-    out = capsys.readouterr().out
+    out = autolabel_cli(*base)  # everything is labeled: nothing offered, nothing written
     assert "dense_traffic: nothing left to label" in out and "labeled 0." in out
 
     unsettled = facts("LANE_LEFT", lane_after=1, behind_gap=15.5, behind_closing=2.0)
     (run / "seed1.jsonl").write_text(json.dumps(record(0, [("LANE_LEFT", unsettled, 0.4)])) + "\n")
-    assert (
-        run_cli(parser.parse_args(base)) == 0
-    )  # a skipped state is offered again and skipped again
-    out = capsys.readouterr().out
+    out = autolabel_cli(*base)  # a skipped state is offered again and skipped again
     assert "dense_traffic: 1 states, 0 y, 0 n, 1 skipped" in out and "labeled 0." in out
     assert len(load_labels(labels_dir)) == 4 and label_key(unsettled, DENSE) not in load_labels(
         labels_dir
@@ -192,8 +187,7 @@ def test_run_cli_labels_each_state_once_and_reruns_add_nothing(
     assert cal["cut_in"]["positives"] == 0 and cal["cut_in"]["label_source"] == LABELER
 
 
-def test_run_cli_with_no_records_fails(tmp_path: Path) -> None:
-    parser = argparse.ArgumentParser()
-    add_arguments(parser)
+def test_command_with_no_records_fails(tmp_path: Path) -> None:
     (tmp_path / "empty.jsonl").write_text("")
-    assert run_cli(parser.parse_args(["--run", str(tmp_path / "empty.jsonl")])) == 2
+    result = CliRunner().invoke(standalone_app(command), ["--run", str(tmp_path / "empty.jsonl")])
+    assert result.exit_code == 2 and "no records" in result.stderr

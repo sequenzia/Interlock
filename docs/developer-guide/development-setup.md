@@ -75,7 +75,7 @@ uv run uvicorn backend.server:app --reload       # server by itself
 cd frontend && pnpm dev                          # console by itself on :5173
 ```
 
-Every subcommand is a thin wrapper over a module, so `uv run python -m backend.run_episode --shield on` and `uv run interlock run --shield on` take the same flags. New flags go in the module's `add_arguments`, never in `backend/cli.py`. See [CLI internals](backend/cli.md).
+Every subcommand is a thin wrapper over a module, so `uv run python -m backend.run_episode --shield on` and `uv run interlock run --shield on` take the same flags. New flags are parameters of the module's `command`, never anything in `backend/cli.py`. See [CLI internals](backend/cli.md).
 
 ## Working offline
 

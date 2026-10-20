@@ -1,9 +1,6 @@
 """Chat-LLM baseline for the judge, offline. Plan section 16.3.
 
-    interlock baseline --checks 2000 --models claude-haiku-5-5,claude-sonnet-5-5
-    interlock baseline --dry-run                 # sample, print one request, send nothing
-    interlock baseline --prices other-prices.json     # prices from somewhere else
-
+Behind ``interlock baseline``; ``python -m backend.baseline_llm`` takes the same flags.
 Samples labeled (candidate action, rule) checks from the newest eval runs,
 stratified by rule and label, sends each chat model the identical facts JSON
 and question text the judge saw, and asks for one probability of violation
@@ -21,7 +18,6 @@ folds into latest.json and plots.
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import json
 import os
@@ -33,10 +29,12 @@ from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
+import typer
 from dotenv import load_dotenv
 
+from backend.cli_support import repo_relative, run_standalone
 from backend.evaluate import EVAL_DIR, newest_runs
 from backend.jev_client import build_question, question_dict
 from backend.label import Label, label_key, load_labels, rule_group
@@ -428,40 +426,50 @@ def print_summary(summary: dict[str, Any]) -> None:
         )
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Flags shared by ``python -m backend.baseline_llm`` and ``interlock baseline``."""
-    parser.add_argument("--checks", type=int, default=2000, help="checks to sample (default 2000)")
-    parser.add_argument(
-        "--models",
-        default=",".join(DEFAULT_MODELS),
-        help=f"comma list of model ids (default {','.join(DEFAULT_MODELS)})",
-    )
-    parser.add_argument("--runs", type=Path, default=EVAL_DIR, help="eval runs root")
-    parser.add_argument("--seed", type=int, default=0, help="sampling seed (default 0)")
-    parser.add_argument("--concurrency", type=int, default=4, help="calls in flight per model")
-    parser.add_argument(
-        "--prices",
-        type=Path,
-        default=None,
-        help="JSON {model: {input_per_mtok, output_per_mtok}} in USD; default backend/prices.json when it exists",
-    )
-    parser.add_argument("--out", type=Path, default=BASELINE_PATH, help="where the block goes")
-    parser.add_argument("--cache", type=Path, default=CACHE_PATH, help="reply cache JSONL")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="sample, print the strata and one request, send nothing",
-    )
+def command(
+    checks: Annotated[int, typer.Option(help="checks to sample")] = 2000,
+    models: Annotated[str, typer.Option(help="comma list of model ids")] = ",".join(DEFAULT_MODELS),
+    runs: Annotated[
+        Path, typer.Option(help="eval runs root", show_default=repo_relative(EVAL_DIR))
+    ] = EVAL_DIR,
+    seed: Annotated[int, typer.Option(help="sampling seed")] = 0,
+    concurrency: Annotated[int, typer.Option(help="calls in flight per model")] = 4,
+    prices: Annotated[
+        Path | None,
+        typer.Option(
+            help="JSON `{model: {input_per_mtok, output_per_mtok}}` in USD; "
+            "default backend/prices.json when it exists"
+        ),
+    ] = None,
+    out: Annotated[
+        Path, typer.Option(help="where the block goes", show_default=repo_relative(BASELINE_PATH))
+    ] = BASELINE_PATH,
+    cache: Annotated[
+        Path, typer.Option(help="reply cache JSONL", show_default=repo_relative(CACHE_PATH))
+    ] = CACHE_PATH,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="sample, print the strata and one request, send nothing"),
+    ] = False,
+) -> None:
+    """Chat-LLM baseline on logged checks: the judge's own questions, scored the same way.
 
+    ```
+    interlock baseline --checks 2000 --models claude-haiku-5-5,claude-sonnet-5-5
+    interlock baseline --dry-run                      # sample, print one request, send nothing
+    interlock baseline --prices other-prices.json     # prices from somewhere else
+    ```
 
-def run_cli(args: argparse.Namespace) -> int:
+    Needs ANTHROPIC_API_KEY in backend/.env unless `--dry-run`. Writes
+    `internal/eval/baseline.json`, which `interlock eval --report` folds into the report.
+    """
     load_dotenv(ENV_FILE)
-    items = load_items(args.runs, load_labels())
+    items = load_items(runs, load_labels())
     if not items:
-        print(f"no labeled checks under {args.runs}", file=sys.stderr)
-        return 2
-    sample = stratified_sample(items, args.checks, random.Random(args.seed))
-    models = [m for m in args.models.split(",") if m]
+        typer.echo(f"no labeled checks under {runs}", err=True)
+        raise typer.Exit(2)
+    sample = stratified_sample(items, checks, random.Random(seed))
+    model_ids = [m for m in models.split(",") if m]
     strata: dict[str, dict[str, int]] = {}
     for item in sample:
         strata.setdefault(item.group, {"violation": 0, "ok": 0})
@@ -470,46 +478,42 @@ def run_cli(args: argparse.Namespace) -> int:
         f"{len(items)} distinct labeled checks, {len(sample)} sampled: {json.dumps(strata)}",
         flush=True,
     )
-    if args.dry_run:
+    if dry_run:
         system, user = build_messages(sample[0])
         print(
-            f"\nmodels: {models}\n\nsystem:\n{system}\n\nuser:\n{user}\n\n"
+            f"\nmodels: {model_ids}\n\nsystem:\n{system}\n\nuser:\n{user}\n\n"
             f"output format:\n{json.dumps(FORMAT)}"
         )
-        return 0
+        return
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY is not set; put it in backend/.env", file=sys.stderr)
-        return 2
+        typer.echo("ANTHROPIC_API_KEY is not set; put it in backend/.env", err=True)
+        raise typer.Exit(2)
     try:
-        prices = load_prices(args.prices)
+        price_table = load_prices(prices)
     except ValueError as exc:
-        print(exc, file=sys.stderr)
-        return 2
-    if prices is None:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
+    if price_table is None:
         print("no prices file: tokens will be reported, cost will read n/a")
-    chat = AnthropicChat(BaselineCache(args.cache))
+    chat = AnthropicChat(BaselineCache(cache))
 
     async def run_and_close() -> dict[str, list[Reply]]:
         try:  # close on the loop that opened the connections
-            return await run_models(sample, models, chat.ask, args.concurrency)
+            return await run_models(sample, model_ids, chat.ask, concurrency)
         finally:
             await chat.close()
 
     replies = asyncio.run(run_and_close())
-    summary = summarize(sample, replies, prices)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(summary, indent=1))
-    print_summary(summary)
-    print(f"\nwrote {args.out}. Fold it into the report with: uv run interlock eval --report")
-    return 0
+    result = summarize(sample, replies, price_table)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=1))
+    print_summary(result)
+    print(f"\nwrote {out}. Fold it into the report with: uv run interlock eval --report")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    add_arguments(parser)
-    sys.exit(run_cli(parser.parse_args(argv)))
+    """``python -m backend.baseline_llm``: the ``interlock baseline`` command on its own."""
+    run_standalone(command, argv)
 
 
 if __name__ == "__main__":

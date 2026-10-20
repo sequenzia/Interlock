@@ -2,28 +2,23 @@
 
 Recipe from the HighwayEnv docs, recorded in internal/build-plan.md section 12.
 The policy is trained on env reward alone and never sees an operator rule.
-
-    uv run python -m backend.train                         # 20k steps
-    uv run python -m backend.train --timesteps 100000      # long run
-    uv run python -m backend.train --eval-only models/dqn_highway_20k.zip
-    uv run python -m backend.train --promote               # also copy to dqn_highway.zip
-    uv run interlock train --promote                       # same flags via backend/cli.py
+Behind ``interlock train``; ``python -m backend.train`` takes the same flags.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import shutil
-import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import numpy as np
+import typer
 from stable_baselines3 import DQN
 
+from backend.cli_support import run_standalone
 from backend.env import make_env
 from backend.paths import DEFAULT_MODEL_PATH, MODELS_DIR
 
@@ -118,34 +113,39 @@ def parse_seed_range(text: str) -> list[int]:
     return seeds
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Flags shared by ``python -m backend.train`` and ``interlock train``."""
-    parser.add_argument("--timesteps", type=int, default=20_000)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument(
-        "--out",
-        type=Path,
-        default=None,
-        help="checkpoint path (default models/dqn_highway_<N>k.zip)",
-    )
-    parser.add_argument(
-        "--eval-seeds", default="0-19", help='seeds for the post-training rollout, e.g. "0-19"'
-    )
-    parser.add_argument(
-        "--eval-only", type=Path, default=None, help="skip training and evaluate this checkpoint"
-    )
-    parser.add_argument(
-        "--promote", action="store_true", help="also copy the checkpoint to models/dqn_highway.zip"
-    )
+def command(
+    timesteps: Annotated[int, typer.Option(help="training steps")] = 20_000,
+    seed: Annotated[int, typer.Option(help="training seed")] = 0,
+    out: Annotated[
+        Path | None, typer.Option(help="checkpoint path (default `models/dqn_highway_<N>k.zip`)")
+    ] = None,
+    eval_seeds: Annotated[
+        str, typer.Option(help='seeds for the post-training rollout, e.g. "0-19"')
+    ] = "0-19",
+    eval_only: Annotated[
+        Path | None, typer.Option(help="skip training and evaluate this checkpoint")
+    ] = None,
+    promote: Annotated[
+        bool, typer.Option("--promote", help="also copy the checkpoint to models/dqn_highway.zip")
+    ] = False,
+) -> None:
+    """Train the DQN on task reward alone, or evaluate a checkpoint with greedy rollouts.
 
+    ```
+    interlock train                                        # 20k steps
+    interlock train --timesteps 100000                     # long run
+    interlock train --eval-only models/dqn_highway_20k.zip
+    interlock train --promote                              # also copy to dqn_highway.zip
+    ```
 
-def run_cli(args: argparse.Namespace) -> int:
-    seeds = parse_seed_range(args.eval_seeds)
-    if args.eval_only is not None:
-        checkpoint = args.eval_only
+    Writes the checkpoint and a `.eval.json` next to it with the rollout summary.
+    """
+    seeds = parse_seed_range(eval_seeds)
+    if eval_only is not None:
+        checkpoint = eval_only
     else:
-        checkpoint = args.out or MODELS_DIR / f"dqn_highway_{args.timesteps // 1000}k.zip"
-        train(args.timesteps, checkpoint, args.seed)
+        checkpoint = out or MODELS_DIR / f"dqn_highway_{timesteps // 1000}k.zip"
+        train(timesteps, checkpoint, seed)
 
     summary = evaluate_checkpoint(checkpoint, seeds)
     print(json.dumps({k: v for k, v in summary.items() if k != "per_episode"}, indent=2))
@@ -153,18 +153,14 @@ def run_cli(args: argparse.Namespace) -> int:
     report.write_text(json.dumps(summary, indent=2))
     print(f"wrote {report}")
 
-    if args.promote:
+    if promote:
         shutil.copyfile(checkpoint, DEFAULT_MODEL_PATH)
         print(f"promoted {checkpoint.name} to {DEFAULT_MODEL_PATH}")
-    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    add_arguments(parser)
-    sys.exit(run_cli(parser.parse_args(argv)))
+    """``python -m backend.train``: the ``interlock train`` command on its own."""
+    run_standalone(command, argv)
 
 
 if __name__ == "__main__":

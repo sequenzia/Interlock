@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,6 +36,7 @@ UNAVAILABLE_P = 0.5
 DEFAULT_CACHE_PATH = LOGS_DIR / "jev_cache.jsonl"
 
 Source = Literal["live", "cache", "unavailable"]
+JevMode = Literal["auto", "live", "mock"]
 Facts = dict[str, Any]
 
 
@@ -278,6 +280,13 @@ class JevClient:
     async def close(self) -> None:
         if self.live is not None:
             await self.live.close()
+
+
+def resolve_jev_mode(mode: JevMode) -> Literal["live", "mock"]:
+    """``auto`` is live when TYPESAFE_API_KEY is set and mock otherwise; load the env file first."""
+    if mode == "auto":
+        return "live" if os.environ.get("TYPESAFE_API_KEY") else "mock"
+    return mode
 
 
 def make_client(

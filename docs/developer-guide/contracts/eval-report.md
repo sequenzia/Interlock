@@ -6,7 +6,7 @@ The eval harness writes three kinds of JSON. All of them are plain outputs of `b
 | --- | --- | --- |
 | `backend/logs/eval/<stamp>_<label>/metrics.json` | `run_config` | `build_report` |
 | `internal/eval/latest.json` | `build_report` | `GET /eval/latest`, the metrics tab |
-| `models/<checkpoint>.eval.json` | `train.run_cli` | People choosing a checkpoint |
+| `models/<checkpoint>.eval.json` | `train.command` | People choosing a checkpoint |
 
 ## Per-configuration `metrics.json`
 

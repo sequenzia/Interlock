@@ -3,11 +3,7 @@
 Checklist in internal/build-plan.md section 11. Writes the measured behavior to
 internal/jev-spike-results.md and every raw request and response to
 backend/logs/spike/<timestamp>/. Needs TYPESAFE_API_KEY in backend/.env.
-
-    uv run python -m backend.spike.jev_spike                 # all eight items
-    uv run python -m backend.spike.jev_spike --items 1,3,8   # a subset
-    uv run python -m backend.spike.jev_spike --dry-run       # build and validate requests, no network
-    uv run interlock spike --dry-run                         # same flags via backend/cli.py
+Behind ``interlock spike``; ``python -m backend.spike.jev_spike`` takes the same flags.
 
 No simulator is involved. Facts follow the schema in plan section 5.4 and the
 question phrasing in section 5.5 so the spike measures what the shield will send.
@@ -15,23 +11,23 @@ question phrasing in section 5.5 so the spike measures what the shield will send
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import itertools
 import json
 import os
 import statistics
-import sys
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
+import typer
 from dotenv import load_dotenv
 from typesafe_sdk import AsyncTypeSafeClient, Noul, RetryPolicy, TypeSafeError
 
+from backend.cli_support import repo_relative, run_standalone
 from backend.facts import ACTION_MEANING
 from backend.jev_client import DEFAULT_MODEL, build_question
 
@@ -913,55 +909,58 @@ async def run_items(jev: Jev, report: Report, items: set[int], repeats: int) -> 
         await item_8_latency(jev, report, repeats)
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Flags shared by ``python -m backend.spike.jev_spike`` and ``interlock spike``."""
-    parser.add_argument(
-        "--items", default="1-8", help='checklist items to run, e.g. "1,3,8" or "1-8"'
-    )
-    parser.add_argument("--repeats", type=int, default=20, help="steps for the latency item")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="build and validate every request without calling the API",
-    )
-    parser.add_argument(
-        "--results",
-        type=Path,
-        default=RESULTS_PATH,
-        help="where to write the results markdown (default: internal/jev-spike-results.md)",
-    )
+def command(
+    items: Annotated[
+        str, typer.Option(help='checklist items to run, e.g. "1,3,8" or "1-8"')
+    ] = "1-8",
+    repeats: Annotated[int, typer.Option(help="steps for the latency item")] = 20,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="build and validate every request without calling the API"),
+    ] = False,
+    results: Annotated[
+        Path,
+        typer.Option(
+            help="where to write the results markdown", show_default=repo_relative(RESULTS_PATH)
+        ),
+    ] = RESULTS_PATH,
+) -> None:
+    """The Day 1 Jev checklist: measure how Jev judges hand-written driving facts.
 
+    ```
+    interlock spike                      # all eight items
+    interlock spike --items 1,3,8        # a subset
+    interlock spike --dry-run            # build and validate requests, no network
+    ```
 
-def run_cli(args: argparse.Namespace) -> int:
-    items: set[int] = set()
-    for part in args.items.split(","):
+    Writes the results markdown and every raw request and response under
+    `backend/logs/spike/<timestamp>/`. Needs TYPESAFE_API_KEY in backend/.env unless `--dry-run`.
+    """
+    chosen: set[int] = set()
+    for part in items.split(","):
         if "-" in part:
             lo, hi = part.split("-", 1)
-            items.update(range(int(lo), int(hi) + 1))
+            chosen.update(range(int(lo), int(hi) + 1))
         elif part.strip():
-            items.add(int(part))
+            chosen.add(int(part))
 
     load_dotenv(BACKEND_DIR / ".env")
-    if not args.dry_run and not os.environ.get("TYPESAFE_API_KEY"):
-        print(
+    if not dry_run and not os.environ.get("TYPESAFE_API_KEY"):
+        typer.echo(
             "TYPESAFE_API_KEY is not set. Copy backend/.env.example to backend/.env and fill it in.",
-            file=sys.stderr,
+            err=True,
         )
-        return 2
+        raise typer.Exit(2)
     try:
-        asyncio.run(run(items, args.repeats, args.dry_run, Path(args.results)))
+        asyncio.run(run(chosen, repeats, dry_run, results))
     except TypeSafeError as exc:
-        print(f"TypeSafe SDK error: {exc}", file=sys.stderr)
-        return 1
-    return 0
+        typer.echo(f"TypeSafe SDK error: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    add_arguments(parser)
-    sys.exit(run_cli(parser.parse_args(argv)))
+    """``python -m backend.spike.jev_spike``: the ``interlock spike`` command on its own."""
+    run_standalone(command, argv)
 
 
 if __name__ == "__main__":

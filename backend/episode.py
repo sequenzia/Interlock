@@ -13,7 +13,7 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, Literal
 
 from backend import checkers
 from backend import facts as fact_extractor
@@ -90,7 +90,8 @@ async def always_deny(escalation: Escalation) -> Answer:
     return Answer("deny")
 
 
-OPERATORS: dict[str, Operator] = {
+OperatorName = Literal["simulated", "approve", "deny"]
+OPERATORS: dict[OperatorName, Operator] = {
     "simulated": simulated_operator,
     "approve": always_approve,
     "deny": always_deny,

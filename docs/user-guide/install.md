@@ -69,7 +69,7 @@ uv run interlock --help
 cd frontend && pnpm typecheck
 ```
 
-The test suite runs offline with an untrained policy and the mock judge, so it passes without a key and without a checkpoint. `interlock --help` lists the five subcommands: `run`, `eval`, `train`, `spike`, `console`.
+The test suite runs offline with an untrained policy and the mock judge, so it passes without a key and without a checkpoint. `interlock --help` lists the eight subcommands: `run`, `eval`, `train`, `spike`, `label`, `autolabel`, `baseline`, `console`.
 
 ## Documentation site
 

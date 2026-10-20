@@ -37,8 +37,8 @@ around Oct 23, 2026.
 ## Stack
 
 - Backend: Python 3.12 via uv, highway-env 1.12, Gymnasium 1.3, SB3 2.9,
-  FastAPI with WebSocket, `typesafe-sdk` for Jev. Pin versions in
-  `pyproject.toml` once training works.
+  FastAPI with WebSocket, Typer for the `interlock` command, `typesafe-sdk`
+  for Jev. Pin versions in `pyproject.toml` once training works.
 - Frontend: Vite, React, TypeScript strict, Tailwind, Zustand, Recharts,
   Canvas 2D road view, Playwright smoke test. Package manager is pnpm.
 - Layout: `backend/`, `frontend/`, `models/`, `internal/`. See the plan for
@@ -81,9 +81,10 @@ around Oct 23, 2026.
   return stable references: never `?? []` or `?? {}` inside a selector.
 - Keep the headless CLI working at all times; the server and UI sit on top
   of it, not beside it. `backend/episode.py` holds the per-step loop both share.
-  `backend/cli.py` is the `interlock` command. Each subcommand calls a module's
-  `add_arguments` and `run_cli`, so new flags go in the module, never in the
-  dispatcher, and `python -m backend.<module>` stays equivalent.
+  `backend/cli.py` is the `interlock` command, a Typer app. Each subcommand is a
+  module's `command` function, whose parameters are its flags, so new flags go
+  in the module, never in the dispatcher, and `python -m backend.<module>` stays
+  equivalent. `backend/cli_support.py` holds the Typer settings every app shares.
 - Context7 is disabled in this project. Read library docs from the official
   sites: highway-env.farama.org, stable-baselines3.readthedocs.io,
   docs.typesafe.ai.

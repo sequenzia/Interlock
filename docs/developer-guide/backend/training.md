@@ -97,7 +97,7 @@ The hyperparameters follow the HighwayEnv quickstart recipe:
 | `--eval-only PATH` | none | Skip training, evaluate this checkpoint |
 | `--promote` | off | Also copy the checkpoint to `models/dqn_highway.zip` |
 
-`run_cli` trains unless `--eval-only`, evaluates, prints the summary without `per_episode`, writes `<checkpoint>.eval.json` next to the checkpoint, and copies to `DEFAULT_MODEL_PATH` when promoting. The `.eval.json` shape is in [Evaluation report](../contracts/eval-report.md).
+`command` trains unless `--eval-only`, evaluates, prints the summary without `per_episode`, writes `<checkpoint>.eval.json` next to the checkpoint, and copies to `DEFAULT_MODEL_PATH` when promoting. The `.eval.json` shape is in [Evaluation report](../contracts/eval-report.md).
 
 ```bash
 uv run interlock train                                            # 20k steps

@@ -145,6 +145,12 @@ def plot_tradeoff(sweep: list[dict[str, Any]], path: Path) -> Path:
     return path
 
 
+def _source_note(rel: dict[str, Any]) -> str:
+    """Who labeled a rule without a checker, for the legend: the labelers named on the rows."""
+    source = rel.get("label_source", "checker")
+    return "" if source == "checker" else f" (labels: {source})"
+
+
 def plot_calibration(cal: dict[str, Any], path: Path) -> Path:
     """Reliability diagram: observed violation rate per bin of p, overall and per checker."""
     fig, (ax, ax_n) = plt.subplots(
@@ -180,8 +186,7 @@ def plot_calibration(cal: dict[str, Any], path: Path) -> Path:
             marker="o",
             markersize=5,
             markeredgecolor=SURFACE,
-            label=f"{CHECKER_LABEL.get(name, name)}"
-            f"{' (hand labels)' if rel.get('label_source') == 'human' else ''}, ECE {rel['ece']:.3f}",
+            label=f"{CHECKER_LABEL.get(name, name)}{_source_note(rel)}, ECE {rel['ece']:.3f}",
             zorder=3,
         )
     _style(

@@ -392,7 +392,9 @@ moving in ahead of a faster vehicle" and "Drive conservatively in dense
 traffic". `interlock label` collects hand labels for them, keyed by a hash of
 the candidate's facts and the rule text, and `metrics.collect_checks` merges
 the labels where the checker label is null, so they enter calibration under
-their preset id with `label_source: "human"`. The evaluator's standing rules
+their preset id with the labeler as `label_source`: `human` from `interlock
+label`, `autolabel` from the fixed standard in `backend/autolabel.py` (Oct
+19). The evaluator's standing rules
 are every preset but the zone rule, seven in all.
 
 ## 7. Log record
@@ -778,8 +780,60 @@ Reading:
   check per call where Jev answers seven per request, so a chat shield
   built Jev's way would share the facts across rules and cost less per
   check than measured here. Thinking was left at the model default, so
-  Haiku thought and Sonnet mostly did not. The fuzzy rules are absent
-  until hand labels exist.
+  Haiku thought and Sonnet mostly did not. The fuzzy rules entered the
+  calibration on Oct 19; see the next subsection.
+
+### Hand labels for the fuzzy rules, Oct 19
+
+Labeled by the standard in `internal/hand-labeling.md`, pinned by Claude
+(Fable 5.1) into `backend/autolabel.py` behind `interlock autolabel`, not by
+a person, and applied to every distinct state in the calibration pool:
+19,091 (facts, rule) states per rule, 19,067 labeled and 24 skipped on the
+"about" thresholds. Rows carry `labeler: autolabel` and the files are
+committed. The pool rather than the shield-off run alone, because
+the unshielded car at 30 m/s is the fastest on the road and never moves in
+ahead of a faster vehicle; the shielded runs, held to 25 m/s, supply all
+290 cut-in violations. The pinned standard and the pool choice are in the
+guide's last section.
+
+| Rule | Checks | Violations | ECE | Brier | Acc at 0.5 | Allowed at p < 0.3 | Blocked at p > 0.7 | In band |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Conservative in dense traffic | 34,885 | 9,335 | 0.110 | 0.135 | 79.1% | 539 | 1,568 | 31.3% |
+| Room when moving in | 34,883 | 487 | 0.221 | 0.089 | 89.4% | 112 | 345 | 33.0% |
+
+Pooled over all seven rules: 244,393 checks, ECE 0.101, Brier 0.049,
+accuracy 94.6%. The five crisp rules alone are unchanged at 0.095, 0.024
+and 98.7%.
+
+Reading:
+
+- Dense traffic is monotone up to p 0.8 and then falls to 0.63 at the top.
+  The 754 compliant checks at p 0.8 or above all have exactly three
+  vehicles within 50 m, one short of the standard's four, so none is dense
+  by it. Jev's "dense" is a little wider than the labeler's: at a
+  three-vehicle cut the top bins read 0.91 to 0.96 and the ECE is 0.136,
+  with more positives landing in the middle bins; at five it is 0.273. The
+  standard's four stands.
+- Cut-in is the rule Jev cannot score. The observed violation rate never
+  exceeds 6% in any bin while p runs to 0.8. Its mean p on a real lane
+  change is 0.36 with a faster vehicle under 14 m behind, 0.33 with one
+  farther back, 0.37 to 0.41 with a slower vehicle behind and 0.45 with
+  nobody behind: the number does not move with the two facts that decide
+  the rule. The 487 labeled violations sit at p 0.16 to 0.62, median 0.37,
+  6% above 0.5; a judge that always said no would score 98.6% at the 0.5
+  cut. FASTER, which cannot cut anyone off, averages 0.32.
+- For the talk: the two fuzzy rules are the honest counterweight to the
+  crisp five. Jev enforces "drive conservatively" about as well as the
+  headway rule once "dense" is agreed, and does not enforce "plenty of
+  room when moving in ahead of a faster vehicle" on this road. The band
+  hides neither: at 0.3 / 0.7 it would have let 112 cut-in violations run
+  on this rule alone and held 345 compliant checks above the block line.
+  The band catches underconfidence, not an uninformative number.
+- Caveats. One labeler, one standard, and a mechanical one: the labels
+  measure agreement with that standard, not with a panel. The cut-in
+  precondition is rare, 1.4% of checks, all from shielded runs. The plot
+  legend and the metrics tab name the labeler from the rows, "labels:
+  autolabel".
 
 ## 11. Day 1 Jev spike checklist
 
@@ -978,8 +1032,10 @@ old all-blocked column; both were corrected on Oct 17.
    with the p hidden by default. `metrics.py` merges human labels where the
    checker label is null, so fuzzy rules enter calibration with
    `label_source: "human"`, and `eval --report` folds new labels in with no
-   Jev cost. Target 300 labels per fuzzy rule. Built Oct 17; the labels
-   themselves are the operator's work.
+   Jev cost. Target 300 labels per fuzzy rule. Built Oct 17. Oct 19:
+   `backend/autolabel.py` behind `interlock autolabel` applies the guide's
+   standard by script to the whole calibration pool; the label files are
+   committed.
 6. Re-run `interlock eval --seeds 0-19 --all`, rebuild the report and plots.
    Done Oct 17; results and reading under section 10, "Results, Oct 17".
 
@@ -1067,7 +1123,7 @@ and the first plan went from brief to deployed in one night.
 | --- | --- | --- |
 | 1 | A1 metrics fix, A2 conflict policy and queue protocol | Report regenerated from the existing logs; a no-compliant-action escalation resolves from the console with a chosen action. Done Oct 17. |
 | 2 | A3 facts, spike re-run | New fields on every candidate; preset rules within 0.1 of the Oct 16 spike. Done Oct 17. |
-| 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot. Rules, command and eval done Oct 17; labels are the operator's work and pending. |
+| 3 | A4 rules, A5 labeling command, labels collected, A6 eval | Each fuzzy rule has 300 human labels and appears in the calibration plot. Rules, command and eval done Oct 17. Labels done Oct 19 by `interlock autolabel`, the guide's standard pinned by Claude, over every pooled state, 19,067 per rule and committed; both rules in the plot, reading in section 10. |
 | 4 | B baseline, C floor | Baseline block in `latest.json` with its plot; crash rate table before and after the floor. Floor done Oct 17 with the table in section 10 and the default at 2 s. Baseline code, plot and panel done Oct 17; live run done Oct 18 after the structured-output fix, numbers and reading in section 10. |
 | 5 | D twin | Twin strip plays and scrubs in step with the live run on a warmed seed. Done Oct 17. |
 | 6 | Freeze: docs sweep, section 10 and README corrected | `mkdocs build --strict` passes; no code changes after this point |

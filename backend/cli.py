@@ -6,6 +6,7 @@
     interlock train --timesteps 100000 --promote         # DQN on task reward alone
     interlock spike --dry-run                            # Day 1 Jev checklist, offline
     interlock label --run <eval dir> --rule dense_traffic  # hand-label a fuzzy rule
+    interlock autolabel --dry-run                        # the fuzzy rules by the fixed standard, nothing written
     interlock console                                    # server on :8000, console on :5173
     interlock console --jev mock --escalation-timeout 0  # offline, wait for the operator
     interlock console --reload --open                    # dev loop, open the browser
@@ -32,7 +33,7 @@ from pathlib import Path
 from types import FrameType, ModuleType
 from typing import Any
 
-from backend import baseline_llm, evaluate, label, run_episode, train
+from backend import autolabel, baseline_llm, evaluate, label, run_episode, train
 from backend.paths import REPO_DIR
 from backend.spike import jev_spike
 
@@ -248,6 +249,7 @@ def build_parser() -> argparse.ArgumentParser:
     add("train", train, "train the DQN on task reward alone, or evaluate a checkpoint")
     add("spike", jev_spike, "Day 1 Jev checklist, writes internal/jev-spike-results.md")
     add("label", label, "hand-label candidates against a rule with no checker, for calibration")
+    add("autolabel", autolabel, "label the fuzzy presets by the fixed standard, for calibration")
     add("baseline", baseline_llm, "chat-LLM baseline on logged checks, offline for Jev")
     console = commands.add_parser(
         "console",

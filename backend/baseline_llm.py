@@ -39,7 +39,7 @@ from dotenv import load_dotenv
 
 from backend.evaluate import EVAL_DIR, newest_runs
 from backend.jev_client import build_question, question_dict
-from backend.label import label_key, load_labels, rule_group
+from backend.label import Label, label_key, load_labels, rule_group
 from backend.logger import read_log
 from backend.metrics import Check, reliability
 from backend.paths import BACKEND_DIR, ENV_FILE, INTERNAL_DIR, LOGS_DIR
@@ -99,7 +99,7 @@ class Reply:
 Ask = Callable[[str, Item], Awaitable[Reply]]
 
 
-def collect_items(records: Iterable[dict[str, Any]], labels: dict[str, bool] | None) -> list[Item]:
+def collect_items(records: Iterable[dict[str, Any]], labels: dict[str, Label] | None) -> list[Item]:
     """Every labeled check with its facts, one per distinct state and rule.
 
     Mirrors ``metrics._collect``: checker rules are labeled by the checker, rules
@@ -119,8 +119,8 @@ def collect_items(records: Iterable[dict[str, Any]], labels: dict[str, bool] | N
                     continue
                 truth = check["ground_truth"]
                 group = c["checker"] if c.get("checker") else rule_group(c["text"])
-                if truth is None and labels:
-                    truth = labels.get(key)
+                if truth is None and labels and key in labels:
+                    truth = labels[key].violation
                 if truth is None:
                     continue
                 out[key] = Item(
@@ -402,7 +402,7 @@ def load_prices(path: Path | None) -> dict[str, dict[str, float]] | None:
     return prices
 
 
-def load_items(root: Path, labels: dict[str, bool] | None) -> list[Item]:
+def load_items(root: Path, labels: dict[str, Label] | None) -> list[Item]:
     """Labeled checks from every seed log of the newest run per label under ``root``."""
     records: list[dict[str, Any]] = []
     for path in newest_runs(root).values():

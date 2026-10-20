@@ -150,6 +150,25 @@ Each prompt shows the seed, step and candidate, the rule, and the facts as sente
 | `--show-p` | off | show Jev's probability on each card |
 | `--include-scored` | off | also offer pairs a checker already labeled |
 
+## interlock autolabel
+
+Label the two fuzzy presets by one fixed standard instead of by hand, so they enter the calibration plot without a labeling session. It reads the runs the report pools for calibration, applies the standard to every distinct state the checkers left unlabeled, and appends rows through the same path as `interlock label`, marked `labeler: autolabel`. A state already labeled is skipped, so a rerun adds nothing. Dense means four or more vehicles within 50 m. In dense traffic FASTER breaks the rule; a lane change breaks it into a gap under 15 m on either side, or onto under 2 s of headway or 5 s to collision; IDLE breaks it on the same margins when SLOWER was available; SLOWER complies. A cut-in violation is a lane change with a faster vehicle under 15 m behind in the new lane, or while tailgated. A state within 1 m or 0.5 s of a threshold is skipped as unsettled. Like the checkers, these labels score only; nothing in the shield reads them.
+
+```bash
+uv run interlock autolabel --dry-run                # the split per rule, per action and per bin
+uv run interlock autolabel                          # label the calibration pool, both rules
+uv run interlock autolabel --run backend/logs/eval/<stamp>_off --rule dense_traffic
+uv run interlock eval --report                      # fold the labels into the calibration
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--run PATH` | the calibration pool | a JSONL log or an eval run directory; repeatable |
+| `--rule ID` | both | `dense_traffic` or `cut_in`; repeatable |
+| `--labels-dir PATH` | `backend/logs/labels/` | where existing labels are read and new ones go |
+| `--labeler NAME` | `autolabel` | the labeler recorded on each row |
+| `--dry-run` | off | print the split, write nothing |
+
 ## interlock spike
 
 The hand-written probe of Jev's behaviour on fixed fact sets. It needs the key unless `--dry-run`, which builds and validates every request without calling the API.

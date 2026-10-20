@@ -135,17 +135,17 @@ def test_calibration_bins_and_ece() -> None:
     assert set(cal["by_checker"]) == {"speed_limit"} and cal["overall"]["n"] == 8
 
 
-def test_hand_labels_fill_in_free_text_rules_for_calibration() -> None:
-    from backend.label import label_key
+def test_labels_fill_in_free_text_rules_for_calibration_with_their_labelers() -> None:
+    from backend.label import Label, label_key
 
     rec = record(0, "allow", "FASTER", [("c1", 0.95, True), ("c5", 0.8, None)])
     rec["candidates"][0]["facts"] = {"x": 1}
     rec["candidates"][1]["facts"] = {"x": 2}
     key = label_key({"x": 1}, "free")
     assert {g for _, _, g in collect_checks([rec])} == {"speed_limit"}
-    checks = collect_checks([rec], labels={key: True})
+    checks = collect_checks([rec], labels={key: Label(True, "human")})
     assert (0.8, True, "free") in checks and len(checks) == 3
-    cal = calibration([rec], labels={key: True})
+    cal = calibration([rec], labels={key: Label(True, "human")})
     assert cal["by_checker"]["free"] == {
         **cal["by_checker"]["free"],
         "n": 1,
@@ -153,6 +153,13 @@ def test_hand_labels_fill_in_free_text_rules_for_calibration() -> None:
     }
     assert cal["by_checker"]["speed_limit"]["label_source"] == "checker"
     assert calibration([rec])["by_checker"].keys() == {"speed_limit"}
+    # a second labeler on the same rule: both names, sorted, joined with a plus sign
+    rec["candidates"][1]["checks"].append(
+        {"constraint_id": "c5", "p_violation": 0.2, "ground_truth": None}
+    )
+    both = {key: Label(True, "human"), label_key({"x": 2}, "free"): Label(False, "autolabel")}
+    free = calibration([rec], labels=both)["by_checker"]["free"]
+    assert free["n"] == 2 and free["positives"] == 1 and free["label_source"] == "autolabel+human"
 
 
 def test_floor_counts_steps_with_a_removal_and_steps_that_removed_everything() -> None:

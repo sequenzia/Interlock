@@ -8,7 +8,9 @@ the Jev cache, so it applies to every run that shows the same state and the
 same rule. Labels land in backend/logs/labels/<group>.jsonl and feed the
 calibration of rules the checkers cannot score (metrics.collect_checks).
 Jev's probability is hidden while labeling unless --show-p is given, so the
-label is the operator's judgment, not the judge's.
+label is the operator's judgment, not the judge's. Each row names its labeler,
+``human`` here and ``autolabel`` for the fixed standard in backend/autolabel.py,
+and the report shows that name as the rule's label source.
 """
 
 from __future__ import annotations
@@ -56,9 +58,17 @@ def rule_group(text: str) -> str:
     return slug(text)
 
 
-def load_labels(directory: Path = LABELS_DIR) -> dict[str, bool]:
+@dataclass(frozen=True)
+class Label:
+    """One answer: whether the action violates the rule, and who said so."""
+
+    violation: bool
+    labeler: str
+
+
+def load_labels(directory: Path = LABELS_DIR) -> dict[str, Label]:
     """Every label under the directory, keyed by content hash; a later line wins."""
-    labels: dict[str, bool] = {}
+    labels: dict[str, Label] = {}
     if not directory.exists():
         return labels
     for path in sorted(directory.glob("*.jsonl")):
@@ -66,7 +76,7 @@ def load_labels(directory: Path = LABELS_DIR) -> dict[str, bool]:
             for line in fh:
                 if line.strip():
                     row = json.loads(line)
-                    labels[row["key"]] = bool(row["label"])
+                    labels[row["key"]] = Label(bool(row["label"]), str(row.get("labeler", "human")))
     return labels
 
 

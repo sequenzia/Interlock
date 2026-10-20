@@ -367,7 +367,7 @@ export interface Reliability {
   ece: number;
   brier: number;
   accuracy_at_0_5: number;
-  label_source?: "checker" | "human";
+  label_source?: string; // "checker", or the labeler on the rows: "human", "autolabel", or both joined with "+"
 }
 
 export interface EvalReport {

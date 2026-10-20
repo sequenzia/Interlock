@@ -7,6 +7,7 @@ import pytest
 from backend.env import make_env
 from backend.evaluate import build_report, config_label, new_run_dir, newest_runs, run_config
 from backend.jev_client import JevCache, JevClient
+from backend.label import load_labels
 from backend.policy import Policy
 from backend.shield import Thresholds
 from backend.train import build_model
@@ -58,8 +59,13 @@ def test_newest_runs_recomputes_labels_and_keeps_the_newest_per_label(tmp_path: 
     }
 
 
-def test_run_config_and_report_end_to_end(policy: Policy, tmp_path: Path) -> None:
+def test_run_config_and_report_end_to_end(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     judge = JevClient(live=None, cache=JevCache(None))
+    # Labels collected under backend/logs/labels/ match these seeded states and
+    # would add the fuzzy rules to the pool, so the report reads an empty directory.
+    monkeypatch.setattr("backend.evaluate.load_labels", lambda: load_labels(tmp_path / "labels"))
     root = tmp_path / "eval"
     seeds = [0, 1]
     # The baseline passes another pair, which the off label leaves out.

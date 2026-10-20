@@ -202,7 +202,7 @@ export function MetricsView() {
                   const rel = cal.by_checker[name];
                   if (!rel) return null;
                   return (
-                    <Line key={name} data={reliabilitySeries(rel)} dataKey="observed" name={`${CHECKER_LABEL[name] ?? name}${rel.label_source === "human" ? " (hand labels)" : ""}, ECE ${rel.ece.toFixed(3)}`} stroke={CHECKER_COLOR[name]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
+                    <Line key={name} data={reliabilitySeries(rel)} dataKey="observed" name={`${CHECKER_LABEL[name] ?? name}${rel.label_source && rel.label_source !== "checker" ? ` (labels: ${rel.label_source})` : ""}, ECE ${rel.ece.toFixed(3)}`} stroke={CHECKER_COLOR[name]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
                   );
                 })}
               </LineChart>

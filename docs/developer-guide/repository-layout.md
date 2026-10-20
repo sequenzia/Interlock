@@ -48,12 +48,13 @@ in that module's `add_arguments`, so `python -m backend.<module>` and
 | `metrics.py` | `episode_metrics`, `aggregate`, `collect_checks`, `reliability`, `calibration`. Records in, numbers out. |
 | `evaluate.py` | `run_config`, `build_report`, the sweep. Behind `interlock eval`. |
 | `label.py` | Hand labels for rules without a checker, keyed by facts and rule text. Behind `interlock label`. |
+| `autolabel.py` | The fixed standard for the two fuzzy presets, applied to every state the report pools. Behind `interlock autolabel`. |
 | `baseline_llm.py` | Chat-LLM baseline: the judge's questions on logged checks, sent to Claude models for one structured JSON number. Behind `interlock baseline`. |
 | `plots.py` | Three matplotlib figures from the report JSON. |
 | `cli.py` | The `interlock` entry point and the `console` subcommand that supervises uvicorn and Vite. |
 | `spike/jev_spike.py` | The offline-checkable Jev probe behind `interlock spike`; writes raw requests under `backend/logs/spike/`. |
 | `.env.example` | Template for `backend/.env`, which holds `TYPESAFE_API_KEY` and is gitignored. |
-| `logs/` | Runtime output, gitignored: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `labels/` (hand labels per rule), `jev_cache.jsonl`, `baseline_cache.jsonl` (chat-model replies). |
+| `logs/` | Runtime output, gitignored except `labels/`: `runs/` (console and CLI episodes), `eval/` (one directory per configuration), `spike/`, `labels/` (one JSONL per fuzzy rule, committed so the fuzzy-rule calibration is reproducible), `jev_cache.jsonl`, `baseline_cache.jsonl` (chat-model replies). |
 
 ## frontend/
 

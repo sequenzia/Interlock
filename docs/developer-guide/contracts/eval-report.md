@@ -97,7 +97,7 @@ Example (seed 0, shield on, default thresholds):
 }
 ```
 
-Each reliability object has `n`, `positives`, ten `bins`, `ece`, `brier` and `accuracy_at_0_5`, and each `by_checker` entry also has `label_source`, `"checker"` for a rule scored in code or `"human"` for a rule scored by hand labels. The keys of `by_checker` are checker ids for crisp rules and preset ids (or a slug of the rule text) for rules without a checker; a rule with neither checker nor labels does not appear. A bin is `{lo, hi, count, mean_p, observed}`; an empty bin has `count: 0` and `null` for the two means. Two real bins from the pooled report:
+Each reliability object has `n`, `positives`, ten `bins`, `ece`, `brier` and `accuracy_at_0_5`, and each `by_checker` entry also has `label_source`: `"checker"` for a rule scored in code, otherwise the labeler named on the label rows, `"human"` from `interlock label` or `"autolabel"` from `interlock autolabel`, joined with a plus sign when both labeled the rule. The keys of `by_checker` are checker ids for crisp rules and preset ids (or a slug of the rule text) for rules without a checker; a rule with neither checker nor labels does not appear. A bin is `{lo, hi, count, mean_p, observed}`; an empty bin has `count: 0` and `null` for the two means. Two real bins from the pooled report:
 
 ```json
 {"lo": 0.0, "hi": 0.1, "count": 9061, "mean_p": 0.0502, "observed": 0.0}

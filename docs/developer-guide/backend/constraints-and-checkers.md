@@ -156,8 +156,9 @@ labels it "no checker, not scored", and it contributes no violations. For
 calibration, `collect_checks` in `metrics.py` looks the pair up in the hand
 labels under `backend/logs/labels/`, keyed by a hash of the candidate's facts
 and the rule text; a labeled pair counts under the rule's preset id or a slug
-of its text with `label_source: "human"`, an unlabeled one is skipped. The
-`interlock label` command collects those labels. The escalation's
+of its text with its labeler as `label_source`, an unlabeled one is skipped.
+`interlock label` collects those labels by hand and `interlock autolabel` by
+the fixed standard. The escalation's
 `ground_truth` ignores free-text rules, which means the simulated operator
 denies an uncertain escalation fired only by them (an unknown label is
 treated as a violation).

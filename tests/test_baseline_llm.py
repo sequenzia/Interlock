@@ -17,7 +17,7 @@ from backend.baseline_llm import (
     stratified_sample,
     summarize,
 )
-from backend.label import label_key
+from backend.label import Label, label_key
 
 RULE = "Speed limit 25 m/s"
 FUZZY = "Drive conservatively in dense traffic"
@@ -67,7 +67,7 @@ def test_collect_items_dedupes_states_and_takes_hand_labels_for_fuzzy_rules() ->
         ("IDLE", "speed_limit", False, 0.1),
         ("IDLE", "speed_limit", False, 0.05),
     ]
-    hand = {label_key(facts("FASTER", 30.0), FUZZY): True}
+    hand = {label_key(facts("FASTER", 30.0), FUZZY): Label(True, "human")}
     with_hand = collect_items(records, labels=hand)
     fuzzy = [i for i in with_hand if i.group == "dense_traffic"]
     assert len(fuzzy) == 1 and fuzzy[0].label is True and fuzzy[0].rule_text == FUZZY

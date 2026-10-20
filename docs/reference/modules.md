@@ -250,9 +250,9 @@ Pure functions over records. See [Evaluation internals](../developer-guide/backe
 | `episode_metrics` | `(records: list[Record]) -> dict[str, Any]` |
 | `aggregate` | `(episodes: list[dict[str, Any]]) -> dict[str, Any]` |
 | `Check` | `tuple[float, bool, str]`: p, label, calibration group |
-| `collect_checks` | `(records: Iterable[Record], labels: dict[str, bool] \| None = None) -> list[Check]` |
+| `collect_checks` | `(records: Iterable[Record], labels: dict[str, Label] \| None = None) -> list[Check]` |
 | `reliability` | `(checks: list[Check], bins: int = 10) -> dict[str, Any]` |
-| `calibration` | `(records: Iterable[Record], bins: int = 10, labels: dict[str, bool] \| None = None) -> dict[str, Any]`; each `by_checker` entry carries `label_source` |
+| `calibration` | `(records: Iterable[Record], bins: int = 10, labels: dict[str, Label] \| None = None) -> dict[str, Any]`; each `by_checker` entry carries `label_source` |
 
 ### `backend/evaluate.py`
 
@@ -264,7 +264,8 @@ Batch evaluation and report. Writes `backend/logs/eval/<stamp>_<label>/`, `inter
 | `config_label` | `(shield_on: bool, thresholds: Thresholds, zone_at_step: int \| None) -> str` |
 | `run_config` | `async (policy: Policy, judge: JevClient, seeds: list[int], *, shield_on: bool, thresholds: Thresholds, out_dir: Path, zone_at_step: int \| None = None, rules: list[str] \| None = None, concurrency: int = 3, max_steps: int \| None = None, quiet: bool = False) -> dict[str, Any]` |
 | `new_run_dir` | `(root: Path, label: str) -> Path` |
-| `load_run` | `(path: Path, labels: dict[str, bool] \| None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]`, recomputes and rewrites `metrics.json` from the seed logs |
+| `load_run` | `(path: Path, labels: dict[str, Label] \| None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]`, recomputes and rewrites `metrics.json` from the seed logs |
+| `calibration_pool` | `(root: Path = EVAL_DIR) -> list[Path]`, the newest shield-off run and the newest shield-on runs at the default floor |
 | `newest_runs` | `(root: Path) -> dict[str, Path]` |
 | `build_report` | `(root: Path = EVAL_DIR, report_path: Path = REPORT_PATH, plots_dir: Path = PLOTS_DIR, thresholds: Thresholds = DEFAULT_THRESHOLDS) -> dict[str, Any]` |
 | `print_summary` | `(report: dict[str, Any]) -> None` |
@@ -289,7 +290,8 @@ Hand labels for rules without a checker. See [Command line](../user-guide/cli.md
 | `LABELS_DIR`, `BINS`, `ANSWERS` | `backend/logs/labels/`, `10`, `("y", "n", "s", "q")` |
 | `label_key` | `(facts: dict[str, Any], rule_text: str) -> str`, sha256 of the canonical JSON of both |
 | `slug`, `rule_group` | `(text: str) -> str`; the group is the preset id for a preset text, else the slug |
-| `load_labels` | `(directory: Path = LABELS_DIR) -> dict[str, bool]`, later lines win |
+| `Label` | frozen dataclass: `violation: bool`, `labeler: str` |
+| `load_labels` | `(directory: Path = LABELS_DIR) -> dict[str, Label]`, later lines win; a row without a labeler counts as `human` |
 | `Item` | frozen dataclass: `run_id`, `seed`, `step`, `action`, `rank`, `rule_id`, `rule_text`, `facts`, `sentences`, `p`, `key` |
 | `read_records` | `(run: Path) -> list[dict[str, Any]]`, a log file or an eval directory |
 | `find_rule` | `(record, rule: str) -> dict \| None`, by id, preset id or text substring |
@@ -297,6 +299,21 @@ Hand labels for rules without a checker. See [Command line](../user-guide/cli.md
 | `sample_items` | `(items: list[Item], n: int, rng: random.Random, done: set[str]) -> list[Item]`, round-robin over ten bins of p |
 | `render` | `(item: Item, index: int, total: int, show_p: bool) -> str` |
 | `label_session` | `(items, ask: Callable[[str], str], out_path: Path, *, show_p: bool = False, labeler: str = "human") -> int` |
+| `add_arguments`, `run_cli`, `main` | the module CLI |
+
+### `backend/autolabel.py`
+
+The fixed standard for the two fuzzy presets, behind `interlock autolabel`. See [Command line](../user-guide/cli.md#interlock-autolabel).
+
+| Name | Signature or value |
+| --- | --- |
+| `LABELER`, `DENSE_AT`, `HEADWAY_S`, `GAP_M`, `GAP_BAND_M`, `TTC_S`, `TTC_BAND_S`, `MIN_TARGET_MPS` | `"autolabel"`, `4`, `2.0`, `15.0`, `1.0`, `5.0`, `0.5`, `20.0` |
+| `dense_traffic`, `cut_in` | `(f: Facts, gap_m: float, ttc_s: float) -> bool`, the two standards at the given thresholds |
+| `STANDARDS` | preset id to standard |
+| `answer` | `(rule: str, facts: Facts) -> str`: `y`, `n`, or `s` when a 1 m or 0.5 s shift of a threshold would flip it |
+| `unlabeled_items` | `(records, rule: str, done: set[str]) -> list[Item]`, one per distinct unlabeled state |
+| `summary` | `(rule: str, items, answers) -> str`, counts by answer, by action and by bin of p |
+| `scripted` | `(answers: Iterable[str]) -> Callable[[str], str]`, an `ask` that answers from a list |
 | `add_arguments`, `run_cli`, `main` | the module CLI |
 
 ### `backend/baseline_llm.py`

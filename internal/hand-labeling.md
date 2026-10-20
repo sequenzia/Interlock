@@ -6,7 +6,8 @@ traffic" (`dense_traffic`), have no checker, so nothing in code can say whether
 Jev was right about them. Hand labels fill that gap. They score only: they feed
 the calibration plot and the Metrics tab and never touch the shield's decision.
 Plan section 16.2, item A5. Phase 3 is done when each rule has about 300
-labels and appears in the calibration plot.
+labels and appears in the calibration plot. Done Oct 19, by Claude rather
+than by hand; the last section records how.
 
 ## Commands
 
@@ -95,9 +96,61 @@ Each answer is appended at once to `backend/logs/labels/dense_traffic.jsonl`
 or `backend/logs/labels/cut_in.jsonl`, keyed by a hash of the candidate's
 facts and the rule text, like the Jev cache. A label therefore applies to
 every run that shows the same state and the same rule. The files are plain
-JSONL and are not committed by default; commit them if the calibration numbers
-in the docs should be reproducible from the repo.
+JSONL and are committed, so the calibration numbers in the docs are
+reproducible from the repo.
 
 Labels are tied to the fact schema. If `backend/facts.py` changes the facts of
 a candidate, that candidate's hash changes and its label no longer matches, so
 finish a labeling pass before the next schema change or expect to relabel.
+
+## Labels as collected, Oct 19
+
+Done by Claude (Fable 5.1) in a Claude Code session, not by a person,
+because the operator had no time for the cards before the talk. Instead of
+sampling 300 cards per rule, every distinct state in the report's
+calibration pool was labeled: the newest shield-off run plus the five newest
+shield-on runs at the default floor, 19,091 distinct (facts, rule) states per
+rule. The standard above was pinned into `backend/autolabel.py`, behind
+`interlock autolabel`, which drives `label_session`, so each row has the same
+shape as an interactive answer and carries `labeler: autolabel`. A coded
+standard is a checker in all but name, so like the checkers it scores only
+and nothing in the shield imports it; a rerun skips every state already
+labeled and adds nothing.
+
+How the standard's loose words were pinned:
+
+- "About 15 m" and "about 5 s" became 15 m and 5 s, and a card was skipped
+  when moving the threshold 1 m or 0.5 s either way would flip its label:
+  24 skips per rule.
+- "SLOWER was available" means the target speed is above the 20 m/s floor
+  of the speed set, so a real SLOWER existed. In the pool it always did.
+- A real SLOWER complies in dense traffic even when the headway after it is
+  still under 2 s, because nothing more conservative exists in the action
+  set. IDLE breaks the rule on under 2 s of headway or under 5 s to
+  collision when SLOWER was available; the carve-out above names only
+  headway, and time to collision was folded in because the general clause
+  lists both.
+- A lane change at the road edge is judged by its effect, like IDLE, as in
+  the worked example. FASTER at the 30 m/s cap is still a violation when it
+  is dense, as the standard says, since the card reads "raise the target
+  speed" either way.
+
+Why the pool and not the shield-off run alone: in the shield-off run the
+car holds 30 m/s and is the fastest vehicle on the road, so in all 1,315 lane
+changes with a vehicle behind that vehicle is pulling away and the cut-in
+rule's precondition never arises; every one of its 5,195 states labels `n`.
+The shielded runs enforce the 25 m/s limit, which puts faster traffic behind
+the car: 334 to 466 lane-change candidates per run with a faster vehicle
+behind, and 290 states in all with that vehicle under 14 m away.
+
+Counts: dense traffic 19,067 labels, 6,296 violations; cut-in 19,067
+labels, 290 violations. In the pooled calibration that is 34,885 and 34,883
+checks. Results and the reading are in the plan, section 10, "Hand labels
+for the fuzzy rules, Oct 19". The density cut matters: at three or more
+vehicles the dense-traffic ECE is 0.136 with the top bins at 0.91 to 0.96;
+at four, 0.110 with the top bins at 0.63 to 0.76; at five, 0.273. Four is
+the number above and the one used.
+
+The label files are committed, so the fuzzy-rule numbers in the docs are
+reproducible from the repo, and `interlock autolabel` on the same runs
+reproduces the files.

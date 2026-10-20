@@ -105,8 +105,12 @@ satisfied every rule now reach the operator instead of looping on a no-op
 last resort. The headway rule took the crash rate to 5% and a 2 second
 time-to-collision floor in code, which no rule can type away, took it to 0;
 the floor costs 22 headway violations because the car follows slow traffic
-instead of changing lanes into closing gaps. Calibration over 174,625 labeled checks gives an expected
-calibration error of 0.095 and 98.7% accuracy at a 0.5 cut. A full
+instead of changing lanes into closing gaps. Calibration over 174,625 labeled checks on the five crisp rules gives an
+expected calibration error of 0.095 and 98.7% accuracy at a 0.5 cut. The two
+fuzzy rules, labeled Oct 19 against one fixed standard over every pooled
+state, come in at 0.110 for driving conservatively in dense traffic and 0.221
+for leaving room when moving in ahead of a faster vehicle, the one rule whose
+probability does not track the facts that decide it. A full
 step answers in about 158 ms at the median from a cold cache, and an
 episode costs under a cent.
 

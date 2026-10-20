@@ -37,7 +37,9 @@ uv run interlock label --run backend/logs/eval/<stamp>_on_ta0.30_tb0.70 --rule c
 uv run interlock eval --report
 ```
 
-Each card shows a step's candidate action and the facts as sentences, with Jev's probability hidden, and takes `y`, `n`, `s` or `q`. The sampler spreads the cards across the range of Jev's probability so the reliability line gets points in every bin. Labels accumulate under `backend/logs/labels/`, keyed by the facts and the rule text, and `eval --report` folds them into the calibration with no Jev cost: the fuzzy rules then appear in the reliability diagram and the metrics tab marked "hand labels". A few hundred labels per rule is enough for a readable line. Flags are on [Command line](cli.md#interlock-label).
+Each card shows a step's candidate action and the facts as sentences, with Jev's probability hidden, and takes `y`, `n`, `s` or `q`. The sampler spreads the cards across the range of Jev's probability so the reliability line gets points in every bin. Labels accumulate under `backend/logs/labels/`, keyed by the facts and the rule text, and `eval --report` folds them into the calibration with no Jev cost: the fuzzy rules then appear in the reliability diagram and the metrics tab marked with their labeler, "labels: human". A few hundred labels per rule is enough for a readable line. Flags are on [Command line](cli.md#interlock-label).
+
+The labels behind the results below were not collected by hand. On Oct 19 Claude (Fable 5.1) pinned the guide's standard into [`interlock autolabel`](cli.md#interlock-autolabel) and ran it over every distinct state in the calibration pool instead of a sample: 19,067 states per rule, with 24 per rule skipped where a value sat within 1 m or 0.5 s of a threshold. Dense means four or more vehicles within 50 m. When it is dense, FASTER breaks the rule; a lane change breaks it when either gap in the new lane is under 15 m or it leaves under 2 s of headway or under 5 s to collision; IDLE breaks it when it leaves under 2 s of headway or under 5 s to collision while SLOWER was available; SLOWER complies. A cut-in violation is a real lane change with a faster vehicle behind in the new lane under 15 m away, or while tailgated. Every row under `backend/logs/labels/` carries `labeler: autolabel`, the files are committed so the numbers below are reproducible, and the plot and the Metrics tab show that labeler as the rule's label source.
 
 ## Chat-LLM baseline
 
@@ -78,7 +80,7 @@ Totals over the 20 episodes, shield off to shield on at the default thresholds, 
 | Keep at least 2 seconds of headway to the vehicle ahead | 647 | 65 |
 | At most 1 lane change in any 10 seconds | 300 | 5 |
 
-The two fuzzy presets have no checker and therefore no violation count. Their calibration arrives with hand labels; see above. Headway was 43 before the physics floor: the floor keeps the car out of lane changes into closing gaps, so it follows slow traffic more often. The floor section below has the comparison.
+The two fuzzy presets have no checker and therefore no violation count. Their calibration comes from the labels described above and is read under [Calibration](#calibration). Headway was 43 before the physics floor: the floor keeps the car out of lane changes into closing gaps, so it follows slow traffic more often. The floor section below has the comparison.
 
 ### The threshold sweep
 
@@ -122,18 +124,22 @@ At 1 s the floor removed a candidate on 6% of steps and changed nothing: never t
 
 ### Calibration
 
-Every candidate action is labeled against every scored rule on every step, and the report pools the records of the shield-off run and the five sweep runs at the default floor, 174,625 labeled checks, 34,925 per rule. Runs at other floors are left out because they repeat the same states with the same cached answers.
+Every candidate action is labeled against every rule on every step, by a checker for the five crisp rules and by the labels above for the two fuzzy ones, and the report pools the records of the shield-off run and the five sweep runs at the default floor: 244,393 labeled checks, 34,925 per crisp rule and 34,885 and 34,883 for the two fuzzy rules after the skips. Runs at other floors are left out because they repeat the same states with the same cached answers.
 
 | Rule | ECE | Accuracy at a 0.5 cut |
 | --- | --- | --- |
-| All rules | 0.095 | 98.7% |
+| All rules | 0.101 | 94.6% |
 | Speed limit | 0.056 | 100.0% |
 | One lane change per 10 s | 0.084 | 100.0% |
 | Lane change gap | 0.064 | 97.9% |
 | Headway 2 s | 0.110 | 98.8% |
 | Left lane for passing | 0.174 | 96.9% |
+| Conservative in dense traffic | 0.110 | 79.1% |
+| Room when moving in | 0.221 | 89.4% |
 
-Brier score over all checks: 0.024. The two fuzzy presets appear here once they have hand labels.
+Brier score over all checks: 0.049; over the five crisp rules alone it stays at 0.024, ECE 0.095 and accuracy 98.7%, unchanged from Oct 17.
+
+The two fuzzy rules read differently from the rest. Dense traffic is monotone up to about 0.8 and then falls back to 0.63 in the top bin. The 754 compliant checks that Jev scores at 0.8 or above all have exactly three vehicles within 50 m, one short of the labeling standard's four, so Jev's idea of dense is a little wider than the labeler's; at a three-vehicle cut those bins would read 0.91 to 0.96. Cut-in never rises above an observed 6% in any bin while Jev spreads its probability up to 0.8. Its mean probability on a lane change is about the same whether the vehicle behind is faster or slower and whether the gap is under 14 m or over 16 m, and only 6% of the 487 labeled violations score above 0.5, so the number does not track the two facts that decide the rule. A judge that always answered no would score 98.6% on that rule at the 0.5 cut. The shield-off car never meets the rule's precondition, because at 30 m/s it is the fastest vehicle on the road; every cut-in violation comes from a shielded run, where the speed limit puts faster traffic behind the car.
 
 ![Reliability diagram per rule](../assets/plots/calibration.png)
 
@@ -185,6 +191,7 @@ Latency and cost are the other half. One chat-model check took about 1.1 s at th
 - **The physics floor is a one-dimensional safety net and that is the point.** It reads one fact, time to collision ahead, it is set at launch, and no rule can type it away. At 2 s it removed the only rear-end on 20 seeds and cost 22 headway violations and a little operator load. It does not see a vehicle alongside during a lane change; that is the gap rule's job, and at 0.5 / 0.5 the judge got one such call wrong.
 - **The simulated operator is perfect.** It answers from the checkers, so the high-escalation settings are flattered, and its 627 overrides at 0.1 / 0.9 are not something a person would match.
 - **A chat model can be better calibrated and still a worse shield.** On 2,000 balanced checks Sonnet 5.5 beat Jev on ECE, Brier and accuracy, yet at the default band it would have allowed 3 violations and blocked 5 compliant actions where Jev allowed and blocked none, because Jev's errors are underconfidence and the band catches them. Jev pays with operator load, 20.6% of checks escalated against 3.1%. The chat model pays with about a second per check against 158 ms per step, and an episode would cost about 65 times as much with Haiku and 860 times with Sonnet.
+- **The fuzzy rules are where the judge is weakest, in two different ways.** Dense traffic calibrates about as well as the headway rule up to 0.8, and its top-bin miss is a one-vehicle disagreement about what dense means. Cut-in is the rule Jev cannot score on this road: a lane change with a faster vehicle 5 m behind gets about the same probability as one with nobody behind, and at the default band 112 of the 487 labeled violations would have run on this rule alone while 345 compliant checks sat above the block threshold. The band does not hide a judge that is uninformative, only one that is underconfident.
 - **Return drops by about five points.** Less than the nine of the three-rule run, because the override keeps the car moving where SLOWER used to stall it, and less than the six before the floor, because no shielded episode ends in a crash.
 
 ## Reproducing

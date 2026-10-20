@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-18T06:46:23+00:00",
+ "generated_at": "2026-10-20T01:02:00+00:00",
  "thresholds_default": {
   "t_allow": 0.3,
   "t_block": 0.7
@@ -863,85 +863,245 @@
    },
    "calibration": {
     "overall": {
-     "n": 25975,
-     "positives": 9750,
+     "n": 36358,
+     "positives": 12627,
      "bins": [
       {
        "lo": 0.0,
        "hi": 0.1,
-       "count": 8374,
-       "mean_p": 0.0603,
-       "observed": 0.0
+       "count": 9384,
+       "mean_p": 0.0623,
+       "observed": 0.0007
       },
       {
        "lo": 0.1,
        "hi": 0.2,
-       "count": 5453,
-       "mean_p": 0.1267,
-       "observed": 0.0
+       "count": 8595,
+       "mean_p": 0.1273,
+       "observed": 0.0212
       },
       {
        "lo": 0.2,
        "hi": 0.3,
-       "count": 908,
-       "mean_p": 0.2345,
-       "observed": 0.0066
+       "count": 1836,
+       "mean_p": 0.2409,
+       "observed": 0.0703
       },
       {
        "lo": 0.3,
        "hi": 0.4,
-       "count": 318,
-       "mean_p": 0.339,
-       "observed": 0.1887
+       "count": 1318,
+       "mean_p": 0.3432,
+       "observed": 0.1153
       },
       {
        "lo": 0.4,
        "hi": 0.5,
-       "count": 934,
-       "mean_p": 0.4527,
-       "observed": 0.1285
+       "count": 1959,
+       "mean_p": 0.4478,
+       "observed": 0.172
       },
       {
        "lo": 0.5,
        "hi": 0.6,
-       "count": 548,
-       "mean_p": 0.5317,
-       "observed": 0.3777
+       "count": 1243,
+       "mean_p": 0.5376,
+       "observed": 0.3403
       },
       {
        "lo": 0.6,
        "hi": 0.7,
-       "count": 587,
-       "mean_p": 0.6503,
-       "observed": 0.9097
+       "count": 1215,
+       "mean_p": 0.6463,
+       "observed": 0.7045
       },
       {
        "lo": 0.7,
        "hi": 0.8,
-       "count": 871,
-       "mean_p": 0.7443,
-       "observed": 0.9679
+       "count": 1719,
+       "mean_p": 0.7452,
+       "observed": 0.9308
       },
       {
        "lo": 0.8,
        "hi": 0.9,
-       "count": 2565,
-       "mean_p": 0.8638,
-       "observed": 0.9992
+       "count": 3551,
+       "mean_p": 0.8606,
+       "observed": 0.9611
       },
       {
        "lo": 0.9,
        "hi": 1.0,
-       "count": 5417,
-       "mean_p": 0.9309,
-       "observed": 1.0
+       "count": 5538,
+       "mean_p": 0.9304,
+       "observed": 0.9982
       }
      ],
-     "ece": 0.1119,
-     "brier": 0.0311,
-     "accuracy_at_0_5": 0.98
+     "ece": 0.1103,
+     "brier": 0.0569,
+     "accuracy_at_0_5": 0.9414
     },
     "by_checker": {
+     "cut_in": {
+      "n": 5195,
+      "positives": 0,
+      "bins": [
+       {
+        "lo": 0.0,
+        "hi": 0.1,
+        "count": 785,
+        "mean_p": 0.0772,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.1,
+        "hi": 0.2,
+        "count": 1875,
+        "mean_p": 0.1302,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.2,
+        "hi": 0.3,
+        "count": 622,
+        "mean_p": 0.2487,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.3,
+        "hi": 0.4,
+        "count": 691,
+        "mean_p": 0.3443,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.4,
+        "hi": 0.5,
+        "count": 660,
+        "mean_p": 0.4416,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.5,
+        "hi": 0.6,
+        "count": 342,
+        "mean_p": 0.5401,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.6,
+        "hi": 0.7,
+        "count": 204,
+        "mean_p": 0.6329,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.7,
+        "hi": 0.8,
+        "count": 16,
+        "mean_p": 0.7156,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.8,
+        "hi": 0.9,
+        "count": 0,
+        "mean_p": null,
+        "observed": null
+       },
+       {
+        "lo": 0.9,
+        "hi": 1.0,
+        "count": 0,
+        "mean_p": null,
+        "observed": null
+       }
+      ],
+      "ece": 0.253,
+      "brier": 0.0921,
+      "accuracy_at_0_5": 0.9001,
+      "label_source": "autolabel"
+     },
+     "dense_traffic": {
+      "n": 5188,
+      "positives": 2877,
+      "bins": [
+       {
+        "lo": 0.0,
+        "hi": 0.1,
+        "count": 225,
+        "mean_p": 0.0844,
+        "observed": 0.0311
+       },
+       {
+        "lo": 0.1,
+        "hi": 0.2,
+        "count": 1267,
+        "mean_p": 0.1258,
+        "observed": 0.1436
+       },
+       {
+        "lo": 0.2,
+        "hi": 0.3,
+        "count": 306,
+        "mean_p": 0.2443,
+        "observed": 0.402
+       },
+       {
+        "lo": 0.3,
+        "hi": 0.4,
+        "count": 309,
+        "mean_p": 0.3451,
+        "observed": 0.2977
+       },
+       {
+        "lo": 0.4,
+        "hi": 0.5,
+        "count": 365,
+        "mean_p": 0.4467,
+        "observed": 0.5945
+       },
+       {
+        "lo": 0.5,
+        "hi": 0.6,
+        "count": 353,
+        "mean_p": 0.5443,
+        "observed": 0.6119
+       },
+       {
+        "lo": 0.6,
+        "hi": 0.7,
+        "count": 424,
+        "mean_p": 0.6471,
+        "observed": 0.7594
+       },
+       {
+        "lo": 0.7,
+        "hi": 0.8,
+        "count": 832,
+        "mean_p": 0.7467,
+        "observed": 0.9099
+       },
+       {
+        "lo": 0.8,
+        "hi": 0.9,
+        "count": 986,
+        "mean_p": 0.8524,
+        "observed": 0.8621
+       },
+       {
+        "lo": 0.9,
+        "hi": 1.0,
+        "count": 121,
+        "mean_p": 0.906,
+        "observed": 0.9174
+       }
+      ],
+      "ece": 0.0712,
+      "brier": 0.151,
+      "accuracy_at_0_5": 0.7893,
+      "label_source": "autolabel"
+     },
      "headway": {
       "n": 5195,
       "positives": 3549,
@@ -2175,85 +2335,245 @@
    },
    "calibration": {
     "overall": {
-     "n": 30000,
-     "positives": 3820,
+     "n": 41982,
+     "positives": 5186,
      "bins": [
       {
        "lo": 0.0,
        "hi": 0.1,
-       "count": 18458,
-       "mean_p": 0.0463,
-       "observed": 0.0
+       "count": 21122,
+       "mean_p": 0.0488,
+       "observed": 0.0003
       },
       {
        "lo": 0.1,
        "hi": 0.2,
-       "count": 5625,
-       "mean_p": 0.1299,
-       "observed": 0.0
+       "count": 9050,
+       "mean_p": 0.1314,
+       "observed": 0.0014
       },
       {
        "lo": 0.2,
        "hi": 0.3,
-       "count": 495,
-       "mean_p": 0.2295,
-       "observed": 0.002
+       "count": 1794,
+       "mean_p": 0.2409,
+       "observed": 0.0295
       },
       {
        "lo": 0.3,
        "hi": 0.4,
-       "count": 216,
-       "mean_p": 0.3362,
-       "observed": 0.0556
+       "count": 1613,
+       "mean_p": 0.3386,
+       "observed": 0.129
       },
       {
        "lo": 0.4,
        "hi": 0.5,
-       "count": 1007,
-       "mean_p": 0.4581,
-       "observed": 0.0318
+       "count": 1776,
+       "mean_p": 0.4521,
+       "observed": 0.1053
       },
       {
        "lo": 0.5,
        "hi": 0.6,
-       "count": 528,
-       "mean_p": 0.5325,
-       "observed": 0.2973
+       "count": 1291,
+       "mean_p": 0.5399,
+       "observed": 0.2455
       },
       {
        "lo": 0.6,
        "hi": 0.7,
-       "count": 365,
-       "mean_p": 0.6449,
-       "observed": 0.9233
+       "count": 1105,
+       "mean_p": 0.6457,
+       "observed": 0.5086
       },
       {
        "lo": 0.7,
        "hi": 0.8,
-       "count": 442,
-       "mean_p": 0.7552,
-       "observed": 0.948
+       "count": 1114,
+       "mean_p": 0.7439,
+       "observed": 0.763
       },
       {
        "lo": 0.8,
        "hi": 0.9,
-       "count": 835,
-       "mean_p": 0.8391,
-       "observed": 0.9976
+       "count": 1050,
+       "mean_p": 0.8383,
+       "observed": 0.899
       },
       {
        "lo": 0.9,
        "hi": 1.0,
-       "count": 2029,
-       "mean_p": 0.9398,
-       "observed": 1.0
+       "count": 2067,
+       "mean_p": 0.9393,
+       "observed": 0.9894
       }
      ],
-     "ece": 0.0918,
-     "brier": 0.0222,
-     "accuracy_at_0_5": 0.9876
+     "ece": 0.1013,
+     "brier": 0.0468,
+     "accuracy_at_0_5": 0.9466
     },
     "by_checker": {
+     "cut_in": {
+      "n": 5991,
+      "positives": 78,
+      "bins": [
+       {
+        "lo": 0.0,
+        "hi": 0.1,
+        "count": 1787,
+        "mean_p": 0.0629,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.1,
+        "hi": 0.2,
+        "count": 1394,
+        "mean_p": 0.1358,
+        "observed": 0.005
+       },
+       {
+        "lo": 0.2,
+        "hi": 0.3,
+        "count": 804,
+        "mean_p": 0.2472,
+        "observed": 0.0199
+       },
+       {
+        "lo": 0.3,
+        "hi": 0.4,
+        "count": 1057,
+        "mean_p": 0.3375,
+        "observed": 0.0341
+       },
+       {
+        "lo": 0.4,
+        "hi": 0.5,
+        "count": 357,
+        "mean_p": 0.4438,
+        "observed": 0.0476
+       },
+       {
+        "lo": 0.5,
+        "hi": 0.6,
+        "count": 289,
+        "mean_p": 0.542,
+        "observed": 0.0069
+       },
+       {
+        "lo": 0.6,
+        "hi": 0.7,
+        "count": 224,
+        "mean_p": 0.6393,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.7,
+        "hi": 0.8,
+        "count": 76,
+        "mean_p": 0.7338,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.8,
+        "hi": 0.9,
+        "count": 3,
+        "mean_p": 0.82,
+        "observed": 0.0
+       },
+       {
+        "lo": 0.9,
+        "hi": 1.0,
+        "count": 0,
+        "mean_p": null,
+        "observed": null
+       }
+      ],
+      "ece": 0.2163,
+      "brier": 0.0872,
+      "accuracy_at_0_5": 0.8938,
+      "label_source": "autolabel"
+     },
+     "dense_traffic": {
+      "n": 5991,
+      "positives": 1288,
+      "bins": [
+       {
+        "lo": 0.0,
+        "hi": 0.1,
+        "count": 877,
+        "mean_p": 0.071,
+        "observed": 0.008
+       },
+       {
+        "lo": 0.1,
+        "hi": 0.2,
+        "count": 2031,
+        "mean_p": 0.1325,
+        "observed": 0.003
+       },
+       {
+        "lo": 0.2,
+        "hi": 0.3,
+        "count": 495,
+        "mean_p": 0.2421,
+        "observed": 0.0727
+       },
+       {
+        "lo": 0.3,
+        "hi": 0.4,
+        "count": 340,
+        "mean_p": 0.3436,
+        "observed": 0.4706
+       },
+       {
+        "lo": 0.4,
+        "hi": 0.5,
+        "count": 412,
+        "mean_p": 0.4447,
+        "observed": 0.335
+       },
+       {
+        "lo": 0.5,
+        "hi": 0.6,
+        "count": 474,
+        "mean_p": 0.5469,
+        "observed": 0.3333
+       },
+       {
+        "lo": 0.6,
+        "hi": 0.7,
+        "count": 516,
+        "mean_p": 0.649,
+        "observed": 0.436
+       },
+       {
+        "lo": 0.7,
+        "hi": 0.8,
+        "count": 596,
+        "mean_p": 0.7369,
+        "observed": 0.7232
+       },
+       {
+        "lo": 0.8,
+        "hi": 0.9,
+        "count": 212,
+        "mean_p": 0.8356,
+        "observed": 0.5236
+       },
+       {
+        "lo": 0.9,
+        "hi": 1.0,
+        "count": 38,
+        "mean_p": 0.9116,
+        "observed": 0.4211
+       }
+      ],
+      "ece": 0.1326,
+      "brier": 0.1294,
+      "accuracy_at_0_5": 0.7945,
+      "label_source": "autolabel"
+     },
      "headway": {
       "n": 6000,
       "positives": 2372,
@@ -4420,85 +4740,245 @@
  },
  "calibration": {
   "overall": {
-   "n": 174625,
-   "positives": 29053,
+   "n": 244393,
+   "positives": 38875,
    "bins": [
     {
      "lo": 0.0,
      "hi": 0.1,
-     "count": 98802,
-     "mean_p": 0.0475,
-     "observed": 0.0
+     "count": 112422,
+     "mean_p": 0.0498,
+     "observed": 0.0003
     },
     {
      "lo": 0.1,
      "hi": 0.2,
-     "count": 33855,
-     "mean_p": 0.1294,
-     "observed": 0.0
+     "count": 53726,
+     "mean_p": 0.1304,
+     "observed": 0.0045
     },
     {
      "lo": 0.2,
      "hi": 0.3,
-     "count": 3561,
-     "mean_p": 0.2325,
-     "observed": 0.0031
+     "count": 11403,
+     "mean_p": 0.2419,
+     "observed": 0.0334
     },
     {
      "lo": 0.3,
      "hi": 0.4,
-     "count": 1805,
-     "mean_p": 0.3351,
-     "observed": 0.0709
+     "count": 9726,
+     "mean_p": 0.3391,
+     "observed": 0.1283
     },
     {
      "lo": 0.4,
      "hi": 0.5,
-     "count": 5615,
-     "mean_p": 0.4568,
-     "observed": 0.0504
+     "count": 10695,
+     "mean_p": 0.4508,
+     "observed": 0.1231
     },
     {
      "lo": 0.5,
      "hi": 0.6,
-     "count": 3161,
-     "mean_p": 0.5351,
-     "observed": 0.3597
+     "count": 7554,
+     "mean_p": 0.5406,
+     "observed": 0.2824
     },
     {
      "lo": 0.6,
      "hi": 0.7,
-     "count": 2748,
-     "mean_p": 0.6447,
-     "observed": 0.9287
+     "count": 7322,
+     "mean_p": 0.6455,
+     "observed": 0.5705
     },
     {
      "lo": 0.7,
      "hi": 0.8,
-     "count": 2992,
-     "mean_p": 0.7518,
-     "observed": 0.9596
+     "count": 7092,
+     "mean_p": 0.744,
+     "observed": 0.8006
     },
     {
      "lo": 0.8,
      "hi": 0.9,
-     "count": 6563,
-     "mean_p": 0.8488,
-     "observed": 0.9977
+     "count": 8632,
+     "mean_p": 0.8475,
+     "observed": 0.921
     },
     {
      "lo": 0.9,
      "hi": 1.0,
-     "count": 15523,
-     "mean_p": 0.9365,
-     "observed": 1.0
+     "count": 15821,
+     "mean_p": 0.936,
+     "observed": 0.993
     }
    ],
-   "ece": 0.0949,
-   "brier": 0.0237,
-   "accuracy_at_0_5": 0.9871
+   "ece": 0.101,
+   "brier": 0.0488,
+   "accuracy_at_0_5": 0.9458
   },
   "by_checker": {
+   "cut_in": {
+    "n": 34883,
+    "positives": 487,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 9455,
+      "mean_p": 0.0638,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 8594,
+      "mean_p": 0.1336,
+      "observed": 0.0028
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 4982,
+      "mean_p": 0.2481,
+      "observed": 0.0177
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 5820,
+      "mean_p": 0.3385,
+      "observed": 0.0332
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 2558,
+      "mean_p": 0.4429,
+      "observed": 0.0579
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 1704,
+      "mean_p": 0.5411,
+      "observed": 0.0188
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 1353,
+      "mean_p": 0.6399,
+      "observed": 0.0015
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 393,
+      "mean_p": 0.7325,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 24,
+      "mean_p": 0.8142,
+      "observed": 0.0
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 0,
+      "mean_p": null,
+      "observed": null
+     }
+    ],
+    "ece": 0.2207,
+    "brier": 0.0889,
+    "accuracy_at_0_5": 0.894,
+    "label_source": "autolabel"
+   },
+   "dense_traffic": {
+    "n": 34885,
+    "positives": 9335,
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "count": 4165,
+      "mean_p": 0.0725,
+      "observed": 0.0089
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "count": 11277,
+      "mean_p": 0.1311,
+      "observed": 0.0195
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "count": 2860,
+      "mean_p": 0.2426,
+      "observed": 0.0986
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "count": 2101,
+      "mean_p": 0.3441,
+      "observed": 0.4412
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "count": 2522,
+      "mean_p": 0.4454,
+      "observed": 0.3513
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "count": 2689,
+      "mean_p": 0.5468,
+      "observed": 0.3585
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "count": 3221,
+      "mean_p": 0.6485,
+      "observed": 0.5039
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "count": 3707,
+      "mean_p": 0.7389,
+      "observed": 0.7572
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "count": 2045,
+      "mean_p": 0.8436,
+      "observed": 0.6856
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "count": 298,
+      "mean_p": 0.9098,
+      "observed": 0.6275
+     }
+    ],
+    "ece": 0.1096,
+    "brier": 0.1348,
+    "accuracy_at_0_5": 0.7908,
+    "label_source": "autolabel"
+   },
    "headway": {
     "n": 34925,
     "positives": 15123,

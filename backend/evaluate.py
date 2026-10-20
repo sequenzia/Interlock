@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from backend.constraints import CHECKER_LANE_CLOSED, PRESETS, ConstraintStore
 from backend.episode import EpisodeRunner, simulated_operator
 from backend.jev_client import DEFAULT_MODEL, JevClient, make_client
-from backend.label import load_labels
+from backend.label import Label, load_labels
 from backend.logger import JsonlLogger, read_log
 from backend.metrics import aggregate, calibration, episode_metrics
 from backend.paths import DEFAULT_MODEL_PATH, ENV_FILE, INTERNAL_DIR, LOGS_DIR
@@ -144,7 +144,7 @@ def new_run_dir(root: Path, label: str) -> Path:
 
 
 def load_run(
-    path: Path, labels: dict[str, bool] | None = None
+    path: Path, labels: dict[str, Label] | None = None
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Read a run directory and recompute its metrics from the seed logs.
 
@@ -190,6 +190,22 @@ def newest_runs(root: Path) -> dict[str, Path]:
     return found
 
 
+def calibration_pool(root: Path = EVAL_DIR) -> list[Path]:
+    """The runs the report pools for calibration, sorted by stamp.
+
+    The baseline plus the default system: the newest shield-off run and the
+    newest shield-on runs at the default floor. Floor variants would only
+    repeat the same states with the same cached answers. ``interlock
+    autolabel`` labels these same runs.
+    """
+    pool: list[Path] = []
+    for path in newest_runs(root).values():
+        stored = json.loads((path / "metrics.json").read_text())
+        if not stored["shield_on"] or stored.get("floor_s", 0.0) == DEFAULT_FLOOR_S:
+            pool.append(path)
+    return sorted(pool)
+
+
 def _floor_cells(rep: dict[str, Any]) -> dict[str, Any]:
     """The numbers the floor comparison quotes for one run."""
     agg = rep["aggregate"]
@@ -216,17 +232,14 @@ def build_report(
     runs = newest_runs(root)
     if not runs:
         raise SystemExit(f"no eval runs under {root}")
+    pool = set(calibration_pool(root))
     labels = load_labels()
     loaded: dict[str, dict[str, Any]] = {}
     all_records: list[dict[str, Any]] = []
     for label, path in runs.items():
         loaded[label], records = load_run(path, labels)
         loaded[label]["label"] = label
-        rep = loaded[label]
-        # The calibration pool is the baseline plus the default system: shield-off
-        # runs and shield-on runs at the default floor. Floor variants would only
-        # repeat the same states with the same cached answers.
-        if not rep["shield_on"] or rep.get("floor_s", 0.0) == DEFAULT_FLOOR_S:
+        if path in pool:
             all_records.extend(records)
     off_label = config_label(False, thresholds, None)
     on_label = config_label(True, thresholds, None)

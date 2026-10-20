@@ -19,7 +19,10 @@ around Oct 23, 2026.
   `internal/jev-spike-recheck-oct17.md` repeats items 2 and 3 after the Oct 17
   fact schema change and compares them with Day 1.
 - `internal/hand-labeling.md`: how to hand-label the two fuzzy rules, the
-  keys, a consistent standard per rule, and where the labels land.
+  keys, a consistent standard per rule, and where the labels land. Labeled
+  Oct 19 by `interlock autolabel`, that standard pinned in code by Claude,
+  over the whole calibration pool; the last section records how the loose
+  words were pinned. The label files are committed.
 - `internal/decision-models-research.md`: public facts about Jev and the
   decision-model category as of Oct 16. Vendor claims, not measured behavior.
 - `internal/experiment-tracker.md`: the Oct 19 assessment of adding Weights &
@@ -47,7 +50,8 @@ around Oct 23, 2026.
   in the field names. Never ask Jev to count, compare numbers or do multi-hop.
 - Ground-truth checkers in `backend/checkers.py` score only. They never feed
   the shield's decision, including in mock or offline mode. The same holds for
-  hand labels under `backend/logs/labels/`, which exist only for calibration.
+  the labels under `backend/logs/labels/`, by hand or by `interlock autolabel`,
+  which exist only for calibration.
 - When Jev is unreachable and a question is not cached, the shield escalates
   with p = 0.5 flagged "judge unavailable". Never fake a judgment.
 - The shield acts on its own only with a confidently safe action. When no
@@ -125,6 +129,8 @@ uv run interlock train --timesteps 100000            # long run
 uv run interlock train --eval-only models/dqn_highway_20k.zip   # greedy rollouts over --eval-seeds
 uv run interlock train --eval-only models/dqn_highway_20k.zip --promote  # copy to dqn_highway.zip
 uv run interlock label --run backend/logs/eval/<stamp>_on_ta0.30_tb0.70 --rule dense_traffic   # hand-label a fuzzy rule, then eval --report
+uv run interlock autolabel --dry-run                 # the fuzzy rules by the fixed standard: the split per rule, nothing written
+uv run interlock autolabel                           # label every pooled state, then eval --report; a rerun adds nothing
 uv run interlock baseline --dry-run                  # sample 2,000 logged checks, print one chat request, send nothing
 uv run interlock baseline --models claude-haiku-5-5,claude-sonnet-5-5   # chat-LLM baseline; needs ANTHROPIC_API_KEY, reads backend/prices.json if present, then eval --report
 uv run interlock spike                               # Day 1 Jev spike, writes internal/jev-spike-results.md

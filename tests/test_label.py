@@ -4,6 +4,7 @@ from pathlib import Path
 
 from backend.constraints import PRESET_DENSE_TRAFFIC, PRESETS
 from backend.label import (
+    Label,
     collect_items,
     label_key,
     label_session,
@@ -84,9 +85,9 @@ def test_label_session_writes_rows_and_honours_skip_and_quit(tmp_path: Path) -> 
     assert rows[0]["key"] == items[0].key and rows[0]["rule"] == RULE
     assert "Jev p" not in prompts[0] and "IDLE at step 0" in prompts[0] and RULE in prompts[0]
     assert prompts[1].startswith("answer y, n, s or q")
-    assert load_labels(tmp_path / "labels") == {items[0].key: True}
+    assert load_labels(tmp_path / "labels") == {items[0].key: Label(True, "human")}
     assert label_session(items[:1], lambda _: "n", out, show_p=True) == 1
-    assert load_labels(tmp_path / "labels") == {items[0].key: False}  # the later line wins
+    assert load_labels(tmp_path / "labels") == {items[0].key: Label(False, "human")}  # later wins
     assert load_labels(tmp_path / "missing") == {}
 
 

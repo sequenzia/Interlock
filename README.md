@@ -309,12 +309,13 @@ backend/
   checkers.py      ground-truth checkers, scoring only
   logger.py        the JSONL record
   episode.py       the per-step loop shared by the CLI and the server
-  cli.py           the interlock command: run, eval, train, spike, console
+  cli.py           the interlock command: run, eval, train, spike, label, autolabel, baseline, console
   run_episode.py   headless episode, behind interlock run
   server.py        FastAPI WebSocket server, live and replay
   metrics.py       episode metrics, aggregates, calibration
   evaluate.py      batch evaluation and report
   label.py         hand-label fuzzy rules for calibration, behind interlock label
+  autolabel.py     the fixed standard for the fuzzy rules, behind interlock autolabel
   plots.py         slide plots
   spike/           the Day 1 Jev spike
 frontend/          Vite, React, TypeScript, Tailwind, Zustand, Recharts, Playwright

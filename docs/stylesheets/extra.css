@@ -18,3 +18,85 @@
   --md-mermaid-node-fg-color: hsl(var(--md-hue), 15%, 65%);
   --md-mermaid-label-fg-color: hsl(var(--md-hue), 15%, 95%);
 }
+
+/*
+ * Lightbox: a screenshot or diagram opens large in a modal on click.
+ * docs/javascripts/lightbox.js builds the modal and sizes diagrams.
+ */
+
+.md-typeset img:not(.twemoji),
+.lightbox-diagram {
+  cursor: zoom-in;
+}
+
+.md-typeset img:focus-visible,
+.lightbox-diagram:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+html.lightbox-open {
+  overflow: hidden;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.75);
+  cursor: zoom-out;
+}
+
+.lightbox[hidden] {
+  display: none;
+}
+
+.lightbox__box {
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0.8rem;
+  background: var(--md-default-bg-color);
+  border-radius: 0.2rem;
+  box-shadow: var(--md-shadow-z3);
+  cursor: default;
+}
+
+.lightbox__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(92vw - 1.6rem);
+  max-height: calc(88vh - 1.6rem);
+}
+
+.lightbox__diagram svg {
+  display: block;
+}
+
+.lightbox__close {
+  position: fixed;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lightbox__close:hover,
+.lightbox__close:focus-visible {
+  background: rgba(255, 255, 255, 0.35);
+  outline: none;
+}

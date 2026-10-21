@@ -72,6 +72,9 @@ markdown_extensions:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/lightbox.js
+
 plugins:
   - search
 

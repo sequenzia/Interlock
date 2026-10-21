@@ -36,6 +36,7 @@ around Oct 23, 2026.
   Mermaid diagram colors live in `docs/stylesheets/extra.css`, once per color
   scheme; a diagram never sets `classDef` colors, because Material's theme
   overrides the label color and the text vanishes in dark mode.
+  `docs/javascripts/lightbox.js` opens screenshots and diagrams large on click.
 
 ## Stack
 

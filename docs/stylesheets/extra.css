@@ -1,0 +1,20 @@
+/*
+ * Mermaid diagrams follow the active color scheme.
+ *
+ * Material renders Mermaid with its own theme CSS, which reads these
+ * variables, and its ".nodeLabel p" rule overrides any "color:" set by a
+ * classDef inside a diagram. So diagrams never set colors themselves; the
+ * neutral palette for nodes, strokes and labels lives here, once per scheme.
+ */
+
+[data-md-color-scheme="default"] {
+  --md-mermaid-node-bg-color: #f4f4f4;
+  --md-mermaid-node-fg-color: #333333;
+  --md-mermaid-label-fg-color: #000000;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-mermaid-node-bg-color: hsl(var(--md-hue), 15%, 26%);
+  --md-mermaid-node-fg-color: hsl(var(--md-hue), 15%, 65%);
+  --md-mermaid-label-fg-color: hsl(var(--md-hue), 15%, 95%);
+}

@@ -18,7 +18,6 @@ flowchart LR
   D -->|in between| E[Escalate:<br/>pause and ask the operator]
   E -->|approve| A
   E -->|deny| F
-  classDef default fill:#f4f4f4,stroke:#333,color:#000;
 ```
 
 ## Rules in plain English

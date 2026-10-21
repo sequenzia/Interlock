@@ -51,7 +51,6 @@ flowchart LR
   ST --> C[components]
   C -- "send(ClientMessage)" --> W2[ws-client.ts send] --> S
   M[metrics-view.tsx] -- "fetch /eval/latest" --> S
-  classDef default fill:#f4f4f4,stroke:#333,color:#000;
 ```
 
 Three rules keep this simple:

@@ -27,7 +27,6 @@ flowchart LR
     EP --> CLI[run_episode.py<br/>headless]
   end
   WS <--> UI[React console<br/>road view, rules, queue, timeline, inspector, metrics]
-  classDef default fill:#f4f4f4,stroke:#333,color:#000;
 ```
 
 | Component | Module | Responsibility |
@@ -127,7 +126,6 @@ record goes to the contract page first, then `backend/logger.py`, then
       B[Browser :5173] <--> V[Vite dev server<br/>proxy /ws /health /eval]
       V <--> U[uvicorn backend.server:app :8000]
       U --> J[Jev API<br/>or the cache in mock mode]
-      classDef default fill:#f4f4f4,stroke:#333,color:#000;
     ```
 
 === "Production"
@@ -143,7 +141,6 @@ record goes to the contract page first, then `backend/logger.py`, then
       B[Browser] --> V[Vercel<br/>static console]
       B <--> F[Fly.io container<br/>uvicorn, one session]
       F --> J[Jev API]
-      classDef default fill:#f4f4f4,stroke:#333,color:#000;
     ```
 
 The backend cannot be serverless. The session is one stateful process: the

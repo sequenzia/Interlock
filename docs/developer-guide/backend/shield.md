@@ -120,7 +120,6 @@ flowchart TD
   ESC -- deny --> FB2[execute the fallback]
   ESC -- override --> OV[execute the named candidate]
   NCA -- deny --> LB[execute least bad, or the last resort flagged all_blocked]
-  classDef default fill:#f4f4f4,stroke:#333,color:#000;
 ```
 
 !!! warning "The shield enforces rules, not collision safety"

@@ -114,7 +114,6 @@ flowchart TD
   J --> L
   K --> L
   L --> M[build_record, log, account]
-  classDef default fill:#f4f4f4,stroke:#333,color:#000;
 ```
 
 ## The escalation item

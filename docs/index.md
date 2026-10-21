@@ -79,7 +79,6 @@ flowchart LR
   SHIELD --> LOG[(JSONL decision log)]
   LOG --> UI[Operator console]
   LOG --> EVAL[Evaluation<br/>before/after, sweep, calibration]
-  classDef default fill:#f4f4f4,stroke:#333,color:#000;
 ```
 
 Each step, the policy ranks its five actions, code turns the simulator state

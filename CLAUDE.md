@@ -33,6 +33,9 @@ around Oct 23, 2026.
   published to GitHub Pages by `.github/workflows/docs.yml`. It covers code,
   usage and results only; it never quotes or links the files under `internal/`.
   When a contract, flag, message or screen changes, update its page in `docs/`.
+  Mermaid diagram colors live in `docs/stylesheets/extra.css`, once per color
+  scheme; a diagram never sets `classDef` colors, because Material's theme
+  overrides the label color and the text vanishes in dark mode.
 
 ## Stack
 

@@ -127,14 +127,14 @@ function laneCell(key: string, block: Block): Cell {
   return cell(key, v);
 }
 
-function edgeCell(block: Block): Cell {
-  const left = block.is_leftmost;
-  const right = block.is_rightmost;
-  if (typeof left !== "boolean" && typeof right !== "boolean") return BLANK;
-  if (left && right) return { text: "only lane", tone: "value" };
-  if (left) return { text: "leftmost", tone: "value" };
-  if (right) return { text: "rightmost", tone: "value" };
-  return { text: "no", tone: "value" };
+/** The road edge a lane sits at, for its column head; null when it is an inner lane or the block does not say. */
+function edgeOf(block: Block): string | null {
+  const left = block.is_leftmost === true;
+  const right = block.is_rightmost === true;
+  if (left && right) return "only lane";
+  if (left) return "leftmost";
+  if (right) return "rightmost";
+  return null;
 }
 
 /** Lane and lane count fold into one "3 of 4" row. */
@@ -178,6 +178,7 @@ function Group({ title, note, children }: { title: ReactNode; note?: ReactNode; 
 interface LaneColumn {
   lane: number | null;
   when: string;
+  edge: string | null;
   block: Block;
 }
 
@@ -204,16 +205,15 @@ export function FactsTable({ facts }: { facts: Record<string, unknown> }) {
   const current = asBlock(facts.current_lane);
   const after = asBlock(facts.lane_after_action);
   const right = asBlock(facts.lane_right_of_lane_after);
-  if (current) columns.push({ lane: laneNow, when: "now", block: current });
-  if (after) columns.push({ lane: laneAfter, when: "after", block: after });
-  if (right) columns.push({ lane: laneAfter === null ? null : laneAfter + 1, when: "to the right", block: right });
+  if (current) columns.push({ lane: laneNow, when: "now", edge: edgeOf(current), block: current });
+  if (after) columns.push({ lane: laneAfter, when: "after", edge: edgeOf(after), block: after });
+  if (right) columns.push({ lane: laneAfter === null ? null : laneAfter + 1, when: "to the right", edge: edgeOf(right), block: right });
   const present = new Set(columns.flatMap((c) => Object.keys(c.block)));
   const laneRow = (k: string): LaneRow => ({ key: k, label: labelOf(k), cell: (b) => laneCell(k, b) });
   const rows: LaneRow[] = [
     ...LANE_ROWS.filter((k) => present.has(k)).map(laneRow),
     ...[...present].filter((k) => !LANE_ROWS.includes(k) && !EDGE_KEYS.includes(k)).map(laneRow),
   ];
-  if (EDGE_KEYS.some((k) => present.has(k))) rows.push({ key: "edge", label: "road edge", cell: edgeCell });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto text-xs leading-snug">
@@ -271,6 +271,7 @@ export function FactsTable({ facts }: { facts: Record<string, unknown> }) {
                 <th key={i} className="px-1 font-normal whitespace-nowrap">
                   <span className="num text-zinc-200">lane {c.lane ?? "?"}</span>
                   <span className="text-zinc-400"> · {c.when}</span>
+                  {c.edge && <span className="text-zinc-400"> · {c.edge}</span>}
                 </th>
               ))}
             </tr>

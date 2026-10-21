@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { DECISION_COLOR, isLaneNoop, uiScale } from "../format";
+import { DECISION_COLOR, isLaneNoop, uiScale, violatedRules } from "../format";
 import { selectViewStep, useStore } from "../store";
-import type { LogRecord, TwinStep } from "../types";
+import type { TwinStep } from "../types";
 import { arrowFor, carSize, drawArrow, drawCar, drawHold, EGO_OFFSET_M, GUTTER_PX, lerp, SANS, VIEW_M } from "./road-view";
 
 // The unshielded twin: the shield-off run of the same seed, drawn faded under the
@@ -9,12 +9,6 @@ import { arrowFor, carSize, drawArrow, drawCar, drawHold, EGO_OFFSET_M, GUTTER_P
 // share one clock. Hidden when the server found no shield-off log for the seed.
 // The server scores the twin against the rules the console has on, so its count
 // and the live count shown beside it answer the same question.
-
-/** Ground-truth violations of the executed action: how the live counter and the twin both count. */
-function executedViolations(r: LogRecord): number {
-  const executed = r.candidates.find((c) => c.action === r.executed);
-  return executed ? executed.checks.filter((c) => c.ground_truth === true).length : 0;
-}
 
 interface TwinFrame {
   prev: TwinStep | null;
@@ -149,7 +143,7 @@ export function TwinStrip() {
   if (steps.length === 0 || !twin) return null;
   const shown = cur?.violations_so_far ?? 0;
   // The live run's count up to the view step, so scrubbing moves both numbers together.
-  const liveShown = live === null ? 0 : liveSteps.slice(0, live.step + 1).reduce((n, r) => n + executedViolations(r), 0);
+  const liveShown = live === null ? 0 : liveSteps.slice(0, live.step + 1).reduce((n, r) => n + violatedRules(r).length, 0);
   const scored = twin.rules > 0;
   const ruleWord = twin.rules === 1 ? "rule" : "rules";
   // The console and the backend deploy separately; a twin from an older backend has no rule ids.

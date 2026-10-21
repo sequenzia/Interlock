@@ -7,9 +7,10 @@ import { send } from "../ws-client";
 const SPEEDS = [0.5, 1, 2, 4];
 const NO_RUNS: string[] = [];
 
+/** A readout: the label over a mono value, left-aligned so the label reads as a column head whatever the value's width. */
 function Stat({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className={`flex flex-col items-end leading-tight ${className ?? ""}`}>
+    <div className={`flex flex-col leading-tight ${className ?? ""}`}>
       <span className="stat-label">{label}</span>
       <span className="num text-xs text-zinc-100">{value}</span>
     </div>
@@ -230,12 +231,15 @@ function LiveStats() {
   const latest = useStore(selectLatestStep);
   const replay = session?.source === "replay";
   const total = replay ? session?.total_steps : hello?.config.duration;
+  // The same box as the transport group, at the same height. Hairlines between the cells, and
+  // each cell at least as wide as its widest usual value (padding included), so the row holds
+  // still while the numbers change under it.
   return (
-    <div className="flex items-center gap-3">
-      <Stat label="step" value={session ? `${session.step}${total ? ` / ${total}` : ""}` : "-"} className="min-w-[3.5rem]" />
-      <Stat label="jev" value={latest ? `${latest.judge.source} ${fmtMs(latest.judge.latency_ms)}` : "-"} className="talk-hide min-w-[5rem] max-[1440px]:hidden" />
-      <Stat label="cost" value={metrics ? fmtUsd(metrics.cost_usd) : "-"} className="talk-hide min-w-[3.5rem] max-[1440px]:hidden" />
-      <Stat label="violations" value={metrics ? String(metrics.violations_total) : "-"} className="min-w-[4rem]" />
+    <div className="flex divide-x divide-zinc-700/70 rounded-md border border-zinc-800 bg-zinc-900/60 py-0.5">
+      <Stat label="step" value={session ? `${session.step}${total ? ` / ${total}` : ""}` : "-"} className="min-w-[4.75rem] px-3" />
+      <Stat label="jev" value={latest ? `${latest.judge.source} ${fmtMs(latest.judge.latency_ms)}` : "-"} className="talk-hide min-w-[7rem] px-3 max-[1440px]:hidden" />
+      <Stat label="cost" value={metrics ? fmtUsd(metrics.cost_usd) : "-"} className="talk-hide min-w-[4.75rem] px-3 max-[1440px]:hidden" />
+      <Stat label="violations" value={metrics ? String(metrics.violations_total) : "-"} className="px-3" />
     </div>
   );
 }
@@ -281,7 +285,9 @@ export function StatusStrip() {
 
       <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">{view === "console" ? <Transport /> : <ReportMeta />}</div>
 
-      <div className="flex shrink-0 items-center gap-3">
+      {/* Readouts, then the two app-level utilities in the corner, clear of the session controls. */}
+      <div className="flex shrink-0 items-center gap-6">
+        {view === "console" && <LiveStats />}
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -302,7 +308,6 @@ export function StatusStrip() {
             <KeyboardIcon />
           </button>
         </div>
-        {view === "console" && <LiveStats />}
       </div>
     </header>
   );

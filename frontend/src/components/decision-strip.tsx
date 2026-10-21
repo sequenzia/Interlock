@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { DECISION_COLOR, DECISION_LABEL } from "../format";
+import { useMemo, useState } from "react";
+import { DECISION_COLOR, DECISION_LABEL, violatedRules } from "../format";
 import { useStore } from "../store";
 import type { LogRecord } from "../types";
 
@@ -10,9 +10,14 @@ function summary(r: LogRecord): string {
     parts.push((r.floor?.removed ?? []).includes(top) ? `${top} under the floor` : `${top} blocked`);
   }
   if (r.human) parts.push(`operator ${r.human.decision}${r.human.action ? ` ${r.human.action}` : ""}`);
+  const violated = violatedRules(r);
+  if (violated.length > 0) parts.push(`violated ${violated.join(", ")}`);
   if (r.crashed) parts.push("crash");
   return parts.join(" · ");
 }
+
+/** Rose, darker the more rules broke at the step; one scale for the live row and the twin's. */
+const violationFill = (count: number): string => `rgba(251,113,133,${Math.min(0.9, 0.3 + count * 0.2)})`;
 
 function Swatch({ color, label }: { color: string; label: string }) {
   return (
@@ -31,6 +36,7 @@ export function DecisionStrip() {
   const twin = useStore((s) => s.twin);
   const seed = useStore((s) => s.session?.seed ?? null);
   const [hover, setHover] = useState<number | null>(null);
+  const violations = useMemo(() => steps.map((r) => violatedRules(r).length), [steps]);
   const total = Math.max(duration, steps.length);
   const twinSteps = twin && twin.seed === seed && twin.steps.length > 0 ? twin.steps : null;
   const hovered = hover !== null ? (steps[hover] ?? null) : null;
@@ -56,11 +62,12 @@ export function DecisionStrip() {
             <span className="h-1.5 w-1.5 rounded-full bg-white" />
             operator answered
           </span>
-          {twinSteps && (
-            <span className="max-[1440px]:hidden">
-              <Swatch color="rgba(251,113,133,0.55)" label="twin violations" />
-            </span>
-          )}
+          <span
+            className="max-[1440px]:hidden"
+            title={twinSteps ? "the rows under the ticks: the live run's violations, then the twin's" : "the row under the ticks: steps where the action that ran broke a rule"}
+          >
+            <Swatch color={violationFill(1)} label="violation" />
+          </span>
         </span>
       </div>
       <div className="relative px-2 pt-1.5 pb-1">
@@ -102,6 +109,12 @@ export function DecisionStrip() {
             );
           })}
         </div>
+        <div className="mt-px flex h-1.5 gap-px" title="the live run's violations per step: the action that ran broke a rule, by the checkers">
+          {Array.from({ length: total }, (_, i) => {
+            const v = violations[i] ?? 0;
+            return <span key={i} className="flex-1 rounded-sm" style={{ background: v > 0 ? violationFill(v) : "transparent" }} />;
+          })}
+        </div>
         {twinSteps && (
           <div className="mt-px flex h-1.5 gap-px" title="the unshielded twin's violations per step">
             {Array.from({ length: total }, (_, i) => {
@@ -114,7 +127,7 @@ export function DecisionStrip() {
                   key={i}
                   className="flex-1 rounded-sm"
                   style={{
-                    background: crashed ? DECISION_COLOR.all_blocked : v > 0 ? `rgba(251,113,133,${Math.min(0.9, 0.3 + v * 0.2)})` : "transparent",
+                    background: crashed ? DECISION_COLOR.all_blocked : v > 0 ? violationFill(v) : "transparent",
                   }}
                 />
               );

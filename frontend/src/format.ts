@@ -1,4 +1,4 @@
-import type { ActionName, DecisionKind, EscalationReason, FallbackKind } from "./types";
+import type { ActionName, DecisionKind, EscalationReason, FallbackKind, LogRecord } from "./types";
 
 export const fmtP = (p: number): string => p.toFixed(2);
 export const fmtMs = (ms: number): string => `${Math.round(ms)} ms`;
@@ -45,6 +45,15 @@ export const FALLBACK_LABEL: Record<FallbackKind, string> = {
 /** A lane change at the edge of the road changes nothing. */
 export function isLaneNoop(action: ActionName, lane: number, laneCount: number): boolean {
   return (action === "LANE_LEFT" && lane <= 1) || (action === "LANE_RIGHT" && lane >= laneCount);
+}
+
+/**
+ * Ids of the rules the executed action broke by the ground-truth checkers, in column order.
+ * Scoring after the fact: the shield never reads these, and a rule without a checker never appears.
+ */
+export function violatedRules(r: LogRecord): string[] {
+  const executed = r.candidates.find((c) => c.action === r.executed);
+  return executed ? executed.checks.filter((c) => c.ground_truth === true).map((c) => c.constraint_id) : [];
 }
 
 /** The root font size as a multiple of 16px, so canvas text follows the density toggle. */

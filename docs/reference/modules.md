@@ -441,6 +441,7 @@ One Zustand store. See [Store and selectors](../developer-guide/frontend/store.m
 | `components/approval-queue.tsx` | `ApprovalQueue()` |
 | `components/decision-strip.tsx` | `DecisionStrip()` |
 | `components/inspector-drawer.tsx` | `InspectorDrawer()` |
+| `components/facts-table.tsx` | `FactsTable()` |
 | `components/metrics-view.tsx` | `MetricsView()` |
 
 Component behaviour is described in [Components](../developer-guide/frontend/components.md).

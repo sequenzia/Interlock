@@ -15,9 +15,9 @@ The strip at the bottom of the left column has one tick per step, 60 for a full 
 | violet | escalated |
 | rose | all blocked |
 
-An escalated step is drawn at full opacity, the others slightly dimmer, and a white dot marks a step the operator answered. Hover a tick for a card such as `step 12 · escalated → SLOWER · LANE_LEFT blocked · operator deny` or `step 20 · allowed → IDLE · FASTER under the floor`. Click a tick to select it: it grows taller with a white ring and a caret under it, the road view jumps to that step, the strip's status badge reads "inspecting 12 · esc follows live", and the inspector opens in the twin's slot. Click the same tick again or press ++esc++ to deselect and follow live.
+An escalated step is drawn at full opacity, the others slightly dimmer, and a white dot marks a step the operator answered. Hover a tick for a card such as `step 12 · escalated → SLOWER · LANE_LEFT blocked · operator deny` or `step 20 · allowed → IDLE · FASTER under the floor`; a step whose executed action broke a rule by the ground-truth checkers adds `violated c1`. Click a tick to select it: it grows taller with a white ring and a caret under it, the road view jumps to that step, the strip's status badge reads "inspecting 12 · esc follows live", and the inspector opens in the twin's slot. Click the same tick again or press ++esc++ to deselect and follow live.
 
-When the seed has an unshielded twin, a thin row under the ticks shows the twin's violations per step in rose, darker the more rules it broke, with a solid cell at the step it crashed. The row fills in step with the live run, so the two timelines read together.
+A thin row under the ticks marks the steps where the action that ran broke a rule by the ground-truth checkers, in rose, darker the more rules it broke. With the shield on it is usually empty, which is the point. When the seed has an unshielded twin, a second row under it shows the twin's violations per step on the same scale, with a solid cell at the step it crashed. The twin row fills in step with the live run, so the two timelines read together. The legend swatch "violation" covers both rows; hover it to see which row is which.
 
 ## Scrubbing
 
@@ -56,7 +56,11 @@ Click a row to make that candidate the subject of the right-hand pane.
 
 ## The facts tab
 
-The right pane shows the selected candidate. "facts" lists the sentences the operator would see in the approval queue, and next to them the JSON that was sent to Jev as state. They are generated from the same data; the JSON is the authority.
+The right pane shows the selected candidate's facts: the JSON Jev was sent, laid out as a table, so nothing is paraphrased and nothing is computed.
+
+Four labelled rows lead, each a few label and value pairs. "ego" has the lane as "3 of 4", the speed and the target speed. "action" names the action and what it means, then the lane and target speed after it; a real lane change also carries the count of lane changes in the last 10 steps with this one included, the number the rate rule is judged on. "traffic" has the vehicles within 50 m, the lane changes in the last 10 steps and the steps spent in the current lane. "zones" has, per zone ahead, its name and lane with where it starts and ends in metres, and whether this action enters it, in the hazard color when it does; or "none ahead".
+
+Under them a lanes table has one column per lane the facts describe: the current lane as "now", the lane the action leads to as "after" (the same lane for IDLE, FASTER and SLOWER, measured at the target speed after the action), and "to the right" when the action leads to lane 1, for the passing-lane rule. One row per metric: the vehicle ahead and its speed, the vehicle behind and its closing speed, a slower vehicle within 40 m, headway, time to collision, tailgating within 10 m, and the road edge. A dash means that lane carries no such measurement, "none" means no vehicle within 200 m, and time to collision reads "not closing" when the vehicle ahead is not being gained on. A "yes" is set in bold. Hover any label for the field's name in the JSON. The sentences the operator saw in the approval queue are these same facts in prose and stay in the log record; the JSON itself is on the raw tab as the request's `state`.
 
 ## The raw tab
 

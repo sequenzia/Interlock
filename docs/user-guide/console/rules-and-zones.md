@@ -8,7 +8,7 @@ The operator rules panel is where the plain-English part of Interlock lives. Eve
 
 Type a sentence in the box and press "add" or ++enter++. The text is sent to Jev verbatim inside every question from then on. Whitespace is collapsed, nothing else is changed.
 
-Each rule gets an id (`c1`, `c2`, ...) that is stable for the session. The line under the text carries the id, a `scored` tag (hover it for the checker's name) or `not scored` when no checker exists, and `fired N×` once the rule has decided the outcome of a step.
+Each rule gets an id (`c1`, `c2`, ...) that is stable for the session. The line under the text carries the id, a `scored` tag (hover it for the checker's name) or `not scored` when no checker exists, `fired N×` once the rule has decided the outcome of a step, and `violated N×` in rose once the action that ran has broken it by the rule's checker. Fired is Jev's call; violated is the checker's, after the fact.
 
 ## The eight presets
 

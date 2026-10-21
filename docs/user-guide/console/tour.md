@@ -12,7 +12,7 @@ The console is a dark, dense operator view. It opens at <http://127.0.0.1:5173> 
 | Road view | left, largest | ego-centered Canvas drawing of the road, vehicles, zones and the executed action, with a HUD and a legend over it |
 | Unshielded twin | left, under the road view | the same seed with the shield off, faded, at the same step; hidden when no shield-off log exists for the seed |
 | Inspector | left, in the twin's slot | replaces the twin while a tick in the decisions strip is selected, so the strip never leaves the screen; see [Timeline and inspector](timeline-and-inspector.md) |
-| Decisions | left, bottom | one tick per step, colored by outcome, with a step axis and the twin's violations under it; click to inspect |
+| Decisions | left, bottom | one tick per step, colored by outcome, with the live run's violations and the twin's under it and a step axis; click to inspect |
 | Approval queue | right, top | the open escalation, or a one-line idle state with the counts of answered ones; see [Approval queue](approval-queue.md) |
 | Operator rules | right, below the queue | rules, presets, zones and thresholds; see [Rules and zones](rules-and-zones.md) |
 
@@ -37,12 +37,12 @@ Left to right:
 | Speed | `0.5/s`, `1/s`, `2/s` or `4/s`, steps per second; default 2 |
 | shield switch | on (cyan) or off; toggles the shield on the current seed; disabled in replay |
 | Status badge | one slot, the most urgent state wins: "waiting on operator" while an escalation is open, "inspecting N" while a tick is selected, "episode over" after the last step or a crash, otherwise the latest step's outcome with `→ ACTION` when the executed action differs from the proposal |
-| Aa | talk density: larger type for a projector, see below |
-| Keyboard button | opens the shortcut list, the same as pressing ++question++ |
 | step | current step, over the episode length (60) or the replay length |
 | jev | source and latency of the latest step's judging; hidden below 1440 px and at talk density |
 | cost | Jev cost so far this episode; hidden below 1440 px and at talk density |
 | violations | executed actions the ground-truth checkers labeled as violations so far |
+| Aa | in the corner: talk density, larger type for a projector, see below |
+| Keyboard button | beside it: opens the shortcut list, the same as pressing ++question++ |
 
 On the metrics tab the transport controls give way to the report's generation time, seed count, thresholds and judge mode, and the live stats hide.
 
@@ -56,7 +56,7 @@ A short, faded second road titled "Without the shield" under the main one shows 
 
 ## Decisions strip
 
-One tick per step, filled in as the episode runs, with a step axis under it and a caret at the latest step. Colors are the outcome, as the swatches in the title say: green allowed, amber fallback, violet escalated, rose all blocked. A white dot on a tick means the operator answered that step. When the seed has an unshielded twin, a thin second row shows the twin's violations per step, revealed in step with the live run, with a solid rose cell where it crashed. Hover for a summary card, click to select and open the inspector, click again to deselect. Details on [Timeline and inspector](timeline-and-inspector.md).
+One tick per step, filled in as the episode runs, with a step axis under it and a caret at the latest step. Colors are the outcome, as the swatches in the title say: green allowed, amber fallback, violet escalated, rose all blocked. A white dot on a tick means the operator answered that step. A thin row under the ticks marks in rose the steps where the action that ran broke a rule by the checkers; when the seed has an unshielded twin, a second row shows the twin's violations per step on the same scale, revealed in step with the live run, with a solid cell where it crashed. Hover for a summary card, click to select and open the inspector, click again to deselect. Details on [Timeline and inspector](timeline-and-inspector.md).
 
 ## Keyboard
 

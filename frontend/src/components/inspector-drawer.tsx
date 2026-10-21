@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons";
 import { selectInspected, useStore } from "../store";
 import type { ActionName, Candidate, LogRecord } from "../types";
 import { send } from "../ws-client";
+import { FactsTable } from "./facts-table";
 
 function pClass(p: number, tAllow: number, tBlock: number): string {
   if (p < tAllow) return "bg-allow/15 text-allow";
@@ -204,14 +205,7 @@ export function InspectorDrawer() {
             )}
           </div>
           {tab === "facts" ? (
-            <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
-              <ul className="min-h-0 list-disc overflow-auto pl-4 text-xs leading-snug text-zinc-200">
-                {chosen.sentences.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-              <pre className={JSON_CLASS}>{JSON.stringify(chosen.facts, null, 1)}</pre>
-            </div>
+            <FactsTable facts={chosen.facts} />
           ) : (
             <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
               <pre className={JSON_CLASS}>{raw ? JSON.stringify(raw.request, null, 1) : "no request"}</pre>

@@ -33,7 +33,8 @@ Scripts in `package.json`: `dev`, `build` (`tsc` then `vite build`), `typecheck`
 | `src/components/road-view.tsx` | Canvas 2D road, ego-centered, interpolated between steps, with a DOM HUD and legend over it |
 | `src/components/twin-strip.tsx` | The unshielded twin under the road view |
 | `src/components/decision-strip.tsx` | One tick per step with an axis, hover card and the twin's violations; click to inspect |
-| `src/components/inspector-drawer.tsx` | Candidates, probability grid, facts, raw Jev exchange |
+| `src/components/inspector-drawer.tsx` | Candidates, probability grid, facts table, raw Jev exchange |
+| `src/components/facts-table.tsx` | One candidate's facts as labelled pairs and a lanes table |
 | `src/components/approval-queue.tsx` | The open escalation with approve, deny and override |
 | `src/components/constraint-panel.tsx` | Rules, presets, zones |
 | `src/components/threshold-band.tsx` | The two-handle threshold band |

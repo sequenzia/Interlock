@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { violatedRules } from "../format";
 import { ChevronDownIcon, CloseIcon } from "../icons";
 import { useStore } from "../store";
 import type { Preset } from "../types";
@@ -29,6 +30,13 @@ export function ConstraintPanel() {
   const fired = useMemo(() => {
     const counts = new Map<string, number>();
     for (const r of steps) if (r.fired_constraint) counts.set(r.fired_constraint, (counts.get(r.fired_constraint) ?? 0) + 1);
+    return counts;
+  }, [steps]);
+
+  // How often the action that ran broke each rule, by the ground-truth checkers. Fired is Jev's call; this is the checker's.
+  const violated = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of steps) for (const cid of violatedRules(r)) counts.set(cid, (counts.get(cid) ?? 0) + 1);
     return counts;
   }, [steps]);
 
@@ -79,6 +87,7 @@ export function ConstraintPanel() {
         <ul className="flex flex-col gap-1.5">
           {constraints.map((c) => {
             const n = fired.get(c.id) ?? 0;
+            const v = violated.get(c.id) ?? 0;
             return (
               <li
                 key={c.id}
@@ -114,6 +123,11 @@ export function ConstraintPanel() {
                     {n > 0 && (
                       <span className="num" title="steps where this rule decided the outcome">
                         fired {n}×
+                      </span>
+                    )}
+                    {v > 0 && (
+                      <span className="num text-blocked" title="steps where the action that ran broke this rule, by its checker">
+                        violated {v}×
                       </span>
                     )}
                   </div>

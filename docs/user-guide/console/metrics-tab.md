@@ -1,6 +1,6 @@
 # Metrics tab
 
-The "metrics" tab in the status strip replaces the console with the evaluation report: the measured effect of the shield over seeded episodes. The numbers are not from the episode you are watching. They come from `interlock eval`, see [Evaluation and results](../evaluation.md). While the tab is open the strip shows the report's generation time, seed count, thresholds and judge mode in place of the transport controls.
+The "metrics" tab in the status strip replaces the console with the evaluation report: the measured effect of the shield over seeded episodes. The numbers are not from the episode you are watching. They come from `interlock eval`, see [Evaluation and results](../evaluation.md). While the tab is open the strip shows the report's generation time, seed count, thresholds and judge mode in place of the source menu and transport controls.
 
 ![The metrics tab](../../assets/screenshots/metrics-tab.png)
 

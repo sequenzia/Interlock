@@ -56,8 +56,11 @@ test("the metrics view loads the evaluation report or says how to produce one", 
   await page.goto("/");
   await page.getByRole("tab", { name: "metrics" }).click();
   await expect(page.getByText(/violations per episode|No evaluation yet/i).first()).toBeVisible();
+  const source = page.getByRole("combobox", { name: "source: live or a logged run" });
+  await expect(source).toHaveCount(0);
   await page.getByRole("tab", { name: "console" }).click();
   await expect(page.getByText("ROAD VIEW", { exact: false })).toBeVisible();
+  await expect(source).toBeVisible();
 });
 
 test("the shortcuts overlay opens with ? and the density toggle scales the root", async ({ page }) => {

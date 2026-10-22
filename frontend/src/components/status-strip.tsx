@@ -278,7 +278,7 @@ export function StatusStrip() {
             </button>
           ))}
         </div>
-        <SourceMenu />
+        {view === "console" && <SourceMenu />}
         {session?.judge_mode === "mock" && <span className="badge border-fallback/50 text-fallback">jev mock</span>}
         {!connected && <span className="text-2xs text-blocked">reconnecting</span>}
       </div>
